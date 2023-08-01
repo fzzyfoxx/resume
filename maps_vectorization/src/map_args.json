@@ -1,0 +1,411 @@
+{
+ "random_grid_input": {
+  "legend_positions_range": [
+   1,
+   20
+  ],
+  "pattern_types_probs": {
+   "solid": 0.25,
+   "striped": 0.25,
+   "line_border": 0.25,
+   "line_filled": 0.25
+  },
+  "center_oversized_description_prob": 0.5,
+  "center_fitting_description_prob": 0.7,
+  "use_common_borderline4filled_prob": 0.5,
+  "use_any_borderline_prob": 0.5,
+  "put_text_label_on_pattern_prob": 0.5,
+  "use_common_text_label_prob": 0.5,
+  "show_common_borderline_on_pattern_prob": 0.5,
+  "height2width_ratio_range": [
+   0.3,
+   1.1
+  ],
+  "patterns_size_range": [
+   50,
+   120
+  ],
+  "no_space_between_prob": 0.2,
+  "vertical_space_size_range": [
+   5,
+   30
+  ],
+  "horizontal_space_size_range": [
+   4,
+   20
+  ],
+  "include_headlines_prob": 0.5,
+  "same_fontsize4headline_prob": 0.3,
+  "headline_fontsize_add_range": [
+   4,
+   10
+  ],
+  "headline_size_distr_args": [
+   5,
+   3
+  ],
+  "space_after_headline_range": [
+   5,
+   30
+  ],
+  "headline_padding_prob": 0.5,
+  "interline_size_range": [
+   0.0,
+   3.0
+  ],
+  "textbox_width_ratio_range": [
+   3.0,
+   6.0
+  ],
+  "description_words_distr_args": [
+   2.0,
+   3.0
+  ],
+  "font_size_range": [
+   10,
+   20
+  ],
+  "add_stroke_prob": 0.2,
+  "stroke_size_range": [
+   1,
+   3
+  ],
+  "uppercase_prob": 0.2,
+  "fonts_path": "./fonts/",
+  "one_column_prob": 0.5,
+  "max_columns_num_range": [
+   2,
+   8
+  ],
+  "space_between_columns_range": [
+   5,
+   25
+  ],
+  "rowwise_prob": 0.5,
+  "legend_vertical_padding_range": [
+   10,
+   100
+  ],
+  "legend_horizontal_padding_range": [
+   10,
+   80
+  ],
+  "frames_around_patterns_prob": 0.5,
+  "frames_around_patterns_thickness_range": [
+   2,
+   5
+  ],
+  "target_max_dim_size": 1200,
+  "fonts_list": [
+   "Changa-Regular.ttf",
+   "Anonymous_Pro_I.ttf",
+   "Aller_LtIt.ttf",
+   "Cantarell-BoldOblique.ttf",
+   "Caviar_Dreams_Bold.ttf",
+   "Aller_Bd.ttf",
+   "Changa-ExtraLight.ttf",
+   "Caudex-Italic.ttf",
+   "Caudex-BoldItalic.ttf",
+   "AbhayaLibre-Medium.ttf",
+   "AbhayaLibre-SemiBold.ttf",
+   "Anonymous_Pro_BI.ttf",
+   "AbhayaLibre-ExtraBold.ttf",
+   "adventpro-extralight.ttf",
+   "Changa-Bold.ttf",
+   "CaviarDreams.ttf",
+   "Cantarell-Oblique.ttf",
+   "Anonymous_Pro.ttf",
+   "Caudex-Regular.ttf",
+   "adventpro-medium.ttf",
+   "CaviarDreams_Italic.ttf",
+   "AbhayaLibre-Regular.ttf",
+   "Aller_Lt.ttf",
+   "Aller_Rg.ttf",
+   "Anonymous_Pro_B.ttf",
+   "Aller_BdIt.ttf",
+   "Changa-Medium.ttf",
+   "Cantarell-Regular.ttf",
+   "AbhayaLibre-Bold.ttf",
+   "Caudex-Bold.ttf",
+   "Aller_It.ttf",
+   "Changa-ExtraBold.ttf",
+   "CaviarDreams_BoldItalic.ttf",
+   "Changa-Light.ttf",
+   "Changa-SemiBold.ttf",
+   "AllerDisplay.ttf",
+   "Cantarell-Bold.ttf"
+  ]
+ },
+ "pattern_randomization_args_collection": {
+  "striped_randomize_args": {
+   "colors_num_probs": [
+    0.7,
+    0.3
+   ],
+   "width_on_pattern_ratio_range": [
+    0.15,
+    0.6
+   ],
+   "same_size_prob": 0.8,
+   "different_width_ratio_range": [
+    0.3,
+    0.8
+   ],
+   "angle_range": [
+    0,
+    180
+   ]
+  },
+  "line_filled_randomize_args": {
+   "light_limit": 200,
+   "line_size_range": [
+    1,
+    4
+   ],
+   "space_ratio_range": [
+    5,
+    15
+   ],
+   "angle_range": [
+    0,
+    180
+   ]
+  },
+  "line_border_randomize_args": {
+   "symbols_in_width_range": [
+    6,
+    12
+   ],
+   "minimum_symbol_width": 4,
+   "no_symbols_prob": 0.5,
+   "no_line_prob": 0.5,
+   "symbols_probs": {
+    "triangle": 0.3,
+    "rectangle": 0.4,
+    "circle": 0.3
+   },
+   "positive_side_prob": 0.5,
+   "on_line_prob": 0.3,
+   "height2width_ratio_range": [
+    0.5,
+    1.5
+   ],
+   "spacing2width_ratio_range": [
+    0.0,
+    4.0
+   ],
+   "filled_prob": 0.8,
+   "light_limit": 150,
+   "force_grayscale_prob": 0.5,
+   "lineshape_thickness_range": [
+    1,
+    3
+   ],
+   "solid_line_thickness_range": [
+    2,
+    6
+   ],
+   "solid_line_same_color_prob": 0.8,
+   "horizontal_pattern_prob": 0.6,
+   "horizontal_pattern_rel_position_range": [
+    0.4,
+    0.8
+   ],
+   "pattern_padding_range": [
+    4,
+    10
+   ]
+  },
+  "text_label_randomize_args": {
+   "text_label_length_range": [
+    2,
+    5
+   ],
+   "text_label_size_rel2height_ratio_range": [
+    0.3,
+    0.7
+   ],
+   "max_width_coverage": 0.6,
+   "fonts_path": "./fonts/",
+   "fonts_list": [
+    "Changa-Regular.ttf",
+    "Anonymous_Pro_I.ttf",
+    "Aller_LtIt.ttf",
+    "Cantarell-BoldOblique.ttf",
+    "Caviar_Dreams_Bold.ttf",
+    "Aller_Bd.ttf",
+    "Changa-ExtraLight.ttf",
+    "Caudex-Italic.ttf",
+    "Caudex-BoldItalic.ttf",
+    "AbhayaLibre-Medium.ttf",
+    "AbhayaLibre-SemiBold.ttf",
+    "Anonymous_Pro_BI.ttf",
+    "AbhayaLibre-ExtraBold.ttf",
+    "adventpro-extralight.ttf",
+    "Changa-Bold.ttf",
+    "CaviarDreams.ttf",
+    "Cantarell-Oblique.ttf",
+    "Anonymous_Pro.ttf",
+    "Caudex-Regular.ttf",
+    "adventpro-medium.ttf",
+    "CaviarDreams_Italic.ttf",
+    "AbhayaLibre-Regular.ttf",
+    "Aller_Lt.ttf",
+    "Aller_Rg.ttf",
+    "Anonymous_Pro_B.ttf",
+    "Aller_BdIt.ttf",
+    "Changa-Medium.ttf",
+    "Cantarell-Regular.ttf",
+    "AbhayaLibre-Bold.ttf",
+    "Caudex-Bold.ttf",
+    "Aller_It.ttf",
+    "Changa-ExtraBold.ttf",
+    "CaviarDreams_BoldItalic.ttf",
+    "Changa-Light.ttf",
+    "Changa-SemiBold.ttf",
+    "AllerDisplay.ttf",
+    "Cantarell-Bold.ttf"
+   ],
+   "special_characters": [
+    ".",
+    "/",
+    "\\",
+    ":",
+    "-"
+   ],
+   "special_character_prob": 0.5,
+   "all_uppercase_prob": 0.6,
+   "use_stroke_prob": 0.4,
+   "stroke_size_range": [
+    1,
+    5
+   ],
+   "grayscale_prob": 0.7,
+   "light_limit": 150,
+   "central_position_prob": 0.8,
+   "shift_range_rel2dim": [
+    -0.15,
+    0.15
+   ]
+  }
+ },
+ "map_drawing_randomize_args": {
+  "line_border_types_probs": {
+   "parcel_polygon": 0.6,
+   "random_polygon": 0.2,
+   "random_line": 0.2
+  },
+  "line_filled_types_probs": {
+   "parcel_polygon": 0.7,
+   "random_polygon": 0.3
+  },
+  "single_shape_prob": 0.5,
+  "multishape_range": [
+   2,
+   6
+  ]
+ },
+ "random_shapes_args": {
+  "radius_range": [
+   80,
+   350
+  ],
+  "quarter_vertices_range": [
+   1,
+   8
+  ],
+  "max_dim_coverage_ratio": 0.5,
+  "dim_diff_range": [
+   10,
+   200
+  ],
+  "edges_range": [
+   3,
+   10
+  ],
+  "min_distance": 15
+ },
+ "map_drawing_args": {
+  "draw_parcels_prob": 0.8,
+  "draw_background_prob": 0.8,
+  "grayscale_prob": 0.8,
+  "light_limit": 200,
+  "background_labels_prob": 0.7,
+  "background_labels_range": [
+   5,
+   30
+  ]
+ },
+ "map_background_label_randomize_args": {
+  "text_label_length_range": [
+   2,
+   5
+  ],
+  "text_label_size_rel2height_ratio_range": [
+   0.07,
+   0.015
+  ],
+  "max_width_coverage": 0.05,
+  "fonts_path": "./fonts/",
+  "fonts_list": [
+   "Changa-Regular.ttf",
+   "Anonymous_Pro_I.ttf",
+   "Aller_LtIt.ttf",
+   "Cantarell-BoldOblique.ttf",
+   "Caviar_Dreams_Bold.ttf",
+   "Aller_Bd.ttf",
+   "Changa-ExtraLight.ttf",
+   "Caudex-Italic.ttf",
+   "Caudex-BoldItalic.ttf",
+   "AbhayaLibre-Medium.ttf",
+   "AbhayaLibre-SemiBold.ttf",
+   "Anonymous_Pro_BI.ttf",
+   "AbhayaLibre-ExtraBold.ttf",
+   "adventpro-extralight.ttf",
+   "Changa-Bold.ttf",
+   "CaviarDreams.ttf",
+   "Cantarell-Oblique.ttf",
+   "Anonymous_Pro.ttf",
+   "Caudex-Regular.ttf",
+   "adventpro-medium.ttf",
+   "CaviarDreams_Italic.ttf",
+   "AbhayaLibre-Regular.ttf",
+   "Aller_Lt.ttf",
+   "Aller_Rg.ttf",
+   "Anonymous_Pro_B.ttf",
+   "Aller_BdIt.ttf",
+   "Changa-Medium.ttf",
+   "Cantarell-Regular.ttf",
+   "AbhayaLibre-Bold.ttf",
+   "Caudex-Bold.ttf",
+   "Aller_It.ttf",
+   "Changa-ExtraBold.ttf",
+   "CaviarDreams_BoldItalic.ttf",
+   "Changa-Light.ttf",
+   "Changa-SemiBold.ttf",
+   "AllerDisplay.ttf",
+   "Cantarell-Bold.ttf"
+  ],
+  "special_characters": [
+   ".",
+   "/",
+   "\\",
+   ":",
+   "-"
+  ],
+  "special_character_prob": 0.5,
+  "all_uppercase_prob": 0.6,
+  "use_stroke_prob": 0.2,
+  "stroke_size_range": [
+   1,
+   4
+  ],
+  "grayscale_prob": 0.7,
+  "light_limit": 150,
+  "central_position_prob": 0.0,
+  "shift_range_rel2dim": [
+   -0.5,
+   0.5
+  ]
+ }
+}
