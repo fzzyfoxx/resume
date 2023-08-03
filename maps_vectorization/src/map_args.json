@@ -22,8 +22,8 @@
    1.1
   ],
   "patterns_size_range": [
-   50,
-   120
+   80,
+   160
   ],
   "no_space_between_prob": 0.2,
   "vertical_space_size_range": [
@@ -62,8 +62,8 @@
    3.0
   ],
   "font_size_range": [
-   10,
-   20
+   14,
+   22
   ],
   "add_stroke_prob": 0.2,
   "stroke_size_range": [
@@ -222,10 +222,10 @@
     5
    ],
    "text_label_size_rel2height_ratio_range": [
-    0.3,
-    0.7
+    0.5,
+    0.8
    ],
-   "max_width_coverage": 0.6,
+   "max_width_coverage": 0.8,
    "fonts_path": "./fonts/",
    "fonts_list": [
     "Changa-Regular.ttf",
