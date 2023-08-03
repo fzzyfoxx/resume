@@ -324,8 +324,11 @@ class map_drawer:
             cross_line = shapely.get_geometry(cross_line, np.random.randint(0,geom_num))
         xs, ys = cross_line.xy
 
-        pos_x = int(np.mean(xs))
-        pos_y = int(np.mean(ys))
+        try:
+            pos_x = int(np.mean(xs))
+            pos_y = int(np.mean(ys))
+        except:
+            pos_x, pos_y = (0,0)
 
         return (pos_x, pos_y)
     

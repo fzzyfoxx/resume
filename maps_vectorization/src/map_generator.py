@@ -42,7 +42,7 @@ class clockwise_points:
     
     @staticmethod
     def _calc_angles(x,y):
-        angles = np.arctan(np.divide(y,x, out=np.zeros_like(x), where=y!=0))*180/math.pi
+        angles = np.arctan(np.divide(y,x, out=np.zeros_like(x), where=x!=0))*180/math.pi
         return angles+np.maximum(0,-angles).astype(np.bool8)*180
     
     @staticmethod
@@ -429,7 +429,7 @@ class full_map_generator:
         return np.concatenate([np.transpose(np.squeeze(shape[:self.max_vertices_num], axis=1), axes=[1,0]), np.zeros((2,verts_to_add), np.int32)], axis=1)
     
     def _prepare_label_for_shapes(self, patterns_info):
-        return tf.constant([np.reshape(self._shape_padding(shape),(-1)) for info in patterns_info for shape in info['map_args']['shapes']][:self.max_shapes_num], tf.float32)/self.target_size
+        return tf.constant([np.reshape(self._shape_padding(shape),(-1)) for info in patterns_info for shape in info['map_args']['shapes']][:self.max_shapes_num], tf.int32)
         
 
     def gen_full_map(self, ):
@@ -476,7 +476,7 @@ class full_map_generator:
             return img, patterns_info, legend_label, minimap_label
         elif self.output_type==1:
             shape_label = self._prepare_label_for_shapes(patterns_info)
-            return tf.constant(img, tf.float32), shape_label
+            return tf.constant(img, tf.uint8), shape_label
 
 ####
 
@@ -494,5 +494,5 @@ class map_generator_decoder:
         return tf.cast(img, tf.uint8).numpy()
     
     def decode_shape_output(self, tf_shapes):
-        coords = np.expand_dims((tf.transpose(tf.reshape(tf_shapes, (-1,2,self.max_vertices_num)), perm=[0,2,1])*self.target_size).numpy().astype(np.int32), axis=-2)
+        coords = np.expand_dims((tf.transpose(tf.reshape(tf_shapes, (-1,2,self.max_vertices_num)), perm=[0,2,1])).numpy().astype(np.int32), axis=-2)
         return [np.array([vert for vert in shape if np.all(vert)!=0]) for shape in coords]
