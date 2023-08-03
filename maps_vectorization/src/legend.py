@@ -1,3 +1,6 @@
+import os
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
 import numpy as np
 import spacy
 from PIL import Image, ImageFont, ImageDraw

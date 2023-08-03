@@ -1,15 +1,15 @@
+import os
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+from map_drawing import map_drawer_input_generator, map_drawer_arg_randomizer, map_drawer
+from legend import load_vocab, gen_random_legend_properties, draw_legend
+
 import numpy as np
 import math
 import shapely
 from PIL import Image, ImageFont, ImageDraw
 import json
 import tensorflow as tf
-
-from map_drawing import map_drawer_input_generator, map_drawer_arg_randomizer, map_drawer
-from legend import load_vocab, gen_random_legend_properties, draw_legend
-
-
-
 
 
 ####
@@ -477,3 +477,22 @@ class full_map_generator:
         elif self.output_type==1:
             shape_label = self._prepare_label_for_shapes(patterns_info)
             return tf.constant(img, tf.float32), shape_label
+
+####
+
+######### MAP GENERATOR DECODER ###########
+
+####
+
+class map_generator_decoder:
+    def __init__(self, cfg):
+        self.target_size = cfg.target_size
+        self.max_vertices_num = cfg.max_vertices_num
+        self.max_shapes_num = cfg.max_shapes_num
+
+    def decode_image(self, img):
+        return tf.cast(img, tf.uint8).numpy()
+    
+    def decode_shape_output(self, tf_shapes):
+        coords = np.expand_dims((tf.transpose(tf.reshape(tf_shapes, (-1,2,self.max_vertices_num)), perm=[0,2,1])*self.target_size).numpy().astype(np.int32), axis=-2)
+        return [np.array([vert for vert in shape if np.all(vert)!=0]) for shape in coords]
