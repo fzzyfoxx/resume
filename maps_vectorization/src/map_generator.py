@@ -10,6 +10,7 @@ import shapely
 from PIL import Image, ImageFont, ImageDraw
 import json
 import tensorflow as tf
+import cv2 as cv
 
 
 ####
@@ -361,7 +362,7 @@ class map_concatenation:
 
 
 class full_map_generator:
-    def __init__(self, cfg, map_args_path, minimap_args_path, map_concatenation_args_path, parcel_input_args_path, bigquery_client):
+    def __init__(self, cfg, vocab, map_args_path, minimap_args_path, map_concatenation_args_path, parcel_input_args_path, bigquery_client):
 
         self.map_args = self._load_args(map_args_path)
         self.minimap_args = self._load_args(minimap_args_path)
@@ -370,9 +371,10 @@ class full_map_generator:
         map_concatenation_args['target_size'] = cfg.target_size
         self.mc = map_concatenation(map_concatenation_args)
 
-        self.vocab = load_vocab()
+        self.vocab = vocab
 
-        self.map_input_gen = map_drawer_input_generator(bigquery_client, self._load_args(parcel_input_args_path), batch_size=cfg.parcel_input_batch_size)
+        self.map_input_gen = map_drawer_input_generator(bigquery_client, self._load_args(parcel_input_args_path), batch_size=cfg.parcel_input_batch_size,
+                                                        test_mode=cfg.test_mode)
 
         self.map_arg_randomizer = map_drawer_arg_randomizer(**self.map_args['map_drawing_randomize_args'])
         self.minimap_arg_randomizer = map_drawer_arg_randomizer(**self.minimap_args['map_drawing_randomize_args'])
@@ -430,13 +432,19 @@ class full_map_generator:
     
     def _prepare_label_for_shapes(self, patterns_info):
         return tf.constant([np.reshape(self._shape_padding(shape),(-1)) for info in patterns_info for shape in info['map_args']['shapes']][:self.max_shapes_num], tf.int32)
-        
+    
+    def _prepare_edge_mask(self, patterns_info):
+        edge_mask = np.zeros((self.target_size, self.target_size,1), np.uint8)
+        pts = [shape for info in patterns_info for shape in info['map_args']['shapes']]
+        cv.polylines(edge_mask, pts, False, 1, 1)
+        return edge_mask
 
     def gen_full_map(self, ):
         '''
             output_types:
             #0 - test mode - returns numpy map image, patterns_info and dicts for position of legend and minimap
             #1 - shapes detection - returns only tf image and tensor with vertices coordinates with format [x,x,x,0,0,...,y,y,y,0,0,...] 
+            #2 - edge detection - returns map shaped image with value of 1 for edges and 0 for any other pixels
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -477,6 +485,9 @@ class full_map_generator:
         elif self.output_type==1:
             shape_label = self._prepare_label_for_shapes(patterns_info)
             return tf.constant(img, tf.uint8), shape_label
+        elif self.output_type==2:
+            edge_mask = self._prepare_edge_mask(patterns_info)
+            return tf.constant(img, tf.uint8), tf.constant(edge_mask, tf.uint8)
 
 ####
 

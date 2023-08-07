@@ -7,6 +7,7 @@ import pyproj
 import shapely
 import numpy as np
 import math
+import random
 from PIL import Image, ImageFont, ImageDraw
 from patterns import text_label_randomization, gen_colors, drawing_patterns
 import copy
@@ -20,10 +21,11 @@ import cv2 as cv
 ####
 
 class map_drawer_input_generator:
-    def __init__(self, client, randomize_args, batch_size):
+    def __init__(self, client, randomize_args, batch_size, test_mode):
         self.client = client
         self.randomize_args = randomize_args
         self.batch_size = batch_size
+        self.test_mode = test_mode
 
         self.query = '''
                 with a as (
@@ -43,6 +45,9 @@ class map_drawer_input_generator:
         
         # transform from CRS 4326 to 2180
         self.project_to_pl = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), pyproj.CRS('EPSG:2180'), always_xy=True).transform
+
+        # prepare first batch input
+        self.download_batch()
 
     @staticmethod
     def _get_randomized_params(batch_size, radius_range, target_map_size_range, padding_range):
@@ -91,14 +96,18 @@ class map_drawer_input_generator:
         parcels = parcels.groupby('group_id')['geom'].apply(list).to_list()
 
         # prepare examples collections
-        parcels = [self._prepare_example(*example_set) for example_set in zip(parcels, target_map_sizes, paddings)]
-        self.batch_iter = iter(zip(parcels, parcels[::-1]))
+        self.parcels = [self._prepare_example(*example_set) for example_set in zip(parcels, target_map_sizes, paddings)]
+        self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
 
     def __next__(self):
         try:
             return next(self.batch_iter)
         except:
-            self.download_batch()
+            if self.test_mode:
+                random.shuffle(self.parcels)
+                self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
+            else:
+                self.download_batch()
             return next(self.batch_iter)
 
 
