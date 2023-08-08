@@ -405,6 +405,9 @@ class full_map_generator:
         patterns_info = legend_drawer.get_pattern_info()
 
         return img, patterns_info
+    
+    def reload_parcel_inputs(self,):
+        self.map_input_gen.download_batch()
 
     def _gen_map_img(self, patterns_info, drawing_arg_randomizer, random_shapes_args, map_drawing_args, map_background_label_randomize_args, parcels_example, background_example):
 
@@ -487,7 +490,7 @@ class full_map_generator:
             return tf.constant(img, tf.uint8), shape_label
         elif self.output_type==2:
             edge_mask = self._prepare_edge_mask(patterns_info)
-            return tf.constant(img, tf.uint8), tf.constant(edge_mask, tf.uint8)
+            return tf.constant(img, tf.float32)/255, tf.constant(edge_mask, tf.float32)
 
 ####
 
