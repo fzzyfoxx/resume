@@ -12,6 +12,7 @@ from PIL import Image, ImageFont, ImageDraw
 from patterns import text_label_randomization, gen_colors, drawing_patterns
 import copy
 import cv2 as cv
+import warnings
 
 
 ####
@@ -247,10 +248,12 @@ class shapes_generator:
                 if len(line_points)>2:
                     curr_linestring = shapely.LineString(line_points[:-1])
                     new_line = shapely.LineString([starting_point, new_point])
-                    if shapely.distance(curr_linestring, new_line)>self.min_distance:
-                        line_points.append(new_point)
-                        starting_point = new_point
-                        break
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        if shapely.distance(curr_linestring, new_line)>self.min_distance:
+                            line_points.append(new_point)
+                            starting_point = new_point
+                            break
                 else:
                     line_points.append(new_point)
                     starting_point = new_point
