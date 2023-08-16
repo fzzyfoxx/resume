@@ -5,6 +5,7 @@ from google.cloud import bigquery
 from google.auth import default
 import pyproj
 import shapely
+from shapely import ops
 import numpy as np
 import math
 import random
@@ -59,7 +60,7 @@ class map_drawer_input_generator:
         return radius, target_map_sizes, paddings
 
     def _convert_geom(self, wkt):
-        shape = shapely.ops.transform(self.project_to_pl, wkt)
+        shape = ops.transform(self.project_to_pl, wkt)
         return np.array([[x,y] for x,y in zip(*shape.exterior.xy)])
     
     @staticmethod
