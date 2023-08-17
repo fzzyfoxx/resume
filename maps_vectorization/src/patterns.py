@@ -334,7 +334,7 @@ class drawing_patterns:
         self.fill_pattern_funcs[pattern_style['pattern_type']](**fill_args)
 
         if shape_only_paste:
-            self.pattern_img = np.ones(self.pattern_size[::-1]+(3,), dtype=np.uint8)*255+(self.pattern_img+1)*self._shape_based_mask(pts)
+            self.pattern_img = np.ones(tuple([max(1,d) for d in self.pattern_size[::-1]])+(3,), dtype=np.uint8)*255+(self.pattern_img+1)*self._shape_based_mask(pts)
 
         if padding>0:
             self._white_frame(padding)
@@ -374,8 +374,13 @@ class drawing_patterns:
         return (mask*255).astype(np.uint8)
     
     def _shape_based_mask(self, pts):
-        mask = np.zeros(self.pattern_size[::-1]+(1,), np.uint8)
-        cv.fillPoly(mask, [pts],(1))
+        mask = np.zeros(tuple([max(1,d) for d in self.pattern_size[::-1]])+(1,), np.uint8)
+        try:
+            cv.fillPoly(mask, [pts],(1))
+        except Exception as e:
+            print(e)
+            print(pts)
+            print(mask.shape)
         return mask
         
 
