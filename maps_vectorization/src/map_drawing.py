@@ -319,12 +319,19 @@ class map_drawer:
             elif shape_type=='random_line':
                 info['map_args']['shapes'] = [self.shape_generator.random_line() for _ in range(shapes_num)]
 
+    @staticmethod
+    def _safe_mean(x):
+        if np.all(np.isnan(x)):
+            return 0
+        else:
+            return np.nanmean(x)
+
     def _random_text_label_position4polygon(self, pts):
         corner = np.min(pts, axis=0)
         x0, y0 = [0,0]
         x1, y1 = np.max(pts, axis=0)[0]-corner[0]
 
-        y_l, y_r = np.random.randint(y0, y1, 2)
+        y_l, y_r = y0 + (np.random.uniform(0, 1, 2)*y1).astype(np.int32)
         cross_line = shapely.LineString([[x0,y_l],[x1,y_r]])
         shape = shapely.Polygon(np.squeeze(pts, axis=1)-corner)
 
@@ -338,8 +345,8 @@ class map_drawer:
         xs, ys = cross_line.xy
 
         try:
-            pos_x = int(np.mean(xs))
-            pos_y = int(np.mean(ys))
+            pos_x = int(self._safe_mean(xs))#int(np.nanmean(xs))
+            pos_y = int(self._safe_mean(ys))#int(np.nanmean(ys))
         except:
             pos_x, pos_y = (0,0)
 
