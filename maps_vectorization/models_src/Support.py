@@ -1,6 +1,12 @@
 import tensorflow as tf
 import keras_tuner as kt
 import mlflow
+from matplotlib import pyplot as plt
+import cv2 as cv
+import os
+import time
+import src.map_generator as mg
+import numpy as np
 
 mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
 
@@ -106,3 +112,155 @@ class BuildHyperModel(kt.HyperModel):
                 return model.fit(*args, callbacks=callbacks, **kwargs)
         else:
             return model.fit(*args, callbacks=callbacks, **kwargs)
+        
+
+def _bytes_feature(value):
+    """Returns a bytes_list from a string / byte."""
+    if isinstance(value, type(tf.constant(0))):
+        value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def serialize_example(features, label):
+
+
+    feature = {
+        'features': _bytes_feature(tf.io.serialize_tensor(features)),
+        'label': _bytes_feature(tf.io.serialize_tensor(label))
+    }
+
+    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example_proto.SerializeToString()
+
+def tf_serialize_example(features, label):
+    tf_string = tf.py_function(serialize_example, [features, label], tf.string)
+    return tf.reshape(tf_string, ())
+
+feature_description = {
+    'features': tf.io.FixedLenFeature([], tf.string),
+    'label': tf.io.FixedLenFeature([], tf.string)
+}
+
+def _parse_function(example_proto, dtypes):
+    features, label = tf.io.parse_single_example(example_proto, feature_description).values()
+
+    features = tf.io.parse_tensor(features, dtypes[0])
+    label = tf.io.parse_tensor(label, dtypes[1])
+
+    return features, label
+
+
+class DatasetGenerator:
+    def __init__(self, cfg, map_generator):
+        self.cfg = cfg
+
+        self.fmg = map_generator
+
+        self.output_types = {
+            '1': {'output': [tf.uint8, tf.int32], 'label_shape': (None, self.cfg.max_vertices_num*2)},
+            '2': {'output': [tf.float32, tf.float32], 'label_shape': (self.cfg.target_size, self.cfg.target_size, 1)}
+        }
+
+        self.map_decoder = mg.map_generator_decoder(cfg)
+
+    @tf.function
+    def _gen_images(self, *args):
+        '''
+            Uses full_map_generator_class to produce feature image and coresponding label
+
+            In the second part shapes are set
+        '''
+        output_args = self.output_types[str(self.cfg.output_type)]
+        features, label = tf.py_function(self.fmg.gen_full_map, [], output_args['output'])
+
+        return features, label
+    
+    @tf.function
+    def _set_shapes(self, features, label):
+        # shapes definition
+        output_args = self.output_types[str(self.cfg.output_type)]
+        features.set_shape((self.cfg.target_size, self.cfg.target_size, 3))
+        label.set_shape(output_args['label_shape'])
+
+        return features, label
+    
+    def save_tfrec_dataset(self, folds_num=1, path='./datasets/train'):
+        if not os.path.exists(path):
+            os.mkdir(path)
+        for fold in range(folds_num):
+            self.fmg.reload_parcel_inputs()
+            self.new_dataset(repeat=False, from_saved=False, batch=False)
+
+            self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
+            print(f'\n\033[1msaving fold {fold+1}/{folds_num}\033[0m')
+            pb = tf.keras.utils.Progbar(self.cfg.fold_size)
+            with tf.io.TFRecordWriter(f'{path}/ds-{fold}.tfrec') as writer:
+                for feature, label in self.ds_iter:
+                    writer.write(serialize_example(feature, label))
+                    pb.add(1)
+
+    def new_dataset(self, repeat=True, from_saved=False, batch=True, ds_path='./datasets/train'):
+        '''
+            create new random dataset based on cfg parameters
+            number of rows is defined by cfg.fold_size
+            returns tf.data.Dataset object
+        '''
+        print('\n\033[1mGenerate new dataset\033[0m')
+        if not from_saved:
+            ds = tf.data.Dataset.range(self.cfg.fold_size)
+            ds = ds.map(self._gen_images, num_parallel_calls=self.cfg.num_parallel_calls)
+        else:
+            output_types = self.output_types[str(self.cfg.output_type)]['output']
+            ds_files = [os.path.join(ds_path, filename) for filename in os.listdir(ds_path)]
+            ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.cfg.num_parallel_calls)
+            ds = ds.map(lambda x: _parse_function(x, output_types), num_parallel_calls=self.cfg.num_parallel_calls)
+        
+        ds = ds.map(self._set_shapes, num_parallel_calls=self.cfg.num_parallel_calls)
+        if batch:
+            if self.cfg.output_type==1:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], [self.cfg.max_shapes_num, self.cfg.max_vertices_num*2]), padding_values=(np.uint8(255), 0))
+            elif self.cfg.output_type==2:
+                ds = ds.batch(self.cfg.ds_batch_size)
+        if repeat:
+            ds = ds.repeat()
+        self.ds = ds
+        self.ds_iter = iter(ds)
+
+    def dataset_speed_test(self,test_iters=20):
+        print('\n\033[1mDataset generator speed test\033[0m')
+        start_time = time.time()
+        for _ in range(test_iters):
+            _ = next(self.ds_iter)
+        proc_time = time.time()-start_time
+
+        print('time per batch: %.3fs | time per example: %.3fs' % (proc_time/test_iters,proc_time/(self.cfg.ds_batch_size*test_iters)))
+
+    def decode_and_draw(self, img, label):
+        decoded_shapes = self.map_decoder.decode_shape_output(label)
+        decoded_img = self.map_decoder.decode_image(img)
+
+        cv.polylines(decoded_img, decoded_shapes, False, (200,0,0), 5)
+        plt.figure(figsize=(10,10))
+        plt.imshow(decoded_img)
+
+    def test_output(self,):
+        print('\n\033[1mDataset output test\033[0m')
+        output_type = self.cfg.output_type
+        if output_type==1:
+            img, label = next(self.ds_iter)
+            print(img.shape, label.shape)
+            self.decode_and_draw(img[0], label[0])
+        elif output_type==2:
+            img, label = next(self.ds_iter)
+            print(img.shape, label.shape)
+
+            plt.figure(figsize=(10,10))
+            plt.imshow(img[0])
+            plt.imshow(label[0], alpha=0.5, cmap='gray')
+
+    @staticmethod
+    def delete_dataset(path):
+        os.system(f'rm -r {path}')
+
+    @staticmethod
+    def get_ds_sizes(path):
+        ['{}: {:.3f} MB'.format(filename, os.path.getsize(os.path.join(path, filename))*1e-6) for filename in os.listdir(path)]
