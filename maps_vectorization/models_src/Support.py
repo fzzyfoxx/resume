@@ -7,6 +7,10 @@ import os
 import time
 import src.map_generator as mg
 import numpy as np
+from google.cloud import storage
+
+storage_client = storage.Client()
+
 
 mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
 
@@ -148,6 +152,14 @@ def _parse_function(example_proto, dtypes):
 
     return features, label
 
+def create_path_if_needed(path):
+    folders = os.path.split(path)
+    curr_path = ''
+    for folder in folders:
+        curr_path = os.path.join(curr_path, folder)
+        if not os.path.exists(curr_path):
+            os.mkdir(curr_path)
+
 
 class DatasetGenerator:
     def __init__(self, cfg, map_generator):
@@ -183,9 +195,9 @@ class DatasetGenerator:
 
         return features, label
     
-    def save_tfrec_dataset(self, folds_num=1, path='./datasets/train'):
-        if not os.path.exists(path):
-            os.mkdir(path)
+    def save_tfrec_dataset(self, folds_num=1, starting_num=0, ds_path='./datasets/train'):
+        create_path_if_needed(ds_path)
+
         for fold in range(folds_num):
             self.fmg.reload_parcel_inputs()
             self.new_dataset(repeat=False, from_saved=False, batch=False)
@@ -193,10 +205,42 @@ class DatasetGenerator:
             self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
             print(f'\n\033[1msaving fold {fold+1}/{folds_num}\033[0m')
             pb = tf.keras.utils.Progbar(self.cfg.fold_size)
-            with tf.io.TFRecordWriter(f'{path}/ds-{fold}.tfrec') as writer:
+            with tf.io.TFRecordWriter(f'{ds_path}/ds-{fold+starting_num}.tfrec') as writer:
                 for feature, label in self.ds_iter:
                     writer.write(serialize_example(feature, label))
                     pb.add(1)
+
+    def upload_dataset_to_storage(self, name, ds_path='./datasets/train'):
+        bucket_name = storage_client.project + name
+        ds_files = [(os.path.join(ds_path, filename), filename) for filename in os.listdir(ds_path)]
+
+        # create if neede and get bucket
+        try:
+            bucket = storage_client.get_bucket(bucket_name)
+        except:
+            bucket = storage_client.create_bucket(storage_client.bucket(bucket_name), location='eu')
+
+        pb = tf.keras.utils.Progbar(len(ds_files))
+        for filepath, filename in ds_files:
+            blob = bucket.blob(filename)
+            blob.upload_from_filename(filepath)
+            pb.add(1)
+
+    def download_dataset_from_storage(self, name, ds_path='./datasets/train'):
+        create_path_if_needed(ds_path)
+        bucket_name = storage_client.project + name
+        bucket = storage_client.get_bucket(bucket_name)
+        blobs = [blob.name for blob in bucket.list_blobs()]
+        ds_files = [(os.path.join(ds_path, filename), filename) for filename in blobs]
+
+        pb = tf.keras.utils.Progbar(len(ds_files))
+        for filepath, blob_name in ds_files:
+            bucket.blob(blob_name).download_to_filename(filepath)
+            pb.add(1)
+
+    def delete_bucket(self, name):
+        bucket_name = storage_client.project + name
+        storage_client.get_bucket(bucket_name).delete(force=True)
 
     def new_dataset(self, repeat=True, from_saved=False, batch=True, ds_path='./datasets/train'):
         '''
