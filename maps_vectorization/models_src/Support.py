@@ -8,6 +8,7 @@ import time
 import src.map_generator as mg
 import numpy as np
 from google.cloud import storage
+import shutil
 
 storage_client = storage.Client()
 
@@ -241,6 +242,7 @@ class DatasetGenerator:
     def delete_bucket(self, name):
         bucket_name = storage_client.project + name
         storage_client.get_bucket(bucket_name).delete(force=True)
+
 
     def new_dataset(self, repeat=True, from_saved=False, batch=True, ds_path='./datasets/train'):
         '''
