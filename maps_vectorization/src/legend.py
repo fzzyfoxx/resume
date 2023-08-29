@@ -276,12 +276,17 @@ class draw_legend:
 
         self.pattern_randomizer = pattern_randomization(legend_properties, **pattern_randomization_args_collection)
 
+    @staticmethod
+    def _get_font_size(font, text, spacing=1):
+        bbox = ImageDraw((0,0), text, font=font, spacing=spacing)
+        return (bbox[2]-bbox[0], bbox[3]-bbox[1])
+
     def _generate_textbox(self, words_count, text_type, max_textbox_width, pattern_style):
         
         font = self.font if text_type=='description' else self.headline_font
         
         words = [self.vocab[i] for i in np.random.randint(0,self.vocab_size, words_count)]
-        words_width = [font.getsize(t+' ')[0] for t in words]
+        words_width = [self._get_font_size(font, t+' ')[0] for t in words]
 
         rows_collection = []
         rows_widths = []
@@ -307,7 +312,7 @@ class draw_legend:
             sentence = sentence.upper()
 
         
-        textbox_size = [int(x) for x in font.getsize_multiline(sentence, spacing=self.args['interline_size'])]
+        textbox_size = [int(x) for x in self._get_font_size(font, sentence, spacing=self.args['interline_size'])] #font.getsize_multiline(sentence, spacing=self.args['interline_size'])
 
         cell_height = max(textbox_size[1] + (self.args['space_after_headline'] if text_type=='headline' else self.args['patterns_vertical_space']), 
                           ((self.args['pattern_height'] + self.args['patterns_vertical_space']) if text_type=='description' else 0))

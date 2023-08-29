@@ -5,10 +5,10 @@
    20
   ],
   "pattern_types_probs": {
-   "solid": 0.25,
-   "striped": 0.25,
-   "line_border": 0.25,
-   "line_filled": 0.25
+   "solid": 0.0,
+   "striped": 0.0,
+   "line_border": 0.0,
+   "line_filled": 1.0
   },
   "center_oversized_description_prob": 0.5,
   "center_fitting_description_prob": 0.7,

@@ -364,7 +364,11 @@ class drawing_patterns:
             self.masks.append(mask)
             mask = Image.fromarray(mask, mode='L')
 
-        self.img.paste(Image.fromarray(self.pattern_img, mode='RGB'), xy, mask)
+        try:
+            self.img.paste(Image.fromarray(self.pattern_img, mode='RGB'), xy, mask)
+        except:
+            print(xy)
+            ValueError("paste img error")
 
 
     def _white_background_mask(self, pattern_color=(200,200,200)):
@@ -413,8 +417,12 @@ class drawing_patterns:
     def _draw_text_label(self, label_text, font, color, stroke, pos, **kwargs):
         img = Image.fromarray(self.pattern_img)
         draw = ImageDraw.Draw(img)
-        draw.text(pos, label_text, fill=color, align='center', anchor='mm', stroke_width=stroke, stroke_fill=(np.random.randint(245,256),)*3,
-                    font=font)
+        try:
+            draw.text(pos, label_text, fill=color, align='center', anchor='mm', stroke_width=stroke, stroke_fill=(np.random.randint(245,256),)*3,
+                        font=font)
+        except:
+            print(pos)
+            ValueError('draw text error')
         
         self.pattern_img = np.array(img)
 
