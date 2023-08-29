@@ -278,8 +278,9 @@ class draw_legend:
 
     @staticmethod
     def _get_font_size(font, text, spacing=1):
-        bbox = ImageDraw((0,0), text, font=font, spacing=spacing)
-        return (bbox[2]-bbox[0], bbox[3]-bbox[1])
+        '''bbox = font.getbbox(text, spacing=spacing)
+        return (bbox[2]-bbox[0], bbox[3]-bbox[1])'''
+        return font.getsize_multiline(text, spacing=spacing)
 
     def _generate_textbox(self, words_count, text_type, max_textbox_width, pattern_style):
         

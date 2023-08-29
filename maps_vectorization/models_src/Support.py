@@ -170,7 +170,8 @@ class DatasetGenerator:
 
         self.output_types = {
             '1': {'output': [tf.uint8, tf.int32], 'label_shape': (None, self.cfg.max_vertices_num*2)},
-            '2': {'output': [tf.float32, tf.float32], 'label_shape': (self.cfg.target_size, self.cfg.target_size, 1)}
+            '2': {'output': [tf.float32, tf.float32], 'label_shape': (self.cfg.target_size, self.cfg.target_size, 1)},
+            '3': {'output': [tf.float32, tf.float32], 'label_shape': (None, self.cfg.target_size, self.cfg.target_size, 1)}
         }
 
         self.map_decoder = mg.map_generator_decoder(cfg)
@@ -266,6 +267,8 @@ class DatasetGenerator:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], [self.cfg.max_shapes_num, self.cfg.max_vertices_num*2]), padding_values=(np.uint8(255), 0))
             elif self.cfg.output_type==2:
                 ds = ds.batch(self.cfg.ds_batch_size)
+            elif self.cfg.output_type==3:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], [self.cfg.max_shapes_num]+[self.cfg.target_size]*2+[1]), padding_values=(0.0, 0.0))
         if repeat:
             ds = ds.repeat()
         self.ds = ds
