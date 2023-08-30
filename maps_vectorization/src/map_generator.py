@@ -441,6 +441,24 @@ class full_map_generator:
         pts = [shape for info in patterns_info for shape in info['map_args']['shapes']]
         cv.polylines(edge_mask, pts, False, 1, 1)
         return edge_mask
+    
+    def _gen_labels_masks(self, patterns_info):
+        labels = []
+        for info in patterns_info:
+
+            if info['map_args']['shape_type']=='random_line':
+                drawing_kwargs = {'thickness': 1, 'isClosed': False}  
+                drawing_func = cv.polylines
+            else: 
+                drawing_kwargs = {}
+                drawing_func = cv.fillPoly
+            
+            label = np.zeros((self.target_size, self.target_size, 1))
+            for shape in info['map_args']['shapes']:  
+                drawing_func(label, [shape], color=1, **drawing_kwargs)
+            labels.append(label)
+
+        return labels
 
     def gen_full_map(self, ):
         '''
@@ -493,20 +511,7 @@ class full_map_generator:
             edge_mask = self._prepare_edge_mask(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.constant(edge_mask, tf.float32)
         elif self.output_type==3:
-            labels = []
-            for info in patterns_info:
-
-                if info['map_args']['shape_type']=='random_line':
-                    drawing_kwargs = {'thickness': 1, 'isClosed': False}  
-                    drawing_func = cv.polylines
-                else: 
-                    drawing_kwargs = {}
-                    drawing_func = cv.fillPoly
-                    
-                for shape in info['map_args']['shapes']:
-                    label = np.zeros((self.target_size, self.target_size, 1))
-                    drawing_func(label, [shape], color=1, **drawing_kwargs)
-                    labels.append(label)
+            labels = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.constant(labels, tf.float32)
 
 ####
