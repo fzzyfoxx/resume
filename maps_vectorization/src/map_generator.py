@@ -453,12 +453,12 @@ class full_map_generator:
                 drawing_kwargs = {}
                 drawing_func = cv.fillPoly
             
-            label = np.zeros((self.target_size, self.target_size, 1))
-            for shape in info['map_args']['shapes']:  
+            for shape in info['map_args']['shapes']:
+                label = np.zeros((self.target_size, self.target_size, 1))  
                 drawing_func(label, [shape], color=1, **drawing_kwargs)
-            labels.append(label)
+                labels.append(label)
 
-        return labels
+        return labels[:self.max_shapes_num]
 
     def gen_full_map(self, ):
         '''
@@ -512,7 +512,7 @@ class full_map_generator:
             return tf.constant(img, tf.float32)/255, tf.constant(edge_mask, tf.float32)
         elif self.output_type==3:
             labels = self._gen_labels_masks(patterns_info)
-            return tf.constant(img, tf.float32)/255, tf.constant(labels, tf.float32)
+            return tf.constant(img, tf.float32)/255, tf.cast(tf.concat(labels, axis=-1), tf.float32)
 
 ####
 

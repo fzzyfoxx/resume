@@ -122,6 +122,8 @@ class SegNet(tf.keras.Model):
                  padding='same', 
                  pool_size=(2,2), 
                  aggregation_type=None,
+                 output_filters=1,
+                 output_activation='sigmoid',
                  **kwargs):
         super(SegNet, self).__init__(self, **kwargs)
 
@@ -146,7 +148,9 @@ class SegNet(tf.keras.Model):
                                                 name='DecoderConv-'+str(n)
                                                 ) for n, conv_num in enumerate(convs_schema)][::-1]
         
-        self.aggr = tf.keras.layers.Conv2D(1, 1, padding='same') if aggregation_type==None else ChannelPooling(type=aggregation_type)
+        self.aggr = tf.keras.layers.Conv2D(output_filters, 1, padding='same') if aggregation_type==None else ChannelPooling(type=aggregation_type)
+
+        self.output_activation = tf.keras.layers.Activation(output_activation)
         
         self.call(tf.keras.layers.Input(input_shape))
 
@@ -165,5 +169,5 @@ class SegNet(tf.keras.Model):
 
         x = self.aggr(x)
  
-        x = tf.keras.layers.Activation('sigmoid')(x)
+        x = self.output_activation(x)
         return x
