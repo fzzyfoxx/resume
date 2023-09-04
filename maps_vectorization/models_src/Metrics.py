@@ -67,7 +67,7 @@ class HungarianLoss(tf.keras.losses.Loss):
         self.loss_func = loss_func
 
     def call(self, y_true, y_pred):
-
+        y_true = tf.cast(y_true, tf.float32)
         match_idxs = tf.stop_gradient(self.hungarian_matching(y_true, y_pred))
         y_true = tf.gather(y_true, match_idxs[:,:,1], batch_dims=1, axis=-1)
         y_pred = tf.gather(y_pred, match_idxs[:,:,0], batch_dims=1, axis=-1)
@@ -85,6 +85,7 @@ class HungarianClassificationMetric(tf.keras.metrics.Metric):
         self.iterations = self.add_weight(name=name+'_iters', initializer='zeros')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.cast(y_true, tf.float32)
         shape = tf.shape(y_true)
         B, H, W, T = shape[0], shape[1], shape[2], shape[3]
 

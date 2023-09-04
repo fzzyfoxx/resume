@@ -512,7 +512,7 @@ class full_map_generator:
             return tf.constant(img, tf.float32)/255, tf.constant(edge_mask, tf.float32)
         elif self.output_type==3:
             labels = self._gen_labels_masks(patterns_info)
-            return tf.constant(img, tf.float32)/255, tf.cast(tf.concat(labels, axis=-1), tf.float32)
+            return tf.constant(img, tf.float32)/255, tf.cast(tf.concat(labels, axis=-1), tf.bool)
 
 ####
 
