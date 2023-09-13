@@ -1,7 +1,7 @@
 {
  "radius_range": [
   200,
-  800
+  400
  ],
  "target_map_size_range": [
   1500,

@@ -45,6 +45,7 @@ def gen_random_position_properties(pattern_type, use_common_borderline4filled_pr
 
 def gen_random_legend_properties(
         legend_positions_range,
+        single_pattern_type,
         pattern_types_probs,
         center_oversized_description_prob,
         center_fitting_description_prob,
@@ -92,7 +93,10 @@ def gen_random_legend_properties(
 
     # generate random patterns
     pattern_types, pattern_probs = np.transpose(np.array([[key, pattern_types_probs[key]] for key in pattern_types_probs.keys()], dtype='object'), axes=[1,0])
-    patterns_order = np.random.choice(pattern_types, size=legend_positions, p=pattern_probs.astype(np.float32))
+    if single_pattern_type:
+        patterns_order = np.repeat(np.random.choice(pattern_types, size=1, p=pattern_probs.astype(np.float32)), legend_positions, axis=0)
+    else:
+        patterns_order = np.random.choice(pattern_types, size=legend_positions, p=pattern_probs.astype(np.float32))
 
     # add common borderline pattern
     if separate_pattern4common_borderline:

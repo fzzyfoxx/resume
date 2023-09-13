@@ -365,6 +365,8 @@ class full_map_generator:
     def __init__(self, cfg, vocab, map_args_path, minimap_args_path, map_concatenation_args_path, parcel_input_args_path, bigquery_client):
 
         self.map_args = self._load_args(map_args_path)
+        if cfg.output_type==4:
+            self.map_args['random_grid_input']['single_pattern_type'] = 1
         self.minimap_args = self._load_args(minimap_args_path)
         
         map_concatenation_args = self._load_args(map_concatenation_args_path)
@@ -467,6 +469,7 @@ class full_map_generator:
             #1 - shapes detection - returns only tf image and tensor with vertices coordinates with format [x,x,x,0,0,...,y,y,y,0,0,...] 
             #2 - edge detection - returns map shaped image with value of 1 for edges and 0 for any other pixels
             #3 - shapes masks - returns N binary masks for N shapes
+            #4 - single pattern type classification - returns class of pattern type in one-hot format
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -513,6 +516,10 @@ class full_map_generator:
         elif self.output_type==3:
             labels = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.cast(tf.concat(labels, axis=-1), tf.bool)
+        elif self.output_type==4:
+            pattern_type = patterns_info[0]['pattern_style']['pattern_type']
+            label = [int(pattern_type==key) for key in self.map_args['random_grid_input']['pattern_types_probs'].keys()]
+            return tf.constant(img, tf.float32)/255, tf.constant(label, tf.float32)
 
 ####
 
