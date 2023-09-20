@@ -78,13 +78,3 @@ class UNet(tf.keras.Model):
             x = upconv([x, x_saved])
 
         return self.final_conv(x)
-    
-class SmoothOutput(tf.keras.layers.Layer):
-    def __init__(self, epsilon=1e-6, **kwargs):
-        super(SmoothOutput, self).__init__(**kwargs)
-
-        self.epsilon = epsilon
-
-    def call(self, x, training=False):
-        x = tf.clip_by_value(x, self.epsilon, 1-self.epsilon)
-        return x

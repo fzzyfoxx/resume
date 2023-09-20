@@ -4,7 +4,7 @@
    1,
    20
   ],
-  "single_pattern_type": 1,
+  "single_pattern_type": 0,
   "pattern_types_probs": {
    "solid": 0.25,
    "striped": 0.25,
