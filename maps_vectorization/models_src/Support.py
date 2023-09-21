@@ -9,6 +9,7 @@ import src.map_generator as mg
 import numpy as np
 from google.cloud import storage
 import shutil
+import warnings
 
 storage_client = storage.Client()
 
@@ -194,7 +195,7 @@ class DatasetGenerator:
                   'feature_names': ['Afeatures', 'Bbbox']
                   },
             '6': {'output': [tf.float32, tf.float32, tf.bool], 
-                  'input_shapes': [img_shape, (None, 4), (self.cfg.target_size, self.cfg.target_size, None)],
+                  'input_shapes': [img_shape, (None, 4), (None,self.cfg.target_size, self.cfg.target_size)],
                   'feature_names': ['Afeatures', 'Bbbox','Cmask']
                   }
         }
@@ -327,7 +328,7 @@ class DatasetGenerator:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'bbox': [self.cfg.max_shapes_num,4],
-                                                                            'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
+                                                                            'mask':+[self.cfg.max_shapes_num]+[self.cfg.target_size]*2}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
 
         if repeat:
@@ -374,3 +375,22 @@ class DatasetGenerator:
     @staticmethod
     def get_ds_sizes(path):
         ['{}: {:.3f} MB'.format(filename, os.path.getsize(os.path.join(path, filename))*1e-6) for filename in os.listdir(path)]
+
+
+def load_mlflow_model(run_name, load_final_state=True, dst_path='.', experiment_id=None):
+    run_args = mlflow.search_runs(experiment_ids=experiment_id, filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = mlflow.tensorflow.load_model(os.path.join(run_args.artifact_uri, "model"))
+
+    if load_final_state:
+        mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
+                                dst_path=dst_path)
+        model.load_weights(os.path.join(dst_path,'final_state/variables'))
+
+    return model
+
+def download_mlflow_weights(run_name, experiment_id=None, dst_path='.'):
+    run_args = mlflow.search_runs(experiment_ids=experiment_id, filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
+    mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
+                                dst_path=dst_path)

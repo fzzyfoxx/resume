@@ -540,7 +540,7 @@ class full_map_generator:
         elif self.output_type==6:
             bboxes = self._gen_bboxes(patterns_info)
             masks = self._gen_labels_masks(patterns_info)
-            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.concat(masks, axis=-1), tf.bool)
+            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.transpose(tf.concat(masks, axis=-1), perm=[2,0,1]), tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########
