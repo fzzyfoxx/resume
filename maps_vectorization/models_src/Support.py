@@ -125,13 +125,13 @@ def _bytes_feature(value):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-def serialize_example(features, label):
+def serialize_example(names, inputs):
 
-
-    feature = {
+    '''feature = {
         'features': _bytes_feature(tf.io.serialize_tensor(features)),
         'label': _bytes_feature(tf.io.serialize_tensor(label))
-    }
+    }'''
+    feature = {name: _bytes_feature(tf.io.serialize_tensor(x)) for name, x in zip(names, inputs)}
 
     example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
     return example_proto.SerializeToString()
@@ -140,18 +140,20 @@ def tf_serialize_example(features, label):
     tf_string = tf.py_function(serialize_example, [features, label], tf.string)
     return tf.reshape(tf_string, ())
 
-feature_description = {
+'''feature_description = {
     'features': tf.io.FixedLenFeature([], tf.string),
     'label': tf.io.FixedLenFeature([], tf.string)
-}
+}'''
 
-def _parse_function(example_proto, dtypes):
-    features, label = tf.io.parse_single_example(example_proto, feature_description).values()
+def _parse_function(example_proto, dtypes, feature_description):
+    inputs = tf.io.parse_single_example(example_proto, feature_description).values()
 
-    features = tf.io.parse_tensor(features, dtypes[0])
-    label = tf.io.parse_tensor(label, dtypes[1])
+    '''features = tf.io.parse_tensor(features, dtypes[0])
+    label = tf.io.parse_tensor(label, dtypes[1])'''
 
-    return features, label
+    inputs = [tf.io.parse_tensor(x, x_type) for x, x_type in zip(inputs, dtypes)]
+
+    return inputs
 
 def create_path_if_needed(path):
     folders = os.path.split(path)
@@ -168,11 +170,33 @@ class DatasetGenerator:
 
         self.fmg = map_generator
 
+        img_shape = (self.cfg.target_size, self.cfg.target_size, 3)
+
         self.output_types = {
-            '1': {'output': [tf.uint8, tf.int32], 'label_shape': (None, self.cfg.max_vertices_num*2)},
-            '2': {'output': [tf.float32, tf.float32], 'label_shape': (self.cfg.target_size, self.cfg.target_size, 1)},
-            '3': {'output': [tf.float32, tf.bool], 'label_shape': (self.cfg.target_size, self.cfg.target_size, None)},
-            '4': {'output': [tf.float32, tf.float32], 'label_shape': (4,)}
+            '1': {'output': [tf.uint8, tf.int32], 
+                  'input_shapes': [img_shape, (None, self.cfg.max_vertices_num*2)],
+                  'feature_names': ['features', 'label']
+                  },
+            '2': {'output': [tf.float32, tf.float32], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, 1)],
+                  'feature_names': ['features', 'label']
+                  },
+            '3': {'output': [tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, None)],
+                  'feature_names': ['features', 'label']
+                  },
+            '4': {'output': [tf.float32, tf.float32], 
+                  'input_shapes': [img_shape, (4,)],
+                  'feature_names': ['features', 'label']
+                  },
+            '5': {'output': [tf.float32, tf.float32], 
+                  'input_shapes': [img_shape, (None,4)],
+                  'feature_names': ['Afeatures', 'Bbbox']
+                  },
+            '6': {'output': [tf.float32, tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (None, 4), (self.cfg.target_size, self.cfg.target_size, None)],
+                  'feature_names': ['Afeatures', 'Bbbox','Cmask']
+                  }
         }
 
         self.map_decoder = mg.map_generator_decoder(cfg)
@@ -185,32 +209,37 @@ class DatasetGenerator:
             In the second part shapes are set
         '''
         output_args = self.output_types[str(self.cfg.output_type)]
-        features, label = tf.py_function(self.fmg.gen_full_map, [], output_args['output'])
+        inputs = tf.py_function(self.fmg.gen_full_map, [], output_args['output'])
 
-        return features, label
+        return inputs
     
     @tf.function
-    def _set_shapes(self, features, label):
+    def _set_shapes(self, *args):
         # shapes definition
+        inputs = args
         output_args = self.output_types[str(self.cfg.output_type)]
-        features.set_shape((self.cfg.target_size, self.cfg.target_size, 3))
-        label.set_shape(output_args['label_shape'])
 
-        return features, label
+        for input, input_shape in zip(inputs, output_args['input_shapes']):
+            input.set_shape(input_shape)
+
+        return inputs
+    
+    def _gen_feature_description(self):
+        return {name: tf.io.FixedLenFeature([], tf.string) for name in self.output_types[str(self.cfg.output_type)]['feature_names']}
     
     def save_tfrec_dataset(self, folds_num=1, starting_num=0, ds_path='./datasets/train'):
         create_path_if_needed(ds_path)
-
+        names = self.output_types[str(self.cfg.output_type)]['feature_names']
         for fold in range(folds_num):
             self.fmg.reload_parcel_inputs()
-            self.new_dataset(repeat=False, from_saved=False, batch=False)
+            self.new_dataset(repeat=False, from_saved=False, batch=False, format_output=False)
 
-            self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
+            #self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
             print(f'\n\033[1msaving fold {fold+1}/{folds_num}\033[0m')
             pb = tf.keras.utils.Progbar(self.cfg.fold_size)
             with tf.io.TFRecordWriter(f'{ds_path}/ds-{fold+starting_num}.tfrec') as writer:
-                for feature, label in self.ds_iter:
-                    writer.write(serialize_example(feature, label))
+                for inputs in self.ds_iter:
+                    writer.write(serialize_example(names,inputs))
                     pb.add(1)
 
     def upload_dataset_to_storage(self, name, ds_path='./datasets/train'):
@@ -246,7 +275,7 @@ class DatasetGenerator:
         storage_client.get_bucket(bucket_name).delete(force=True)
 
 
-    def new_dataset(self, repeat=True, from_saved=False, batch=True, ds_path='./datasets/train'):
+    def new_dataset(self, repeat=True, from_saved=False, batch=True, format_output=True, ds_path='./datasets/train'):
         '''
             create new random dataset based on cfg parameters
             number of rows is defined by cfg.fold_size
@@ -257,21 +286,50 @@ class DatasetGenerator:
             ds = tf.data.Dataset.range(self.cfg.fold_size)
             ds = ds.map(self._gen_images, num_parallel_calls=self.cfg.num_parallel_calls)
         else:
+            feature_description = self._gen_feature_description()
             output_types = self.output_types[str(self.cfg.output_type)]['output']
             ds_files = [os.path.join(ds_path, filename) for filename in os.listdir(ds_path)]
             ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.cfg.num_parallel_calls)
-            ds = ds.map(lambda x: _parse_function(x, output_types), num_parallel_calls=self.cfg.num_parallel_calls)
+            ds = ds.map(lambda x: _parse_function(x, output_types, feature_description), num_parallel_calls=self.cfg.num_parallel_calls)
         
+        # set dataset shapes
         ds = ds.map(self._set_shapes, num_parallel_calls=self.cfg.num_parallel_calls)
+
+        # format output
+        if format_output:
+            if self.cfg.output_type==5:
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            if self.cfg.output_type==6:
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+        # batch and padding definitions
         if batch:
             if self.cfg.output_type==1:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], [self.cfg.max_shapes_num, self.cfg.max_vertices_num*2]), padding_values=(np.uint8(255), 0))
+            
             elif self.cfg.output_type==2:
                 ds = ds.batch(self.cfg.ds_batch_size)
+            
             elif self.cfg.output_type==3:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], [self.cfg.target_size]*2+[self.cfg.max_shapes_num]), padding_values=(0.0, False))
+            
             elif self.cfg.output_type==4:
                 ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type==5:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
+                                                                            {'class': [self.cfg.max_shapes_num],
+                                                                            'bbox': [self.cfg.max_shapes_num,4]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'bbox': 0.0}))
+            
+            elif self.cfg.output_type==6:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
+                                                                            {'class': [self.cfg.max_shapes_num],
+                                                                            'bbox': [self.cfg.max_shapes_num,4],
+                                                                            'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
+
         if repeat:
             ds = ds.repeat()
         self.ds = ds
