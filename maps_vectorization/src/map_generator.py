@@ -461,6 +461,12 @@ class full_map_generator:
                 labels.append(label)
 
         return labels[:self.max_shapes_num]
+    
+    def _gen_bboxes(self, patterns_info):
+        return np.concatenate([np.concatenate([np.min(shape, axis=0)[:,::-1], np.max(shape, axis=0)[:,::-1]], axis=-1) for 
+                                 pattern in patterns_info for shape in pattern['map_args']['shapes']], axis=0)[:self.max_shapes_num]/self.target_size
+        
+
 
     def gen_full_map(self, ):
         '''
@@ -470,6 +476,8 @@ class full_map_generator:
             #2 - edge detection - returns map shaped image with value of 1 for edges and 0 for any other pixels
             #3 - shapes masks - returns N binary masks for N shapes
             #4 - single pattern type classification - returns class of pattern type in one-hot format
+            #5 - shapes bboxes - returns N bboxes coordinates [Ymin,Xmin,Ymax,Xmax] for N shapes
+            #6 - shapes bboxes and masks - combination of output types #3 & #5
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -507,20 +515,32 @@ class full_map_generator:
         
         if self.output_type==0:
             return img, patterns_info, legend_label, minimap_label
+        
         elif self.output_type==1:
             shape_label = self._prepare_label_for_shapes(patterns_info)
             return tf.constant(img, tf.uint8), shape_label
+        
         elif self.output_type==2:
             edge_mask = self._prepare_edge_mask(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.constant(edge_mask, tf.float32)
+        
         elif self.output_type==3:
             labels = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.cast(tf.concat(labels, axis=-1), tf.bool)
+        
         elif self.output_type==4:
             pattern_type = patterns_info[0]['pattern_style']['pattern_type']
             label = [int(pattern_type==key) for key in self.map_args['random_grid_input']['pattern_types_probs'].keys()]
             return tf.constant(img, tf.float32)/255, tf.constant(label, tf.float32)
-
+        
+        elif self.output_type==5:
+            bboxes = self._gen_bboxes(patterns_info)
+            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32)
+        
+        elif self.output_type==6:
+            bboxes = self._gen_bboxes(patterns_info)
+            masks = self._gen_labels_masks(patterns_info)
+            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.concat(masks, axis=-1), tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########
