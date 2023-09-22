@@ -101,8 +101,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def _bbox_decoding(self, bbox, anchor_centers, anchor_sizes):
         YX, HW = bbox[...,:2], bbox[...,2:]
 
-        YX = YX*self.img_size_tensor+anchor_centers
-        HW = (tf.math.exp(HW)*self.img_size_tensor+anchor_sizes)/2
+        YX = tf.math.tanh(YX)*anchor_sizes+anchor_centers#YX*self.img_size_tensor+anchor_centers
+        HW = tf.math.sigmoid(HW)*anchor_sizes/2#(tf.math.exp(HW)*self.img_size_tensor+anchor_sizes)/2
 
         return tf.concat([tf.clip_by_value(YX-HW, [0,0], [self.height, self.width]), tf.clip_by_value(YX+HW, [0,0], [self.height, self.width])], axis=-1)
     
@@ -116,18 +116,22 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def _non_max_suppresion(self, confidence, bboxes):
         NMS_indices = tf.image.non_max_suppression(bboxes, confidence, max_output_size=self.output_proposals, iou_threshold=self.iou_threshold)
 
-        last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
+        '''last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
         additional_proposals = self.output_proposals-len(NMS_indices)
-        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))
+        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))'''
 
         NMS_bboxes = tf.gather(bboxes, NMS_indices, axis=0)
-        additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
+        #additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
 
         NMS_confidence = tf.gather(confidence, NMS_indices, axis=0)
-        additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
+        #additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
 
-        confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
-        bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
+        #confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
+        #bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
+        additional_bboxes = self.output_proposals-len(NMS_indices)
+
+        bboxes = tf.pad(NMS_bboxes, [[0,additional_bboxes],[0,0]])
+        confidence = tf.pad(NMS_confidence, [[0,additional_bboxes]])
 
         confidence.set_shape((self.output_proposals,))
         bboxes.set_shape((self.output_proposals, 4))

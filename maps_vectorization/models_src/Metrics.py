@@ -289,7 +289,7 @@ class MultivariantHungarianLoss():
         I = xI*yI
         U = self._calc_area(aY1, aX1, aY2, aX2)+self._calc_area(bY1, bX1, bY2, bX2)-I
 
-        return 1-tf.math.divide_no_nan(I,U)
+        return 1-I/tf.clip_by_value(U, 1e-5, 1-1e-5)
     
     ### Bbox regression
     def Ln(self, a, b):
@@ -302,8 +302,8 @@ class MultivariantHungarianLoss():
 
     ##### Hungarian Matching #####
 
-    @staticmethod
-    def HungarianMatching(cost_matrix):
+    @tf.autograph.experimental.do_not_convert
+    def HungarianMatching(self, cost_matrix):
         match_idxs = tf.map_fn(lambda x: tf.transpose(tf.convert_to_tensor(tf.numpy_function(linear_sum_assignment, [x], [tf.int64, tf.int64])), perm=[1,0]), elems=cost_matrix, fn_output_signature=tf.int64)
         y_true_idxs = match_idxs[...,1]
         y_pred_idxs = match_idxs[...,0]
@@ -357,8 +357,10 @@ class MultivariantHungarianLoss():
         cost_matrices = [self._calc_cost_matrix(y_true_n, y_pred_n, **args) for y_true_n, y_pred_n, args in zip(y_true, y_pred, self.cost_matrix_args)]
 
         HM_cost_matrix = self.add(cost_matrices)
+        HM_cost_matrix = tf.where(tf.math.is_nan(HM_cost_matrix), 2.0, HM_cost_matrix)
 
-        idxs = tf.stop_gradient(self.HungarianMatching(HM_cost_matrix))
+
+        idxs = self.HungarianMatching(HM_cost_matrix) #tf.stop_gradient()
         y_true_idxs, y_pred_idxs = idxs[0], idxs[1]
 
         unit_mask = tf.ones_like(y_true_idxs, dtype=tf.float32)
