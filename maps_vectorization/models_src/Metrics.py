@@ -43,6 +43,42 @@ class WeightedF12D(tf.keras.metrics.Metric):
 
     def result(self):
         return self.score.result()
+    
+
+class IoUMetric(tf.keras.metrics.Metric):
+    def __init__(self, name='IoU'):
+        super().__init__(name=name)
+
+        self.score = tf.keras.metrics.Mean()
+
+    @staticmethod
+    def _extract_coords(bbox):
+        return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
+    
+    @staticmethod
+    def _calc_area(Y1,X1,Y2,X2):
+        return (X2-X1)*(Y2-Y1)
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+
+        aY1, aX1, aY2, aX2 = self._extract_coords(y_true)
+        bY1, bX1, bY2, bX2 = self._extract_coords(y_pred)
+
+        xI = tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2)
+        yI = tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2)
+
+        I = xI*yI
+        U = self._calc_area(aY1, aX1, aY2, aX2)+self._calc_area(bY1, bX1, bY2, bX2)-I
+
+        scores = tf.expand_dims(tf.math.divide_no_nan(I,U), axis=-1)
+
+        self.score.update_state(scores, sample_weight=sample_weight)
+
+    def reset_states(self):
+        self.score.reset_states()
+
+    def result(self):
+        return self.score.result()
 
 
 class HungarianMatching:
