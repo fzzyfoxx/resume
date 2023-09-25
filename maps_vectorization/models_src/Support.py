@@ -10,6 +10,7 @@ import numpy as np
 from google.cloud import storage
 import shutil
 import warnings
+import math
 
 storage_client = storage.Client()
 
@@ -328,7 +329,7 @@ class DatasetGenerator:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'bbox': [self.cfg.max_shapes_num,4],
-                                                                            'mask':+[self.cfg.max_shapes_num]+[self.cfg.target_size]*2}), 
+                                                                            'mask':[self.cfg.max_shapes_num]+[self.cfg.target_size]*2}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
 
         if repeat:
@@ -394,3 +395,51 @@ def download_mlflow_weights(run_name, experiment_id=None, dst_path='.'):
     run_args = mlflow.search_runs(experiment_ids=experiment_id, filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
     mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
                                 dst_path=dst_path)
+    
+
+
+
+def plot_bbox_preds(features, labels, preds, target_size=256, plotsize=8, max_plots=None, cols=1, draw_preds=True, fontsize=3):
+    plots_num = min(len(features), max_plots) if max_plots else len(features)
+    rows = math.ceil(plots_num/cols)
+    #decode features
+    features = (features.numpy()*255).astype(np.uint8)
+    #decode bboxes
+    true_bboxes = (labels['bbox'].numpy()*cfg.target_size).astype(np.int32)
+    pred_bboxes = (preds['bbox'].numpy()*cfg.target_size).astype(np.int32)
+    probs = preds['class']
+
+    fig, axs = plt.subplots(rows, cols, figsize=(plotsize*cols, plotsize*rows))
+
+    for img, inst_true_bboxes, inst_pred_bboxes, inst_probs, i in zip(features, true_bboxes, pred_bboxes, probs, range(plots_num)):
+        pred_img = img.copy()
+        for true_bbox, pred_bbox, prob in zip(inst_true_bboxes, inst_pred_bboxes, inst_probs):
+            if np.sum(true_bbox)>0:
+                cv.rectangle(img, true_bbox[:2][::-1], true_bbox[2:][::-1], (255,0,0), 1)
+            if np.sum(pred_bbox)>0:
+                cv.rectangle(pred_img, pred_bbox[:2][::-1], pred_bbox[2:][::-1], (0,0,255), 1)
+                if draw_preds:
+                    cv.putText(pred_img, '{:.1f}%'.format(prob), pred_bbox[:2][::-1], cv.FONT_HERSHEY_SIMPLEX , fontsize, (0,0,255))
+
+        img = cv.addWeighted(img, 0.5, pred_img, 0.5, 0)
+        if plots_num==1:
+            axs.imshow(img)
+        else:
+            axs.flat[i].imshow(img)
+
+def plot_mask_preds(features, labels, preds, threshold=0.5, target_size=256, plotsize=6, cmap='gray', max_plots=None, alpha=0.5):
+    rows = min(len(features), max_plots) if max_plots else len(features)
+
+    features = (features.numpy()*255).astype(np.uint8)
+    true_masks = (labels['mask'].numpy()*255).astype(np.uint8)[...,np.newaxis]
+    pred_masks = (preds['mask'].numpy()*255).astype(np.uint8)[...,np.newaxis]
+
+    fig, axs = plt.subplots(rows, 4, figsize=(4*plotsize, rows*plotsize))
+
+    for img, inst_true_mask, inst_pred_mask, row in zip(features, true_masks, pred_masks, range(rows)):
+        axs[row, 0].imshow(np.sum(inst_true_mask, axis=0), cmap=cmap)
+        axs[row, 1].imshow(np.sum(inst_pred_mask, axis=0), cmap=cmap)
+        binary_pred_mask = np.sum(np.where(inst_pred_mask>threshold, 0, 1), axis=0)
+        axs[row, 2].imshow(binary_pred_mask, cmap=cmap)
+        axs[row, 3].imshow(img)
+        axs[row, 3].imshow(binary_pred_mask, cmap='gray', alpha=alpha)
