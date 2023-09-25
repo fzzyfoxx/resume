@@ -58,7 +58,8 @@ class FeaturePyramid(tf.keras.Model):
     
 class RegionProposalNetwork(tf.keras.layers.Layer):
     def __init__(self, 
-                 anchors=3, 
+                 anchor_sizes=[24,48,64,156,224],
+                 anchor_scales=[0.5,1.0,2.0], 
                  window_size=1, 
                  base_img_size=(256,256), 
                  init_top_k_proposals=0.3,
@@ -66,10 +67,13 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
                  iou_threshold = 0.5,
                  add_bbox_dense_layer = False,
                  normalize_bboxes = False,
+                 delta_scaler = [0.2,0.2,0.1,0.1],
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
 
-        self.anchors = anchors
+        self.anchors = len(anchor_scales)
+        self.anchor_scales = anchor_scales
+        self.anchor_sizes = anchor_sizes
         self.window_size = window_size
         self.height, self.width = base_img_size
 
@@ -83,7 +87,9 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.bbox_normalization = tf.constant(base_img_size*2, dtype=tf.float32)[tf.newaxis,tf.newaxis]
         self.add_bbox_dense_layer = add_bbox_dense_layer
 
-    def _get_anchor_centers(self, shape, anchor_num):
+        self.delta_scaler = tf.constant(delta_scaler, tf.float32)
+
+    def _get_anchor_centers(self, shape, windows_num, anchor_size):
         H, W = shape[1], shape[2]
         rows = tf.repeat(tf.reshape(tf.range(self.height, delta=self.height//H, dtype=tf.float32), (1,H,1,1)), W, axis=2)
         cols = tf.repeat(tf.reshape(tf.range(self.width, delta=self.width//W, dtype=tf.float32), (1,1,W,1)), H, axis=1)
@@ -91,20 +97,27 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         pool = tf.keras.layers.AveragePooling2D(pool_size=self.window_size, padding='same')
 
-        return tf.reshape(tf.reshape(tf.repeat(tf.expand_dims(pool(grid), axis=-2), self.anchors, axis=-2), (1,anchor_num,2*self.anchors)), (1,anchor_num*self.anchors,2))
+        centers = tf.reshape(tf.reshape(tf.repeat(tf.expand_dims(pool(grid), axis=-2), self.anchors, axis=-2), (1,windows_num,2*self.anchors)), (1,windows_num*self.anchors,2))
+
+        sizes = tf.stack([tf.constant([anchor_size/scale, anchor_size*scale], dtype=tf.float32) for scale in self.anchor_scales], axis=0) # [3,2]
+        sizes =  tf.reshape(tf.repeat(sizes[tf.newaxis, tf.newaxis], windows_num, axis=1), (1, windows_num*self.anchors, 2))
+
+        return tf.concat([centers, sizes], axis=-1)
     
-    def _get_anchor_sizes(self, shape):
+    '''def _get_anchor_sizes(self, shape):
         H, W = shape[1], shape[2]
         anchor_height = self.height/H*self.window_size
         anchor_width = self.width/W*self.window_size
 
-        return tf.cast([anchor_height, anchor_width], dtype=tf.float32)[tf.newaxis, tf.newaxis]
+        return tf.cast([anchor_height, anchor_width], dtype=tf.float32)[tf.newaxis, tf.newaxis]'''
 
-    def _bbox_decoding(self, bbox, anchor_centers, anchor_sizes):
-        YX, HW = bbox[...,:2], bbox[...,2:]
+    def _bbox_decoding(self, bbox, anchor_bboxes):
+        #bbox *= self.delta_scaler
+        dYX, dHW = bbox[...,:2], bbox[...,2:]
+        YX, HW = anchor_bboxes[...,:2], anchor_bboxes[...,2:]
 
-        YX = YX*anchor_sizes+anchor_centers#YX*self.img_size_tensor+anchor_centers
-        HW = tf.nn.relu(HW)*anchor_sizes/2#(tf.math.exp(HW)*self.img_size_tensor+anchor_sizes)/2
+        YX += dYX*HW
+        HW *= tf.math.exp(dHW)*0.5
 
         return tf.concat([tf.clip_by_value(YX-HW, [0,0], [self.height, self.width]), tf.clip_by_value(YX+HW, [0,0], [self.height, self.width])], axis=-1)
     
@@ -118,22 +131,18 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def _non_max_suppresion(self, confidence, bboxes):
         NMS_indices = tf.image.non_max_suppression(bboxes, confidence, max_output_size=self.output_proposals, iou_threshold=self.iou_threshold)
 
-        '''last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
+        last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
         additional_proposals = self.output_proposals-len(NMS_indices)
-        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))'''
+        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))
 
         NMS_bboxes = tf.gather(bboxes, NMS_indices, axis=0)
-        #additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
+        additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
 
         NMS_confidence = tf.gather(confidence, NMS_indices, axis=0)
-        #additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
+        additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
 
-        #confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
-        #bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
-        additional_bboxes = self.output_proposals-len(NMS_indices)
-
-        bboxes = tf.pad(NMS_bboxes, [[0,additional_bboxes],[0,0]])
-        confidence = tf.pad(NMS_confidence, [[0,additional_bboxes]])
+        confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
+        bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
 
         confidence.set_shape((self.output_proposals,))
         bboxes.set_shape((self.output_proposals, 4))
@@ -144,9 +153,10 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def build(self, input_shape):
 
         self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same') for shape in input_shape]
-        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=self.window_size, strides=self.window_size, padding='same') for _ in input_shape]
+        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=self.window_size, strides=self.window_size, padding='same', kernel_initializer='zeros') for _ in input_shape]
         if self.add_bbox_dense_layer:
-            self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4) for _ in input_shape]
+            self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros') for _ in input_shape]
+
         self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=self.window_size, strides=self.window_size, padding='same') for _ in input_shape]
 
         windows_nums = [math.ceil(shape[1]/self.window_size)*math.ceil(shape[2]/self.window_size) for shape in input_shape]
@@ -160,8 +170,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.concat_bbox = tf.keras.layers.Concatenate(axis=-2)
 
         # generate anchor points
-        self.anchor_centers = [self._get_anchor_centers(shape, windows_num) for shape, windows_num in zip(input_shape, windows_nums)]
-        self.anchor_sizes = [self._get_anchor_sizes(shape) for shape in input_shape]
+        self.anchor_bboxes = [self._get_anchor_centers(shape, windows_num, anchor_size) for shape, windows_num, anchor_size in zip(input_shape, windows_nums, self.anchor_sizes)]
+        #self.anchor_sizes = [self._get_anchor_sizes(shape) for shape in input_shape]
 
         # initial proposal limit
         anchors_num = sum(windows_nums)*self.anchors
@@ -183,7 +193,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
             bboxes = [reshape(conv(state)) for state, conv, reshape in zip(features, self.bbox_convs, self.bbox_reshapes)]
 
         # Decode BBox predictions to original size and output format XYXY - left-top & right-bot
-        bboxes = [self._bbox_decoding(b,a_c,a_s) for b,a_c,a_s in zip(bboxes, self.anchor_centers, self.anchor_sizes)]
+        bboxes = [self._bbox_decoding(b, a_b) for b, a_b in zip(bboxes, self.anchor_bboxes)]
 
         # concatenate standardized features
         confidence = self.concat_confidence(confidence)
@@ -403,7 +413,7 @@ class MaskRCNNGenerator:
                  backbone_pretrained=True,
                  RPN_training=False,
                  RPN_pyramid_args={'out_indices': [1,2,3,4], 'add_maxpool': True, 'output_dim': 256},
-                 RPN_rpn_args={'anchors': 3, 'window_size': 1, 'init_top_k_proposals': 0.3, 'output_proposals': 2000, 'normalize_bboxes': True},
+                 RPN_rpn_args={'anchor_sizes': [24,48,64,156,224], 'anchor_scales': [0.5,1.0,2.0], 'window_size': 1, 'init_top_k_proposals': 0.3, 'output_proposals': 2000, 'normalize_bboxes': True},
                  RPN_source={'experiment_id': '1520455876928689', 'run_name': 'monumental-crab'},
                  RPN_download_weights=False,
                  RPN_pretrained=False,
