@@ -437,9 +437,19 @@ def plot_mask_preds(features, labels, preds, threshold=0.5, target_size=256, plo
     fig, axs = plt.subplots(rows, 4, figsize=(4*plotsize, rows*plotsize))
 
     for img, inst_true_mask, inst_pred_mask, row in zip(features, true_masks, pred_masks, range(rows)):
+        inst_true_mask = np.reshape(inst_true_mask, (-1, target_size, target_size, 1))
+        inst_pred_mask = np.reshape(inst_pred_mask, (-1, target_size, target_size, 1))
+
         axs[row, 0].imshow(np.sum(inst_true_mask, axis=0), cmap=cmap)
+        axs[row, 0].set_title('True Mask SUM', fontsize=8)
+
         axs[row, 1].imshow(np.sum(inst_pred_mask, axis=0), cmap=cmap)
+        axs[row, 1].set_title('Pred Mask SUM', fontsize=8)
+
         binary_pred_mask = np.sum(np.where(inst_pred_mask>threshold, 0, 1), axis=0)
         axs[row, 2].imshow(binary_pred_mask, cmap=cmap)
+        axs[row, 2].set_title('Binary Pred Mask SUM', fontsize=8)
+
         axs[row, 3].imshow(img)
         axs[row, 3].imshow(binary_pred_mask, cmap='gray', alpha=alpha)
+        axs[row, 3].set_title('Pred Mask SUM on map', fontsize=12)

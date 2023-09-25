@@ -281,6 +281,118 @@ class CombinedMetricsModel(tf.keras.Model):
         return self.loss(y, y_pred)
     
 
+class ProposalPooling(tf.keras.layers.Layer):
+    def __init__(self, reduction='max', **kwargs):
+        super(ProposalPooling, self).__init__(**kwargs)
+
+        self.reduction = tf.reduce_max if reduction=='max' else tf.reduce_mean
+
+    def build(self, input_shape):
+        P, H, W, C = input_shape[1], input_shape[2], input_shape[3], input_shape[4]
+
+        self.perm = tf.keras.layers.Permute((1,4,2,3))
+        self.flatten = tf.keras.layers.Reshape((P,C,H*W))
+
+    def call(self, inputs):
+        x = self.perm(inputs)
+        x = self.flatten(x)
+        x = self.reduction(x, axis=-1)
+
+        return x
+
+class FPNBBoxHead(tf.keras.layers.Layer):
+    def __init__(self, 
+                roi_size=7, 
+                roi_source_indices=[1,2,3,4], 
+                roi_pyramid_indices=[0,1,2,3], 
+                hidden_sizes=1024, 
+                hidden_layers=2, 
+                pooling='max', 
+                dropout=0.2, 
+                **kwargs):
+        super(FPNBBoxHead, self).__init__(**kwargs)
+
+        self.roi_aligner = ROIAligner(crop_size=roi_size, source_indices=roi_source_indices, pyramid_indices=roi_pyramid_indices)
+        self.pool = ProposalPooling(reduction=pooling)
+
+        self.out_dropout, self.init_dropout = [tf.keras.layers.Dropout(dropout) for _ in range(2)]
+        self.dense_layers = tf.keras.Sequential([tf.keras.layers.Dense(hidden_sizes, activation='relu') for _ in range(hidden_layers)])
+
+        self.class_predictor = tf.keras.layers.Dense(1, activation='sigmoid')
+        self.class_flatten = tf.keras.layers.Flatten()
+        self.bbox_predictor = tf.keras.layers.Dense(4, activation='sigmoid')
+
+    def decode_bbox(self, bbox):
+        YX, HW = bbox[...,:2], bbox[...,2:]/2
+        bbox = tf.concat([YX-HW, YX+HW], axis=-1)
+        return tf.clip_by_value(bbox, 0.0, 1.0)
+
+    def call(self, pyramid, bboxes, training=None):
+        x = self.roi_aligner(pyramid, bboxes)
+        x = self.pool(x)
+        x = self.init_dropout(x, training=training)
+        x = self.dense_layers(x)
+
+        confidence = self.class_flatten(self.class_predictor(x))
+        bbox = self.bbox_predictor(x)
+        bbox = self.decode_bbox(bbox)
+
+        return confidence, bbox
+    
+
+    
+class MaskHead(tf.keras.layers.Layer):
+    def __init__(self,
+                roi_size=32, 
+                roi_source_indices=[1,2,3,4], 
+                roi_pyramid_indices=[0,1,2,3],
+                filters=256,
+                kernel_size=3,
+                output_size=(256,256),
+                convs_num=4,
+                upscale_blocks=3,
+                upscale_block_convs=1,
+                **kwargs
+                ):
+        super(MaskHead, self).__init__(**kwargs)
+        self.filters = filters
+        self.kernel_size = kernel_size
+        self.roi_size = roi_size
+        self.upscale_blocks = upscale_blocks
+
+        self.roi_aligner = ROIAligner(crop_size=roi_size, source_indices=roi_source_indices, pyramid_indices=roi_pyramid_indices)
+
+        self.convs = tf.keras.Sequential([tf.keras.layers.Conv2D(filters, kernel_size, padding='same', activation='relu') for _ in range(convs_num)])
+        self.upscales = tf.keras.Sequential([self._gen_upscale_block(upscale_block_convs) for _ in range(upscale_blocks)])
+
+        self.out_conv = tf.keras.layers.Conv2D(1, kernel_size=1, activation='sigmoid')
+
+        self.resize = tf.keras.Sequential([tf.keras.layers.Permute((2,3,1)),
+                                           tf.keras.layers.Resizing(*output_size)])
+
+    def _gen_upscale_block(self, convs):
+        return tf.keras.Sequential([tf.keras.layers.Conv2DTranspose(self.filters, self.kernel_size, strides=2, padding='same', activation='relu')]+
+                                   [tf.keras.layers.Conv2D(self.filters, self.kernel_size, activation='relu', padding='same') for _ in range(convs)])
+    
+    def build(self, input_shape):
+        self.P = input_shape[1][1]
+        self.init_channels = input_shape[0][0][3]
+        self.upscaled_size = self.roi_size*(2**self.upscale_blocks)
+
+    def call(self, inputs, training=None):
+
+        x = self.roi_aligner(*inputs) # [B,P,H,W,C(init)]
+        x = tf.reshape(x, (-1, self.roi_size, self.roi_size, self.init_channels)) #[B*P,H,W,C(init)]
+        x = self.convs(x) # [B*P,H,W,C]
+        x = self.upscales(x) # [B*P, H*n, W*n, C]
+
+        x = self.out_conv(x) # [B*P, H*n, W*n, 1]
+        x = tf.reshape(x, (-1, self.P, self.upscaled_size, self.upscaled_size)) # [B,P,H*n,W*n]
+
+        x = self.resize(x) # [B,H(out),W(out),P]
+        return x
+    
+
 class MaskRCNNGenerator:
     def __init__(self, 
                  input_shape=(256,256,3), 
@@ -291,12 +403,16 @@ class MaskRCNNGenerator:
                  backbone_pretrained=True,
                  RPN_training=False,
                  RPN_pyramid_args={'out_indices': [1,2,3,4], 'add_maxpool': True, 'output_dim': 256},
-                 RPN_rpn_args={'anchors': 3, 'window_size': 1, 'init_top_k_proposals': 0.3, 'output_proposals': 1000, 'normalize_bboxes': True},
-                 RPN_ROI_args={'crop_size': 7, 'source_indices': [1,2,3,4]},
-                 RPN_ROI_output=False,
-                 RPN_source={'experiment_id': None, 'run_name': None},
+                 RPN_rpn_args={'anchors': 3, 'window_size': 1, 'init_top_k_proposals': 0.3, 'output_proposals': 2000, 'normalize_bboxes': True},
+                 RPN_source={'experiment_id': '1520455876928689', 'run_name': 'monumental-crab'},
                  RPN_download_weights=False,
                  RPN_pretrained=False,
+                 Head_training=False,
+                 Head_download_weights=False,
+                 Head_pretrained=False,
+                 Head_pyramid_args={'roi_source_indices': [1,2,3,4], 'roi_pyramid_indices': [0,1,2,3]},
+                 Head_BBox_args={'roi_size': 7, 'hidden_sizes': 1024, 'hidden_layers': 2},
+                 Head_Mask_args={'roi_size': 32, 'filters': 256, 'kernel_size': 3, 'convs_num': 4, 'upscale_blocks': 3, 'upscale_block_convs': 1},
                  CombinedModel_metrics=None,
                  ):
 
@@ -305,7 +421,8 @@ class MaskRCNNGenerator:
 
         self.func_mapping = {
             'backbone': self._gen_backbone,
-            'RPN': self._gen_RPN
+            'RPN': self._gen_RPN,
+            'head': self._gen_Head
         }
 
         self.combined_model = False
@@ -335,24 +452,47 @@ class MaskRCNNGenerator:
         hidden_states = backbone(inputs)
         feature_pyramid = FeaturePyramid(name='FeaturePyramid', **self.RPN_pyramid_args, trainable=self.RPN_training)(hidden_states)
         rois_conf, rois = RegionProposalNetwork(name='RPN', **self.RPN_rpn_args, trainable=self.RPN_training)(feature_pyramid)
-        
-        if self.RPN_ROI_output:
-            rois = ROIAligner(name='ROI', **self.RPN_ROI_args)(feature_pyramid, rois)
-            RPN = tf.keras.Model(inputs, rois)
-        else:
+
+        if self.model_type=='RPN':
             RPN = CombinedMetricsModel(inputs, {'class': rois_conf, 'bbox':rois})
-            self.combined_model = True
+        else:
+            RPN = tf.keras.Model(inputs, [feature_pyramid, rois], name='backbone-RPN')
+
+        self.combined_model = True
 
         if self.RPN_pretrained:
             RPN.load_weights('./RPN/final_state/variables')
 
         return RPN
     
+    def _gen_Head(self):
+        if self.Head_download_weights:
+            download_mlflow_weights(**self.Head_source, dst_path='./Head')
+            self.Head_download_weights = False
+
+        RPN = self._gen_RPN()
+
+        inputs = tf.keras.layers.Input(self.input_shape)
+        pyramid, bbox_proposals = RPN(inputs)
+        conf, bboxes = FPNBBoxHead(name='BBoxHead', **self.Head_BBox_args, **self.Head_pyramid_args)(pyramid, bbox_proposals)
+        masks = MaskHead(name='MaskHead', **self.Head_Mask_args, **self.Head_pyramid_args)([pyramid, bbox_proposals])
+
+        Head = CombinedMetricsModel(inputs, {'class': conf, 'bbox': bboxes, 'mask': masks})
+
+        self.combined_model = True
+
+        if self.Head_pretrained:
+            Head.load_weights('./Head/final_state/variables')
+
+        return Head
+
+    
     def __call__(self, model_type, **kwargs):
 
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+        self.model_type = model_type
         model = self.func_mapping[model_type]()
 
         if (self.CombinedModel_metrics!=None) & self.combined_model:

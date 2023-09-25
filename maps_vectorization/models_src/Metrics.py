@@ -178,7 +178,7 @@ class MultivariantHungarianLoss():
                  bbox_regularization_rank=1,
                  mask_alpha=0.75,
                  mask_gamma=5,
-                 mask_pool_size=4,
+                 mask_pool_size=8,
                  mask_class_pred=False,
                  return_matching=True,
                  name='HL',
@@ -213,6 +213,8 @@ class MultivariantHungarianLoss():
 
         self.return_matching = return_matching
 
+        self.pool = tf.keras.layers.AveragePooling2D(pool_size=mask_pool_size, strides=mask_pool_size)
+
     ##### Cost Matrix #####
 
     def _gen_cost_matrix_args(self, flags, losses, pool_sizes, perms, class_masks, input_names, output_sizes, losses_weights):
@@ -244,12 +246,11 @@ class MultivariantHungarianLoss():
 
         return output_args, masking_flags, names, matching_args, losses_weights_list
     
-    @staticmethod
-    def _calc_cost_matrix(a, b, cost_func,pool_size=1, perm=[0,1,2], unit_true=False):
+    def _calc_cost_matrix(self, a, b, cost_func,pool_size=1, perm=[0,1,2], unit_true=False):
 
         if pool_size>1:
-            a = tf.keras.layers.AveragePooling2D(pool_size=pool_size, strides=pool_size)(a)
-            b = tf.keras.layers.AveragePooling2D(pool_size=pool_size, strides=pool_size)(b)
+            a = self.pool(a)
+            b = self.pool(b)
             
         a = tf.transpose(a, perm=perm)
         b = tf.transpose(b, perm=perm)
