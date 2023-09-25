@@ -405,8 +405,8 @@ def plot_bbox_preds(features, labels, preds, target_size=256, plotsize=8, max_pl
     #decode features
     features = (features.numpy()*255).astype(np.uint8)
     #decode bboxes
-    true_bboxes = (labels['bbox'].numpy()*cfg.target_size).astype(np.int32)
-    pred_bboxes = (preds['bbox'].numpy()*cfg.target_size).astype(np.int32)
+    true_bboxes = (labels['bbox'].numpy()*target_size).astype(np.int32)
+    pred_bboxes = (preds['bbox'].numpy()*target_size).astype(np.int32)
     probs = preds['class']
 
     fig, axs = plt.subplots(rows, cols, figsize=(plotsize*cols, plotsize*rows))

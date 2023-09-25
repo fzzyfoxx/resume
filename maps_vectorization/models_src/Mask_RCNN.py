@@ -64,6 +64,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
                  init_top_k_proposals=0.3,
                  output_proposals=1000,
                  iou_threshold = 0.5,
+                 add_bbox_dense_layer = False,
                  normalize_bboxes = False,
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
@@ -80,6 +81,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         self.normalize_bboxes = normalize_bboxes
         self.bbox_normalization = tf.constant(base_img_size*2, dtype=tf.float32)[tf.newaxis,tf.newaxis]
+        self.add_bbox_dense_layer = add_bbox_dense_layer
 
     def _get_anchor_centers(self, shape, anchor_num):
         H, W = shape[1], shape[2]
@@ -101,8 +103,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def _bbox_decoding(self, bbox, anchor_centers, anchor_sizes):
         YX, HW = bbox[...,:2], bbox[...,2:]
 
-        YX = tf.math.tanh(YX)*anchor_sizes+anchor_centers#YX*self.img_size_tensor+anchor_centers
-        HW = tf.math.sigmoid(HW)*anchor_sizes/2#(tf.math.exp(HW)*self.img_size_tensor+anchor_sizes)/2
+        YX = YX*anchor_sizes+anchor_centers#YX*self.img_size_tensor+anchor_centers
+        HW = tf.nn.relu(HW)*anchor_sizes/2#(tf.math.exp(HW)*self.img_size_tensor+anchor_sizes)/2
 
         return tf.concat([tf.clip_by_value(YX-HW, [0,0], [self.height, self.width]), tf.clip_by_value(YX+HW, [0,0], [self.height, self.width])], axis=-1)
     
@@ -143,6 +145,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same') for shape in input_shape]
         self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=self.window_size, strides=self.window_size, padding='same') for _ in input_shape]
+        if self.add_bbox_dense_layer:
+            self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4) for _ in input_shape]
         self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=self.window_size, strides=self.window_size, padding='same') for _ in input_shape]
 
         windows_nums = [math.ceil(shape[1]/self.window_size)*math.ceil(shape[2]/self.window_size) for shape in input_shape]
@@ -173,7 +177,10 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         confidence = [sigmoid(reshape(conv(state))) for state, conv, reshape, sigmoid in zip(features, self.confidence_convs, self.confidence_reshapes, self.sigmoids)]
 
         # BBox predictions
-        bboxes = [reshape(conv(state)) for state, conv, reshape in zip(features, self.bbox_convs, self.bbox_reshapes)]
+        if self.add_bbox_dense_layer:
+            bboxes = [reshape(dense(conv(state))) for state, conv, reshape, dense in zip(features, self.bbox_convs, self.bbox_reshapes, self.bbox_dense)]
+        else:
+            bboxes = [reshape(conv(state)) for state, conv, reshape in zip(features, self.bbox_convs, self.bbox_reshapes)]
 
         # Decode BBox predictions to original size and output format XYXY - left-top & right-bot
         bboxes = [self._bbox_decoding(b,a_c,a_s) for b,a_c,a_s in zip(bboxes, self.anchor_centers, self.anchor_sizes)]
