@@ -407,7 +407,10 @@ def plot_bbox_preds(features, labels, preds, target_size=256, plotsize=8, max_pl
     #decode bboxes
     true_bboxes = (labels['bbox'].numpy()*target_size).astype(np.int32)
     pred_bboxes = (preds['bbox'].numpy()*target_size).astype(np.int32)
-    probs = preds['class']
+    if 'class' in preds.keys():
+        probs = preds['class']
+    else:
+        probs = tf.zeros(pred_bboxes.shape[:-1])[...,tf.newaxis]
 
     fig, axs = plt.subplots(rows, cols, figsize=(plotsize*cols, plotsize*rows))
 
