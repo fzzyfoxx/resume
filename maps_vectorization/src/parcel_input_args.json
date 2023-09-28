@@ -1,4 +1,5 @@
 {
+"randomize_args": {
  "radius_range": [
   200,
   400
@@ -11,4 +12,10 @@
   50,
   400
  ]
+},
+"adjustment_args": {
+    "target_mean_size": 0.45,
+    "min_shapes_num": 10,
+    "adjust_extending": true
+}
 }

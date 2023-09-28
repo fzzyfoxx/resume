@@ -14,6 +14,7 @@ from patterns import text_label_randomization, gen_colors, drawing_patterns
 import copy
 import cv2 as cv
 import warnings
+from scipy.stats import skewnorm
 
 
 ####
@@ -22,12 +23,101 @@ import warnings
 
 ####
 
+### functions for parcel size adjustment
+
+def bbox_size_from_input_shape(shape):
+    # shape input [N,1,2]
+    XY1 = np.min(shape, axis=0)[0]
+    XY2 = np.max(shape, axis=0)[0]
+    sizes = XY2-XY1
+    return np.mean(sizes)
+
+def relative_input_bbox_sizes(shapes, img_size):
+    img_size = np.mean(img_size)
+
+    return np.array([bbox_size_from_input_shape(shape) for shape in shapes])/img_size
+
+def bbox_center(shape):
+    # input shape [N,1,2]
+    # output shape [2]
+    XY1 = np.min(shape, axis=0)[0]
+    XY2 = np.max(shape, axis=0)[0]
+    return XY1+(XY2-XY1)/2
+
+def bbox_from_input_shape(shape):
+    # input shape [N,1,2]
+    # output shape [Xmin,Ymin,Xmax,Ymax]
+    XY1 = np.min(shape, axis=0)[0]
+    XY2 = np.max(shape, axis=0)[0]
+    return np.concatenate([XY1, XY2], axis=0)
+
+def crop_shape_by_window(shape, window_polygon):
+    shape_polygon = shapely.Polygon(shape[:,0])
+    if shapely.intersects(shape_polygon, window_polygon):
+        try:
+            shape_polygon = shapely.intersection(shape_polygon, window_polygon)
+            coords = np.array([[x,y] for x,y in zip(*shape_polygon.exterior.xy)])[:,np.newaxis]
+            if len(coords)>2:
+                return coords
+            else:
+                return None
+        except:
+            return None
+    else:
+        return None
+
+def cropping_shape_input(shapes, img_size, padding, target_mean_size, min_shapes_num, adjust_extending=False):
+    bbox_sizes = relative_input_bbox_sizes(shapes, img_size)
+    centroids = np.stack([bbox_center(shape) for shape in shapes], axis=0)
+    bboxes = np.stack([bbox_from_input_shape(shape) for shape in shapes], axis=0)
+    init_window_size = img_size-2*padding
+
+    filtered_shapes = shapes.copy()
+    approx_mean_size = np.mean(bbox_sizes)
+    shapes_num = len(shapes)
+    scaler = 1.0
+    
+    while (shapes_num>min_shapes_num) & (approx_mean_size<target_mean_size):
+        center = np.mean(centroids, axis=0, keepdims=True)
+        corners = [bboxes[:,[x,y]] for x in [0,2] for y in [1,3]]
+        corner_scores = [np.mean(np.abs(corner-center), axis=-1) for corner in corners]
+        corner_scores_agg = [np.max(s) for s in corner_scores]
+        delete_idx = np.argmax(corner_scores[np.argmax(corner_scores_agg)])
+
+        bbox_sizes = np.delete(bbox_sizes, delete_idx, axis=0)
+        bboxes = np.delete(bboxes, delete_idx, axis=0)
+        centroids = np.delete(centroids, delete_idx, axis=0)
+        filtered_shapes.pop(delete_idx)
+        
+        new_window_size = np.max(bboxes[:,2:], axis=0)-np.min(bboxes[:,:2], axis=0)
+        scaler = init_window_size/new_window_size
+        approx_mean_size = np.mean(bbox_sizes)*np.mean(scaler)
+        shapes_num -= 1
+
+    left_upper = np.min(bboxes[:,:2], axis=0)
+
+    if adjust_extending:
+        right_bottom = np.max(bboxes[:,2:], axis=0)
+        window = np.concatenate([left_upper, right_bottom], axis=0)
+        window_polygon = shapely.Polygon([window[[x,y]] for x,y in zip([0,0,2,2],[1,3,3,1])])
+        filtered_shapes = [shape for shape in [crop_shape_by_window(shape, window_polygon) for shape in shapes] if shape is not None]
+
+    left_upper = left_upper[np.newaxis, np.newaxis]
+    rescaled_shapes = [((shape-left_upper)*scaler).astype(np.int32)+padding for shape in filtered_shapes]
+
+    return rescaled_shapes
+
+### input generator class
+
 class map_drawer_input_generator:
-    def __init__(self, client, randomize_args, batch_size, test_mode):
+    def __init__(self, client, randomize_args, batch_size, test_mode, adjustment, adjustment_args):
         self.client = client
         self.randomize_args = randomize_args
         self.batch_size = batch_size
         self.test_mode = test_mode
+
+        self.adjustment = adjustment
+        self.adjustment_args = adjustment_args # target_mean_size:float, min_shapes_num:int, adjust_extending:bool
 
         self.query = '''
                 with a as (
@@ -99,7 +189,13 @@ class map_drawer_input_generator:
 
         # prepare examples collections
         self.parcels = [self._prepare_example(*example_set) for example_set in zip(parcels, target_map_sizes, paddings)]
-        self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
+        if self.adjustment:
+            self.backgrounds = self.parcels.copy()
+            self.parcels = [{'shapes': cropping_shape_input(**example_set, **self.adjustment_args), 'img_size': example_set['img_size'], 'padding': example_set['padding']} 
+                            for example_set in self.parcels]
+            self.batch_iter = iter(zip(self.parcels, self.backgrounds[::-1]))
+        else:
+            self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
 
     def __next__(self):
         try:
@@ -107,7 +203,11 @@ class map_drawer_input_generator:
         except:
             if self.test_mode:
                 random.shuffle(self.parcels)
-                self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
+                if self.adjustment:
+                    random.shuffle(self.backgrounds)
+                    self.batch_iter = iter(zip(self.parcels, self.backgrounds))
+                else:
+                    self.batch_iter = iter(zip(self.parcels, self.parcels[::-1]))
             else:
                 self.download_batch()
             return next(self.batch_iter)
@@ -281,7 +381,6 @@ class map_drawer:
         
         self.patterns_info = args_randomizer._prepare_drawing_parameters(patterns_info)
 
-        self.shapes = shapes
         self.img_size = img_size
 
         self.background = background
@@ -296,9 +395,32 @@ class map_drawer:
 
         self.map_drawing_args = map_drawing_args
 
+        self.shapes, self.probs = self._compute_probs(shapes)
+
+    def _compute_probs(self, shapes):
+        shapes_num = len(shapes)
+        bbox_sizes = relative_input_bbox_sizes(shapes, self.img_size)
+
+        ## filter out small shapes
+        max_shapes_to_delete = max(0, shapes_num-self.map_drawing_args['min_shapes_num'])
+
+        small_bbox_idxs = np.where(bbox_sizes<self.map_drawing_args['minimal_bbox_size'])[0]
+        if (max_shapes_to_delete>0) & (len(small_bbox_idxs)>0):
+            idxs_to_delete = np.random.choice(small_bbox_idxs, size=min(max_shapes_to_delete, len(small_bbox_idxs)), replace=False)
+            bbox_sizes = np.delete(bbox_sizes, idxs_to_delete, axis=0)
+            shapes_num = len(bbox_sizes)
+            shapes = [shape for i, shape in enumerate(shapes) if i not in idxs_to_delete]
+        #######
+
+        probs = skewnorm.pdf(bbox_sizes, **self.map_drawing_args['distr_args'])+1e-5
+        probs = probs/np.sum(probs)
+
+        return shapes, probs
+
     def _assign_parcels(self, ):
         all_shapes_num = len(self.shapes)
         available_shape_idxs = list(range(all_shapes_num))
+        available_shape_probs = self.probs
         all_shapes_idxs = list(range(all_shapes_num))
 
         for info in self.patterns_info:
@@ -307,10 +429,13 @@ class map_drawer:
             if shape_type=='parcel_polygon':
                 shapes_num = min(shapes_num, len(available_shape_idxs)) if not transparent else min(shapes_num, all_shapes_num)
                 if shapes_num>0:
-                    selected_parcels_idxs = np.random.choice(all_shapes_idxs if transparent else available_shape_idxs, size=shapes_num, replace=False)
+                    p = self.probs if transparent else available_shape_probs
+                    selected_parcels_idxs = np.random.choice(all_shapes_idxs if transparent else available_shape_idxs, size=shapes_num, replace=False, p=p)
                     info['map_args']['shapes'] = copy.deepcopy(list(map(self.shapes.__getitem__, selected_parcels_idxs)))
                     if not transparent:
                         available_shape_idxs = [idx for idx in available_shape_idxs if idx not in selected_parcels_idxs]
+                        available_shape_probs = self.probs[available_shape_idxs].copy()
+                        available_shape_probs = available_shape_probs/np.sum(available_shape_probs)
                 else:
                     info['map_args']['shapes'] = []
             elif shape_type=='random_polygon':
@@ -363,7 +488,7 @@ class map_drawer:
         padding = ((self.img_size-img_size)/2).astype(np.int32)[np.newaxis, np.newaxis]
         cv.polylines(self.img, [shape+padding for shape in shapes], True, color=color)
 
-    def _gen_background_args(self, draw_parcels_prob, draw_background_prob, grayscale_prob, light_limit, background_labels_prob, background_labels_range):
+    def _gen_background_args(self, draw_parcels_prob, draw_background_prob, grayscale_prob, light_limit, background_labels_prob, background_labels_range, **kwargs):
         draw_parcels = np.random.binomial(1, draw_parcels_prob)
         draw_background = np.random.binomial(1, draw_background_prob)
 

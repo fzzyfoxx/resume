@@ -375,8 +375,8 @@ class full_map_generator:
 
         self.vocab = vocab
 
-        self.map_input_gen = map_drawer_input_generator(bigquery_client, self._load_args(parcel_input_args_path), batch_size=cfg.parcel_input_batch_size,
-                                                        test_mode=cfg.test_mode)
+        self.map_input_gen = map_drawer_input_generator(bigquery_client, **self._load_args(parcel_input_args_path), batch_size=cfg.parcel_input_batch_size,
+                                                        test_mode=cfg.test_mode, adjustment=cfg.parcel_input_adjustment)
 
         self.map_arg_randomizer = map_drawer_arg_randomizer(**self.map_args['map_drawing_randomize_args'])
         self.minimap_arg_randomizer = map_drawer_arg_randomizer(**self.minimap_args['map_drawing_randomize_args'])
