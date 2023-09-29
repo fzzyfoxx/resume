@@ -56,6 +56,28 @@ class FeaturePyramid(tf.keras.Model):
 
         return hidden_states[::-1]
     
+
+
+
+def gen_anchors(shape, anchor_size, window_size, anchor_scales, base_img_size):
+    H, W = shape[1], shape[2]
+    windows_num = math.ceil(H/window_size)*math.ceil(W/window_size)
+    height, width = base_img_size
+    anchors = len(anchor_scales)
+
+    rows = tf.repeat(tf.reshape(tf.range(height, delta=height//H, dtype=tf.float32), (1,H,1,1)), W, axis=2)
+    cols = tf.repeat(tf.reshape(tf.range(width, delta=width//W, dtype=tf.float32), (1,1,W,1)), H, axis=1)
+    grid = tf.concat([cols, rows], axis=-1)
+
+    pool = tf.keras.layers.AveragePooling2D(pool_size=window_size, padding='same')
+
+    centers = tf.reshape(tf.reshape(tf.repeat(tf.expand_dims(pool(grid), axis=-2), anchors, axis=-2), (1,windows_num,2*anchors)), (1,windows_num*anchors,2))
+
+    sizes = tf.stack([tf.constant([anchor_size/scale, anchor_size*scale], dtype=tf.float32) for scale in anchor_scales], axis=0) # [3,2]
+    sizes =  tf.reshape(tf.repeat(sizes[tf.newaxis, tf.newaxis], windows_num, axis=1), (1, windows_num*anchors, 2))
+
+    return tf.concat([centers, sizes], axis=-1)
+
 class RegionProposalNetwork(tf.keras.layers.Layer):
     def __init__(self, 
                  anchor_sizes=[24,48,64,156,224],
@@ -77,6 +99,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.anchor_scales = anchor_scales
         self.anchor_sizes = anchor_sizes
         self.window_sizes = window_sizes
+        self.base_img_size = base_img_size
         self.height, self.width = base_img_size
         self.input_mapping = input_mapping
         self.bbox_training = bbox_training
@@ -92,28 +115,6 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.add_bbox_dense_layer = add_bbox_dense_layer
 
         self.delta_scaler = tf.constant(delta_scaler, tf.float32)
-
-    def _get_anchor_centers(self, shape, windows_num, anchor_size, window_size):
-        H, W = shape[1], shape[2]
-        rows = tf.repeat(tf.reshape(tf.range(self.height, delta=self.height//H, dtype=tf.float32), (1,H,1,1)), W, axis=2)
-        cols = tf.repeat(tf.reshape(tf.range(self.width, delta=self.width//W, dtype=tf.float32), (1,1,W,1)), H, axis=1)
-        grid = tf.concat([cols, rows], axis=-1)
-
-        pool = tf.keras.layers.AveragePooling2D(pool_size=window_size, padding='same')
-
-        centers = tf.reshape(tf.reshape(tf.repeat(tf.expand_dims(pool(grid), axis=-2), self.anchors, axis=-2), (1,windows_num,2*self.anchors)), (1,windows_num*self.anchors,2))
-
-        sizes = tf.stack([tf.constant([anchor_size/scale, anchor_size*scale], dtype=tf.float32) for scale in self.anchor_scales], axis=0) # [3,2]
-        sizes =  tf.reshape(tf.repeat(sizes[tf.newaxis, tf.newaxis], windows_num, axis=1), (1, windows_num*self.anchors, 2))
-
-        return tf.concat([centers, sizes], axis=-1)
-    
-    '''def _get_anchor_sizes(self, shape):
-        H, W = shape[1], shape[2]
-        anchor_height = self.height/H*self.window_size
-        anchor_width = self.width/W*self.window_size
-
-        return tf.cast([anchor_height, anchor_width], dtype=tf.float32)[tf.newaxis, tf.newaxis]'''
     
     def _map_input(self, x):
         return [x[i] for i in self.input_mapping]
@@ -185,7 +186,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.concat_bbox = tf.keras.layers.Concatenate(axis=-2)
 
         # generate anchor points
-        self.anchor_bboxes = [self._get_anchor_centers(shape, windows_num, anchor_size, window_size) for 
+        self.anchor_bboxes = [gen_anchors(shape, anchor_size, window_size, self.anchor_scales, self.base_img_size) for 
                               shape, windows_num, anchor_size, window_size in zip(input_shape, windows_nums, self.anchor_sizes, self.window_sizes)]
         #self.anchor_sizes = [self._get_anchor_sizes(shape) for shape in input_shape]
 

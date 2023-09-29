@@ -43,6 +43,24 @@ class WeightedF12D(tf.keras.metrics.Metric):
 
     def result(self):
         return self.score.result()
+
+def extract_coords(bbox):
+        return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
+    
+def calc_area(Y1,X1,Y2,X2):
+        return (X2-X1)*(Y2-Y1)
+
+def IoU(a,b):
+    aY1, aX1, aY2, aX2 = extract_coords(a)
+    bY1, bX1, bY2, bX2 = extract_coords(b)
+
+    xI = tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2)
+    yI = tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2)
+
+    I = xI*yI
+    U = calc_area(aY1, aX1, aY2, aX2)+calc_area(bY1, bX1, bY2, bX2)-I
+
+    return tf.math.divide_no_nan(I,U)
     
 
 class IoUMetric(tf.keras.metrics.Metric):
@@ -51,26 +69,9 @@ class IoUMetric(tf.keras.metrics.Metric):
 
         self.score = tf.keras.metrics.Mean()
 
-    @staticmethod
-    def _extract_coords(bbox):
-        return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
-    
-    @staticmethod
-    def _calc_area(Y1,X1,Y2,X2):
-        return (X2-X1)*(Y2-Y1)
-
     def update_state(self, y_true, y_pred, sample_weight=None):
 
-        aY1, aX1, aY2, aX2 = self._extract_coords(y_true)
-        bY1, bX1, bY2, bX2 = self._extract_coords(y_pred)
-
-        xI = tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2)
-        yI = tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2)
-
-        I = xI*yI
-        U = self._calc_area(aY1, aX1, aY2, aX2)+self._calc_area(bY1, bX1, bY2, bX2)-I
-
-        scores = tf.expand_dims(tf.math.divide_no_nan(I,U), axis=-1)
+        scores = tf.expand_dims(IoU(y_true, y_pred), axis=-1)
 
         self.score.update_state(scores, sample_weight=sample_weight)
 
@@ -271,26 +272,8 @@ class MultivariantHungarianLoss():
     ##### BBox Loss #####
 
     ### IoU
-
-    @staticmethod
-    def _extract_coords(bbox):
-        return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
-    
-    @staticmethod
-    def _calc_area(Y1,X1,Y2,X2):
-        return (X2-X1)*(Y2-Y1)
-    
     def IoULoss(self, a, b):
-        aY1, aX1, aY2, aX2 = self._extract_coords(a)
-        bY1, bX1, bY2, bX2 = self._extract_coords(b)
-
-        xI = tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2)
-        yI = tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2)
-
-        I = xI*yI
-        U = self._calc_area(aY1, aX1, aY2, aX2)+self._calc_area(bY1, bX1, bY2, bX2)-I
-
-        return 1-I/tf.clip_by_value(U, 1e-5, 1-1e-5)
+        return 1-tf.clip_by_value(IoU(a,b), 1e-5, 1-1e-5)
     
     ### Bbox regression
     def Ln(self, a, b):
