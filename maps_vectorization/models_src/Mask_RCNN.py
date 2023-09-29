@@ -60,22 +60,26 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def __init__(self, 
                  anchor_sizes=[24,48,64,156,224],
                  anchor_scales=[0.5,1.0,2.0], 
-                 window_size=1, 
+                 window_sizes=[1,1,1,1,1], 
+                 input_mapping=[0,1,2,3,4],
                  base_img_size=(256,256), 
                  init_top_k_proposals=0.3,
                  output_proposals=1000,
                  iou_threshold = 0.5,
                  add_bbox_dense_layer = False,
                  normalize_bboxes = False,
-                 delta_scaler = [0.2,0.2,0.1,0.1],
+                 delta_scaler = [1.0,1.0,1.0,1.0],
+                 bbox_training=True,
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
 
         self.anchors = len(anchor_scales)
         self.anchor_scales = anchor_scales
         self.anchor_sizes = anchor_sizes
-        self.window_size = window_size
+        self.window_sizes = window_sizes
         self.height, self.width = base_img_size
+        self.input_mapping = input_mapping
+        self.bbox_training = bbox_training
 
         self.img_size_tensor = tf.constant(base_img_size, dtype=tf.float32)[tf.newaxis, tf.newaxis]
 
@@ -89,13 +93,13 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         self.delta_scaler = tf.constant(delta_scaler, tf.float32)
 
-    def _get_anchor_centers(self, shape, windows_num, anchor_size):
+    def _get_anchor_centers(self, shape, windows_num, anchor_size, window_size):
         H, W = shape[1], shape[2]
         rows = tf.repeat(tf.reshape(tf.range(self.height, delta=self.height//H, dtype=tf.float32), (1,H,1,1)), W, axis=2)
         cols = tf.repeat(tf.reshape(tf.range(self.width, delta=self.width//W, dtype=tf.float32), (1,1,W,1)), H, axis=1)
         grid = tf.concat([cols, rows], axis=-1)
 
-        pool = tf.keras.layers.AveragePooling2D(pool_size=self.window_size, padding='same')
+        pool = tf.keras.layers.AveragePooling2D(pool_size=window_size, padding='same')
 
         centers = tf.reshape(tf.reshape(tf.repeat(tf.expand_dims(pool(grid), axis=-2), self.anchors, axis=-2), (1,windows_num,2*self.anchors)), (1,windows_num*self.anchors,2))
 
@@ -110,9 +114,12 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         anchor_width = self.width/W*self.window_size
 
         return tf.cast([anchor_height, anchor_width], dtype=tf.float32)[tf.newaxis, tf.newaxis]'''
+    
+    def _map_input(self, x):
+        return [x[i] for i in self.input_mapping]
 
     def _bbox_decoding(self, bbox, anchor_bboxes):
-        #bbox *= self.delta_scaler
+        bbox *= self.delta_scaler
         dYX, dHW = bbox[...,:2], bbox[...,2:]
         YX, HW = anchor_bboxes[...,:2], anchor_bboxes[...,2:]
 
@@ -151,15 +158,23 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         
 
     def build(self, input_shape):
+        input_shape = self._map_input(input_shape)
 
         self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same') for shape in input_shape]
-        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=self.window_size, strides=self.window_size, padding='same', kernel_initializer='zeros') for _ in input_shape]
+        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', kernel_initializer='zeros') for window_size in self.window_sizes]
         if self.add_bbox_dense_layer:
             self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros') for _ in input_shape]
+            if not self.bbox_training:
+                for layer in self.bbox_dense:
+                    layer.trainable = False
 
-        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=self.window_size, strides=self.window_size, padding='same') for _ in input_shape]
+        if not self.bbox_training:
+            for layer in self.bbox_convs:
+                layer.trainable = False
 
-        windows_nums = [math.ceil(shape[1]/self.window_size)*math.ceil(shape[2]/self.window_size) for shape in input_shape]
+        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=window_size, strides=window_size, padding='same') for window_size in self.window_sizes]
+
+        windows_nums = [math.ceil(shape[1]/window_size)*math.ceil(shape[2]/window_size) for shape, window_size in zip(input_shape, self.window_sizes)]
         print(f'windows nums: {windows_nums}')
         self.bbox_reshapes = [tf.keras.layers.Reshape((anchor_num*self.anchors,4)) for anchor_num in windows_nums]
         self.confidence_reshapes = [tf.keras.layers.Reshape((anchor_num*self.anchors,)) for anchor_num in windows_nums]
@@ -170,7 +185,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.concat_bbox = tf.keras.layers.Concatenate(axis=-2)
 
         # generate anchor points
-        self.anchor_bboxes = [self._get_anchor_centers(shape, windows_num, anchor_size) for shape, windows_num, anchor_size in zip(input_shape, windows_nums, self.anchor_sizes)]
+        self.anchor_bboxes = [self._get_anchor_centers(shape, windows_num, anchor_size, window_size) for 
+                              shape, windows_num, anchor_size, window_size in zip(input_shape, windows_nums, self.anchor_sizes, self.window_sizes)]
         #self.anchor_sizes = [self._get_anchor_sizes(shape) for shape in input_shape]
 
         # initial proposal limit
@@ -180,6 +196,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         print(f'top k anchors num: {self.init_top_k}')
 
     def call(self, inputs, training=None):
+        inputs = self._map_input(inputs)
         # initial convolution for each feature in pyramid
         features = [conv(state) for state, conv in zip(inputs, self.in_convs)]
 
