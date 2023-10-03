@@ -154,7 +154,6 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
                  delta_scaler = [1.0,1.0,1.0,1.0],
                  bbox_training=True,
                  confidence_training=True,
-                 core_training=True,
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
 
@@ -168,7 +167,6 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         self.bbox_training = bbox_training
         self.confidence_training = confidence_training
-        self.core_training = core_training
 
         self.img_size_tensor = tf.constant(base_img_size, dtype=tf.float32)[tf.newaxis, tf.newaxis]
 
@@ -198,7 +196,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
     def build(self, input_shape):
         input_shape = self._map_input(input_shape)
 
-        self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same', trainable=self.core_training) for shape in input_shape]
+        self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same', trainable=self.confidence_training) for shape in input_shape]
         self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', 
                                                   kernel_initializer='zeros', trainable=self.bbox_training) 
                            for window_size in self.window_sizes]
