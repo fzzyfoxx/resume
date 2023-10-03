@@ -78,6 +78,67 @@ def gen_anchors(shape, anchor_size, window_size, anchor_scales, base_img_size):
 
     return tf.concat([centers, sizes], axis=-1)
 
+
+class NonMaxSupression(tf.keras.layers.Layer):
+    def __init__(self, 
+                 init_top_k_proposals=0.5, 
+                 iou_threshold=0.5, 
+                 output_proposals=200,
+                 **kwargs):
+        super(NonMaxSupression, self).__init__(**kwargs)
+
+        self.init_top_k_ratio = init_top_k_proposals
+        self.output_proposals = output_proposals
+        self.iou_threshold = iou_threshold
+
+    def _top_k(self, confidence, bboxes, k):
+        idxs = tf.math.top_k(confidence, k).indices
+        confidence = tf.gather(confidence, idxs, batch_dims=1, axis=-1)
+        bboxes = tf.gather(bboxes, idxs, batch_dims=1, axis=-2)
+
+        return confidence, bboxes
+
+    def _non_max_suppresion(self, confidence, bboxes):
+        NMS_indices = tf.image.non_max_suppression(bboxes, confidence, max_output_size=self.output_proposals, iou_threshold=self.iou_threshold)
+
+        last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
+        additional_proposals = self.output_proposals-len(NMS_indices)
+        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))
+
+        NMS_bboxes = tf.gather(bboxes, NMS_indices, axis=0)
+        additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
+
+        NMS_confidence = tf.gather(confidence, NMS_indices, axis=0)
+        additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
+
+        confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
+        bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
+
+        confidence.set_shape((self.output_proposals,))
+        bboxes.set_shape((self.output_proposals, 4))
+
+        return confidence, bboxes
+
+    def build(self, input_shape):
+        anchors_num = input_shape[0][1]
+        self.init_top_k = int(anchors_num*self.init_top_k_ratio)
+
+    def call(self, inputs, training=None):
+        confidence, bboxes = inputs[0], inputs[1]
+        # limit proposals to k with best scores
+        confidence, bboxes = self._top_k(confidence, bboxes, k=self.init_top_k)
+
+        # proceed nom max suppression
+        confidence, bboxes = tf.map_fn(lambda x: self._non_max_suppresion(*x), elems=[confidence, bboxes], fn_output_signature=(tf.float32, tf.float32))
+
+        return confidence, bboxes
+
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape.as_list()[0]
+        return ((batch_size, self.output_proposals), (batch_size, self.output_porposals, 4))
+    
+
+
 class RegionProposalNetwork(tf.keras.layers.Layer):
     def __init__(self, 
                  anchor_sizes=[24,48,64,156,224],
@@ -92,6 +153,8 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
                  normalize_bboxes = False,
                  delta_scaler = [1.0,1.0,1.0,1.0],
                  bbox_training=True,
+                 confidence_training=True,
+                 core_training=True,
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
 
@@ -102,7 +165,10 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.base_img_size = base_img_size
         self.height, self.width = base_img_size
         self.input_mapping = input_mapping
+
         self.bbox_training = bbox_training
+        self.confidence_training = confidence_training
+        self.core_training = core_training
 
         self.img_size_tensor = tf.constant(base_img_size, dtype=tf.float32)[tf.newaxis, tf.newaxis]
 
@@ -128,52 +194,20 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         HW *= tf.math.exp(dHW)*0.5
 
         return tf.concat([tf.clip_by_value(YX-HW, [0,0], [self.height, self.width]), tf.clip_by_value(YX+HW, [0,0], [self.height, self.width])], axis=-1)
-    
-    def _top_k(self, confidence, bboxes, k):
-        idxs = tf.math.top_k(confidence, k).indices
-        confidence = tf.gather(confidence, idxs, batch_dims=1, axis=-1)
-        bboxes = tf.gather(bboxes, idxs, batch_dims=1, axis=-2)
-
-        return confidence, bboxes
-    
-    def _non_max_suppresion(self, confidence, bboxes):
-        NMS_indices = tf.image.non_max_suppression(bboxes, confidence, max_output_size=self.output_proposals, iou_threshold=self.iou_threshold)
-
-        last_idx = tf.reduce_max(tf.concat([NMS_indices, tf.constant([0])], axis=0))
-        additional_proposals = self.output_proposals-len(NMS_indices)
-        starting_point = tf.reduce_min(tf.stack([self.init_top_k-additional_proposals, last_idx+1], axis=0))
-
-        NMS_bboxes = tf.gather(bboxes, NMS_indices, axis=0)
-        additional_bboxes = bboxes[starting_point:(starting_point+additional_proposals)]
-
-        NMS_confidence = tf.gather(confidence, NMS_indices, axis=0)
-        additional_confidences = confidence[starting_point:(starting_point+additional_proposals)]
-
-        confidence =  tf.concat([NMS_confidence, additional_confidences], axis=0)
-        bboxes = tf.concat([NMS_bboxes, additional_bboxes], axis=0)
-
-        confidence.set_shape((self.output_proposals,))
-        bboxes.set_shape((self.output_proposals, 4))
-
-        return confidence, bboxes
-        
 
     def build(self, input_shape):
         input_shape = self._map_input(input_shape)
 
-        self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same') for shape in input_shape]
-        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', kernel_initializer='zeros') for window_size in self.window_sizes]
+        self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same', trainable=self.core_training) for shape in input_shape]
+        self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', 
+                                                  kernel_initializer='zeros', trainable=self.bbox_training) 
+                           for window_size in self.window_sizes]
         if self.add_bbox_dense_layer:
-            self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros') for _ in input_shape]
-            if not self.bbox_training:
-                for layer in self.bbox_dense:
-                    layer.trainable = False
+            self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros', trainable=self.bbox_training) for _ in input_shape]
 
-        if not self.bbox_training:
-            for layer in self.bbox_convs:
-                layer.trainable = False
 
-        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=window_size, strides=window_size, padding='same') for window_size in self.window_sizes]
+        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=window_size, strides=window_size, padding='same', trainable=self.confidence_training) 
+                                 for window_size in self.window_sizes]
 
         windows_nums = [math.ceil(shape[1]/window_size)*math.ceil(shape[2]/window_size) for shape, window_size in zip(input_shape, self.window_sizes)]
         print(f'windows nums: {windows_nums}')
@@ -192,9 +226,13 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         # initial proposal limit
         anchors_num = sum(windows_nums)*self.anchors
-        self.init_top_k = int(anchors_num*self.init_top_k_ratio)
+        if self.trainable:
+            self.output_proposals = anchors_num
+        #init_top_k = int(anchors_num*self.init_top_k_ratio)
+        self.NMS = NonMaxSupression(self.init_top_k_ratio, self.iou_threshold, self.output_proposals)
+        self.NMS.build([(None, anchors_num),(None, anchors_num, 4)])
         print(f'all anchors num: {anchors_num}')
-        print(f'top k anchors num: {self.init_top_k}')
+        print(f'top k anchors num: {self.NMS.init_top_k}')
 
     def call(self, inputs, training=None):
         inputs = self._map_input(inputs)
@@ -217,11 +255,10 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         confidence = self.concat_confidence(confidence)
         bboxes = self.concat_bbox(bboxes)
 
+        if not self.trainable:
         # limit proposals to k with best scores
-        confidence, bboxes = self._top_k(confidence, bboxes, k=self.init_top_k)
-
         # proceed nom max suppression
-        confidence, bboxes = tf.map_fn(lambda x: self._non_max_suppresion(*x), elems=[confidence, bboxes], fn_output_signature=(tf.float32, tf.float32))
+            confidence, bboxes = self.NMS([confidence, bboxes])
 
         if self.normalize_bboxes:
             bboxes /= self.bbox_normalization
@@ -276,6 +313,17 @@ class CombinedMetricsModel(tf.keras.Model):
     @property
     def metrics(self):
         return self.custom_metrics
+    
+    def update_metrics(self, loss, y_true_matched, y_pred_matched):
+        for metric in self.metrics:
+            if metric.name == "loss":
+                metric.update_state(loss)
+            else:
+                weight_label = metric.weight_label
+                sample_weight = y_true_matched[weight_label] if weight_label else None
+                metric.update_state(y_true_matched[metric.label], y_pred_matched[metric.label], sample_weight=sample_weight)
+        # Return a dict mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}
 
     def train_step(self, data):
         # Unpack the data. Its structure depends on your model and
@@ -295,15 +343,15 @@ class CombinedMetricsModel(tf.keras.Model):
         # Update weights
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
         # Update metrics (includes the metric that tracks the loss)
-        for metric in self.metrics:
-            if metric.name == "loss":
-                metric.update_state(loss)
-            else:
-                weight_label = metric.weight_label
-                sample_weight = y_true_matched[weight_label] if weight_label else None
-                metric.update_state(y_true_matched[metric.label], y_pred_matched[metric.label], sample_weight=sample_weight)
-        # Return a dict mapping metric names to current value
-        return {m.name: m.result() for m in self.metrics}
+        return self.update_metrics(loss, y_true_matched, y_pred_matched)
+    
+    def test_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        loss, y_true_matched, y_pred_matched = self.compute_loss(y=y, y_pred=y_pred)
+        loss = tf.reduce_mean(loss)
+
+        return self.update_metrics(loss, y_true_matched, y_pred_matched)
 
     def compute_loss(self, y=None, y_pred=None):
         return self.loss(y, y_pred)
