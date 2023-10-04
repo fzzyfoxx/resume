@@ -421,6 +421,10 @@ class RPNloss():
         target_bboxes = tf.repeat(tf.expand_dims(target_bboxes, axis=1), P, axis=1) # [B,P,T,4]
         pred_bboxes = tf.repeat(tf.expand_dims(bboxes if not self.confidence_score else self.anchors, 2), T, axis=2) # [B,P,T,4]
 
+        if self.confidence_score:
+            B = tf.shape(target_bboxes)[0]
+            pred_bboxes = tf.repeat(pred_bboxes, B, axis=0)
+
         scores = tf.reduce_max(IoU(target_bboxes, pred_bboxes), axis=2) # [B,P]
 
         if not self.confidence_score:
