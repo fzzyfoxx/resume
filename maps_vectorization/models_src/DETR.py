@@ -1,4 +1,5 @@
 import tensorflow as tf
+from models_src.Mask_RCNN import CombinedMetricsModel
 
 class SinePositionEncoding(tf.keras.layers.Layer):
     def __init__(self, fixed_dims=False, temperature=10000, **kwargs):
@@ -66,18 +67,20 @@ class LearnablePositionalEncoding(tf.keras.layers.Layer):
         return pos
     
 class FlatLearnablePositionalEncoding(tf.keras.layers.Layer):
-    def __init__(self, initializer=tf.keras.initializers.GlorotUniform(), **kwargs):
+    def __init__(self, num_queries, emb_dim, initializer=tf.keras.initializers.GlorotUniform(), **kwargs):
         super(FlatLearnablePositionalEncoding, self).__init__(**kwargs)
 
         self.initializer = initializer
+        self.num_queries = num_queries
+        self.emb_dim = emb_dim
 
-    def build(self, input_shape):
-        seq_len, dims = input_shape[1], input_shape[2]
-
-        self.pos = self.add_weight(shape=(seq_len, dims), initializer=self.initializer, trainable=True)
+        self.pos = self.add_weight(shape=(1,self.num_queries, self.emb_dim), initializer=self.initializer, trainable=True)
 
     def call(self, inputs):
         return self.pos
+    
+    def compute_output_shape(self, input_shape):
+        return (1,self.num_queries, self.emb_dim)
 
 class FFN(tf.keras.layers.Layer):
     def __init__(self, mid_layers=1, 
@@ -236,7 +239,7 @@ class DETRUpConv(tf.keras.layers.Layer):
         return x
     
 
-class DETRTransformer(tf.keras.Model):
+class DETRTransformer(CombinedMetricsModel):
     def __init__(self, 
                  input_shape=(256,256,3),
                  output_dim=100,
@@ -249,14 +252,18 @@ class DETRTransformer(tf.keras.Model):
                  FFN_activation='relu',
                  layers_num = 6,
                  pos_encoder = SinePositionEncoding(name='PositionalEncoder'),
-                 query_objects_encoder = FlatLearnablePositionalEncoding(name='QueryObjects-PosEncoder'),
                  upconv_blocks = 4,
+                 queries_num=50,
+                 FFN_out_layers=3,
+                 FFN_out_mid_units=1024,
+                 FFN_out_activation='relu',
+                 mask_output=False,
+                 metrics=[],
                  **kwargs):
         super(DETRTransformer, self).__init__(**kwargs)
 
         backbone = tf.keras.applications.vgg16.VGG16(include_top=False, input_shape=input_shape)
         self.backbone = tf.keras.Model(backbone.inputs, backbone.layers[-2].output, name='Backbone')
-        self.backbone.trainable = False
         backbone_shape = self.backbone.output_shape
 
         self.feature_extraction = tf.keras.layers.Conv2D(attn_dim, 1, name='Features-Extraction')
@@ -264,7 +271,7 @@ class DETRTransformer(tf.keras.Model):
         self.image_flatten = tf.keras.layers.Reshape((-1, attn_dim), name='Image-Flattening')
 
         self.pos_enc_func = pos_encoder
-        self.QO_enc_func = query_objects_encoder
+        self.QO_enc_func = FlatLearnablePositionalEncoding(queries_num, key_dim, name='QueryObjects-PosEncoder')
 
         self.encoder_layers = [EncoderLayer(attn_dim, key_dim, num_heads, dropout, 
                                             FFN_mid_layers, FFN_mid_units, FFN_activation,
@@ -273,13 +280,24 @@ class DETRTransformer(tf.keras.Model):
         self.decoder_layers = [DecoderLayer(attn_dim, key_dim, num_heads, dropout, 
                                             FFN_mid_layers, FFN_mid_units, FFN_activation,
                                             name=f'Decoder-{n}') for n in range(layers_num)]
-        
-        self.img_unsqueeze = tf.keras.layers.Reshape((backbone_shape[1], backbone_shape[2], attn_dim), name='IMG-Unsqueeze')
+        self.mask_output = mask_output
+        if mask_output:
+            self.img_unsqueeze = tf.keras.layers.Reshape((backbone_shape[1], backbone_shape[2], attn_dim), name='IMG-Unsqueeze')
+            self.upconvs = [DETRUpConv(filters=attn_dim, name=f'UpConv-{n}') for n in range(upconv_blocks)]
+            self.output_conv = tf.keras.layers.Conv2D(output_dim, 1, activation='sigmoid',name='Output-Conv')
+        else:
+            self.out_FFN = FFN(FFN_out_layers, FFN_out_mid_units, 5, dropout, FFN_out_activation, name='Out-FFN')
+            self.out_sigmoid = tf.keras.layers.Activation('sigmoid', name='Out-Sigmoid')
 
-        self.upconvs = [DETRUpConv(filters=attn_dim, name=f'UpConv-{n}') for n in range(upconv_blocks)]
-        self.output_conv = tf.keras.layers.Conv2D(output_dim, 1, activation='sigmoid',name='Output-Conv')
+        self.add_metrics(metrics)
 
         self.call(tf.keras.layers.Input(input_shape))
+
+    def _bbox_decoding(self, x):
+        C, YX, HW = x[...,:1], x[...,1:3], x[...,3:]*0.5
+
+        bboxes = tf.concat([tf.clip_by_value(YX-HW, [0,0], [1,1]), tf.clip_by_value(YX+HW, [0,0], [1,1])], axis=-1)
+        return C, bboxes
         
 
     def call(self, inputs, training=None):
@@ -295,17 +313,24 @@ class DETRTransformer(tf.keras.Model):
             memory = encoder_layer(memory, pos_enc, training=training)
 
         #Decoder
-        QO = tf.zeros_like(memory)
-        QO_enc = self.QO_enc_func(QO)
+        QO_enc = self.QO_enc_func(None)
+        QO = tf.zeros_like(QO_enc)
 
         for decoder_layer in self.decoder_layers:
             QO = decoder_layer(QO, memory, pos_enc, QO_enc, training=training)
 
-        # Upscale output images
-        output = self.img_unsqueeze(QO)
+        if self.mask_output:
+            # Upscale output images
+            output = self.img_unsqueeze(QO)
 
-        for upconv in self.upconvs:
-            output = upconv(output)
+            for upconv in self.upconvs:
+                output = upconv(output)
 
-        output = self.output_conv(output)
-        return tf.clip_by_value(output, 1e-8, 1-1e-8)
+            output = self.output_conv(output)
+            output = tf.clip_by_value(output, 1e-8, 1-1e-8)
+        else:
+            output = self.out_sigmoid(self.out_FFN(QO))
+            confidence, bboxes = self._bbox_decoding(output)
+            confidence = tf.squeeze(confidence, axis=2)
+            return {'class': confidence, 'bbox': bboxes}
+        return output
