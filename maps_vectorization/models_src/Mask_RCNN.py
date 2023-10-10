@@ -154,6 +154,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
                  delta_scaler = [1.0,1.0,1.0,1.0],
                  bbox_training=True,
                  confidence_training=True,
+                 nms=True,
                  **kwargs):
         super(RegionProposalNetwork, self).__init__(**kwargs)
 
@@ -164,6 +165,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         self.base_img_size = base_img_size
         self.height, self.width = base_img_size
         self.input_mapping = input_mapping
+        self.nms = nms
 
         self.bbox_training = bbox_training
         self.confidence_training = confidence_training
@@ -203,9 +205,9 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         
 
         self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', 
-                                                  kernel_initializer='zeros', trainable=self.bbox_training, 
-                                                  kernel_regularizer=tf.keras.regularizers.L2(1e-5), bias_regularizer=tf.keras.regularizers.L2(1e-5)) 
+                                                  kernel_initializer='zeros', trainable=self.bbox_training) 
                            for window_size in self.window_sizes]
+        
         if self.add_bbox_dense_layer:
             self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros', trainable=self.bbox_training) for _ in input_shape]
 
@@ -229,7 +231,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
 
         # initial proposal limit
         anchors_num = sum(windows_nums)*self.anchors
-        if self.trainable:
+        if not self.nms:
             self.output_proposals = anchors_num
         #init_top_k = int(anchors_num*self.init_top_k_ratio)
         self.NMS = NonMaxSupression(self.init_top_k_ratio, self.iou_threshold, self.output_proposals)
@@ -258,7 +260,7 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         confidence = self.concat_confidence(confidence)
         bboxes = self.concat_bbox(bboxes)
 
-        if not self.trainable:
+        if self.nms:
         # limit proposals to k with best scores
         # proceed nom max suppression
             confidence, bboxes = self.NMS([confidence, bboxes])

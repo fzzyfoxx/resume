@@ -175,6 +175,16 @@ class TrainingProcessor:
         print('\n\033[1mModel params\033[0m')
         print(model_args)
 
+    def save_temp_weights(self, weights_path):
+        try:
+            os.mkdir(weights_path)
+        except:
+            None
+        self.model.save_weights(f'./{weights_path}/weights.keras', save_format='keras')
+
+    def load_temp_weights(self, weights_path, skip_mismatch=True, by_name=True):
+        self.model.load_weights(f'./{weights_path}/weights.keras', skip_mismatch, by_name)
+
     def load_model(self, run_name, log=True, load_final_state=True):
         run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
         self.initial_epoch = int(run_args['params.epochs']) #int(run_args['params.initial_epoch']) + 

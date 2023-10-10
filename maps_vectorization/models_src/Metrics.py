@@ -371,12 +371,15 @@ class RPNloss():
     def __init__(self, 
                  confidence_score=True,
                  anchor_args=None,
+                 normalize_target_scores=False,
+                 iou_weight=0.5,
                  init_top_k_proposals=0.5, 
                  iou_threshold=0.5, 
                  output_proposals=200,
                  return_matching=True,
                  label_proposals=30,
                  matching_iou_weight=0.5,
+                 confidence_loss = tf.keras.losses.MeanAbsoluteError(),
                  name='RPNL',
                  **kwargs):
 
@@ -385,14 +388,19 @@ class RPNloss():
         self.return_matching = return_matching
         self.matching = MultivariantHungarianLoss(mask=False, losses_weights=[0.,1.,0.], output_proposals=label_proposals, 
                                                   iou_weight=matching_iou_weight, mask_class_pred=True, unit_class_matrix=True)
+        
+        self.normalize_target_scores = normalize_target_scores
+        self.iou_weight = iou_weight
         self.confidence_score = confidence_score
+
         if confidence_score:
             self.height, self.width = anchor_args['base_img_size']
             bbox_normalization = tf.constant(anchor_args['base_img_size']*2, dtype=tf.float32)[tf.newaxis,tf.newaxis]
             anchors = tf.concat([gen_anchors((None, size, size), anchor_size, window_size, anchor_args['anchor_scales'], anchor_args['base_img_size']) 
                                       for size, anchor_size, window_size in zip(*list(map(anchor_args.get, ['input_sizes', 'anchor_sizes', 'window_sizes'])))], axis=1)
             self.anchors = self._bbox_decoding(anchors)/bbox_normalization
-            self.BC = tf.keras.losses.BinaryCrossentropy(reduction='none')
+            self.BC = confidence_loss #tf.keras.losses.BinaryCrossentropy(reduction='none')
+            self.BC.reduction = tf.keras.losses.Reduction.NONE
 
     def get_config(self):
         return {
@@ -413,9 +421,12 @@ class RPNloss():
     def _binary_crossentropy(a,b):
         b = tf.clip_by_value(b, 1e-5, 1-1e-5)
         return a*tf.math.log(b) + (1-a)*tf.math.log(1-b)
+    
+    def Ln(self, a, b):
+        return tf.reduce_mean(tf.abs((a-b)), axis=-1)
 
     def __call__(self, y_true, y_pred):
-        target_bboxes = y_true['bbox'] # [B,T,4]
+        target_bboxes, target_class = y_true['bbox'], y_true['class'] # [B,T,4], [B,T]
         confidence, bboxes = y_pred['class'], y_pred['bbox'] # [B,P], [B,P,4]
 
         T, P = tf.shape(target_bboxes)[1], tf.shape(bboxes)[1]
@@ -426,7 +437,14 @@ class RPNloss():
             B = tf.shape(target_bboxes)[0]
             pred_bboxes = tf.repeat(pred_bboxes, B, axis=0)
 
-        scores = tf.reduce_max(IoU(target_bboxes, pred_bboxes), axis=2) # [B,P]
+        scores = self.iou_weight*IoU(target_bboxes, pred_bboxes)+(1-self.iou_weight)*(1-self.Ln(target_bboxes, pred_bboxes)) #[B,P,T]
+        if self.normalize_target_scores:
+            max_scores = tf.reduce_max(scores, axis=1, keepdims=True) + 1e-6 # [B,1,T]
+            scores /= max_scores
+
+        mask = tf.expand_dims(target_class, axis=1) # [B,1,T]
+        scores *= mask
+        scores = tf.reduce_max(scores, axis=2)+1e-3 # [B,P]
 
         if not self.confidence_score:
             weighted_confidence = confidence/tf.reduce_sum(confidence, axis=-1, keepdims=True)#tf.nn.softmax(confidence, axis=-1) # [B,P]
