@@ -1,0 +1,254 @@
+import os
+import math
+import matplotlib.pyplot as plt
+import inspect
+import mlflow
+import warnings
+import tensorflow as tf
+import numpy as np
+import shutil
+from google.cloud import storage
+
+storage_client = storage.Client()
+
+from models_src.UNet_model import UNet
+from models_src.SegNet_model import SegNet
+from models_src.DETR import DETRTransformer
+
+from models_src.Support import SmoothOutput, DatasetGenerator, BuildHyperModel
+
+
+class TrainingProcessor:
+    def __init__(self, cfg, map_generator):
+        self.cfg = cfg
+        self.map_generator = map_generator
+
+        self.model_gen_funcs = {
+            'UNet': self._gen_UNet,
+            'SegNet': self._gen_SegNet,
+            'DETR': self._gen_DETR,
+            'ResNet': self._gen_ResNet
+        }
+
+        self.steps_per_epoch = int(cfg.fold_size/cfg.ds_batch_size)
+
+        self.cfg_attrs = self._get_cfg_attrs()
+
+        self.reload_dataset(reload_parcels=False)
+
+    def _get_cfg_attrs(self):
+        return [(a, getattr(self.cfg, a)) for a in dir(self.cfg) if not a.startswith('__')]
+
+    def _gen_UNet(self, model_args):
+        inputs = tf.keras.layers.Input((self.cfg.target_size,self.cfg.target_size,3), dtype=tf.float32, name='Map_Input')
+        x = UNet(**model_args, name='UNet')(inputs)
+        outputs = SmoothOutput()(x)
+
+        return tf.keras.Model(inputs, outputs)
+    
+    def _gen_SegNet(self, model_args):
+        inputs = tf.keras.layers.Input((self.cfg.target_size,self.cfg.target_size,3), dtype=tf.float32, name='Map_Input')
+        x = SegNet(**model_args, name='SegNet')(inputs)
+        outputs = SmoothOutput()(x)
+        return tf.keras.Model(inputs, outputs)
+    
+    def _gen_DETR(self, model_args):
+        model = DETRTransformer(**model_args, name='DETR')
+        model.build((None, self.cfg.target_size, self.cfg.target_size, 3))
+        return model
+    
+    def load_model_generator(self, model_generator):
+        self.model_generator = model_generator
+    
+    def _gen_ResNet(self, model_args):
+        return self.model_generator(**model_args)
+
+    def reload_dataset(self, reload_parcels=True):
+        if reload_parcels:
+            self.map_generator.reload_parcel_inputs()
+        self.dg = DatasetGenerator(self.cfg, self.map_generator)
+
+    def _log_mlflow_params(self,):
+        try:
+            mlflow.start_run()
+            print(f'MLflow run: {mlflow.active_run().info.run_name}')
+            for key in self.model_args.keys():
+                mlflow.log_param(key, self.model_args[key])
+
+            for key, value in self.cfg_attrs:
+                mlflow.log_param(key, value)
+
+            for key in self.loss_args.keys():
+                mlflow.log_param('loss.'+key, self.loss_args[key])
+
+            mlflow.log_param('model_type', self.model_type)
+        except:
+            None
+
+    def compile_model(self, model_type, model_args, optimizer, loss, metrics, print_summary=True, log=True, export_model=True):
+        self.model_args = model_args
+        self.model_type = model_type
+        self.loss_args = loss.get_config()
+
+        self.model = self.model_gen_funcs[model_type](model_args)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.model.compile(
+                optimizer=optimizer,
+                loss = loss,
+                metrics = metrics
+                )
+        
+        if log:
+            self._log_mlflow_params()
+            if export_model:
+                mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(loss, metrics))
+
+        if print_summary:
+            print(self.model.summary(expand_nested=True))
+
+        self.initial_epoch = 0
+
+    def _get_custom_measures(self,loss, metrics):
+        custom_objects = {}
+        for c in ([loss]+metrics):
+            if c.__module__.split('.')[0]!='keras':
+                custom_objects[c.__class__.__name__] = c
+        return custom_objects
+
+    def train_model(self, epochs, callbacks=None, continue_run=False, export_final_state=True, export_model=True):
+        if continue_run:
+            self._log_mlflow_params()
+            if export_model:
+                mlflow.tensorflow.log_model(self.model, 'model', custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.model.fit(self.dg.ds, epochs=epochs+self.initial_epoch, steps_per_epoch=self.steps_per_epoch, callbacks=callbacks, initial_epoch=self.initial_epoch)
+        self.initial_epoch += epochs
+
+        if export_final_state:
+            #save weights
+            self.model.save_weights('./final_state/variables')
+            mlflow.log_artifacts('./final_state', 'final_state')
+        
+        try:
+            mlflow.end_run()
+        except:
+            None
+
+    ### LOAD MODEL
+
+    def _load_mlflow_args(self, run_args):
+        cfg_params = {}
+        # fit method parameters
+        fit_args = ['params.'+p for p in inspect.getfullargspec(tf.keras.Model.fit)[0]]
+        run_args = run_args[~run_args.index.str.contains('opt_', case=False) & run_args.index.str.contains('params.') & ~run_args.index.isin(fit_args)]
+
+        # get loss attributes
+        loss_args = {key.split('.')[-1]: value for key, value in run_args[run_args.index.str.contains('loss.')].to_dict().items()}
+        run_args = run_args[~run_args.index.str.contains('loss.')]
+
+        # look for general configuration parameters
+        for key, _ in self.cfg_attrs:
+            search_results = [(p,run_args[p]) for p in run_args.index if 'params.'+key==p]
+            if len(search_results)>0:
+                param, value = search_results[0]
+                cfg_params[key] = getattr(__builtins__, type(getattr(self.cfg,key)).__name__)(value)
+                run_args = run_args.drop(param)
+
+        # get model args
+        model_args = {key.split('.')[-1]: value for key, value in run_args.to_dict().items()}
+
+        if not np.all([getattr(self.cfg, key)==value for key, value in cfg_params.items()]):
+            for key, value in cfg_params.items():
+                setattr(self.cfg, key, value)
+
+            self.reload_dataset()
+
+        self.loss_args = loss_args
+        self.model_args = model_args
+
+        print('\n\033[1mLoss params\033[0m')
+        print(loss_args)
+
+        print('\n\033[1mModel params\033[0m')
+        print(model_args)
+
+    def load_model(self, run_name, log=True, load_final_state=True):
+        run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
+        self.initial_epoch = int(run_args['params.epochs']) #int(run_args['params.initial_epoch']) + 
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.model = mlflow.tensorflow.load_model(os.path.join(run_args.artifact_uri, "model"))
+
+        if load_final_state:
+            mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
+                                    dst_path='./')
+            self.model.load_weights('final_state/variables')
+
+        if log:
+            self._load_mlflow_args(run_args)
+            self._log_mlflow_params()
+            mlflow.tensorflow.log_model(self.model, 'model', custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
+
+    ### HYPERPARAMETER TUNING
+
+    def build_tuner(self, model_type, model_hp, optimizer_class, optimizer_hp, loss_class, loss_hp, metrics_classes, metrics_hp, mlflow_log, mlflow_instance, tuner_class, tuner_args):
+        self.tuner = tuner_class(
+            BuildHyperModel(self.model_gen_funcs[model_type], model_hp, optimizer_class, optimizer_hp, loss_class, loss_hp, metrics_classes, metrics_hp, mlflow_log, mlflow_instance),
+            **tuner_args
+        )
+
+    def run_tuner(self, epochs, callbacks=[], callbacks_classes=[], callbacks_hp=[]):
+        self.tuner.search(self.dg.ds, epochs=epochs, steps_per_epoch=self.steps_per_epoch, callbacks=callbacks, callbacks_classes=callbacks_classes, callbacks_hp=callbacks_hp)
+        print('Best Parameters')
+        print(self.tuner.get_best_hyperparameters()[0].values) 
+
+        self.model = self.tuner.get_best_models(num_models=1)[0]
+
+    def upload_tensorboard_logs(self, filename ,folder_path='logs', delete_after=True):
+        shutil.make_archive(filename, 'zip', folder_path)
+
+        bucket = storage_client.get_bucket(storage_client.project + '-tb-logs')
+        result = bucket.blob(filename).upload_from_filename(filename+'.zip')
+
+        if delete_after:
+            os.remove(filename+'.zip')
+
+        return result
+    
+    def download_tensorboard_logs(self, filename, save_path='', unpack_path='logs', delete_after=True):
+        bucket = storage_client.get_bucket(storage_client.project + '-tb-logs')
+        result = bucket.blob(filename).download_to_filename(os.path.join(save_path, filename+'.zip'))
+
+        shutil.unpack_archive(os.path.join(save_path, filename+'.zip'), unpack_path, 'zip')
+
+        if delete_after:
+            os.remove(os.path.join(save_path, filename+'.zip'))
+
+        return result
+
+    ### DISPLAY RESULTS
+
+    def print_predicted_maps(self, background_type='features', cmap='gray', alpha=0.5 ,threshold=0.5):
+
+        features, labels = next(self.dg.ds_iter)
+        preds = self.model.predict(features)
+        preds = tf.where(preds>threshold, 1.0, 0.0)
+
+        cols=4
+        rows = math.ceil(len(features)/cols)
+
+        if background_type=='features':
+            backgrounds = features
+        elif background_type=='labels':
+            backgrounds = labels
+        else:
+            backgrounds = [None]*len(preds)
+
+        fig, axs = plt.subplots(rows, cols, figsize=(cols*4,rows*4))
+        for background, pred, ax in zip(backgrounds, preds, axs.flat):
+            if type(background).__name__!='NoneType':
+                ax.imshow(background)
+            ax.imshow(pred, cmap=cmap, alpha=alpha)

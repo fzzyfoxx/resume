@@ -46,7 +46,7 @@ class UNetUpConvBlock(tf.keras.layers.Layer):
         return x
 
 class UNet(tf.keras.Model):
-    def __init__(self, init_filters_power=6, levels=5, kernel_size=(3,3), pooling_size=(2,2), init_dropout=0.25, dropout=0.5, padding='same', **kwargs):
+    def __init__(self, out_dims=1, out_activation='sigmoid', init_filters_power=6, levels=5, kernel_size=(3,3), pooling_size=(2,2), init_dropout=0.25, dropout=0.5, padding='same', **kwargs):
         super(UNet, self).__init__(self, **kwargs)
         conv2D_args = {'kernel_size': kernel_size, 'activation': 'relu', 'padding': padding}
 
@@ -59,7 +59,7 @@ class UNet(tf.keras.Model):
         self.downsize_layers = [UNetConvBlock(init_filters*2**i, **conv2D_args, pooling_size=pooling_size, dropout=d) for i,d in enumerate(conv_dropout_list)]
         self.upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d) for i,d in enumerate(upconv_dropout_list)]
 
-        self.final_conv = tf.keras.layers.Conv2D(1, (1,1), activation='sigmoid')
+        self.final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation)
     
     def call(self, inputs, training=False):
         conv_levels = []

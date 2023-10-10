@@ -197,15 +197,20 @@ class RegionProposalNetwork(tf.keras.layers.Layer):
         input_shape = self._map_input(input_shape)
 
         self.in_convs = [tf.keras.layers.Conv2D(shape[-1], kernel_size=3, activation='relu', padding='same', trainable=self.confidence_training) for shape in input_shape]
+
+        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=window_size, strides=window_size, padding='same', trainable=self.confidence_training) 
+                                 for window_size in self.window_sizes]
+        
+
         self.bbox_convs = [tf.keras.layers.Conv2D(self.anchors*4, kernel_size=window_size, strides=window_size, padding='same', 
-                                                  kernel_initializer='zeros', trainable=self.bbox_training) 
+                                                  kernel_initializer='zeros', trainable=self.bbox_training, 
+                                                  kernel_regularizer=tf.keras.regularizers.L2(1e-5), bias_regularizer=tf.keras.regularizers.L2(1e-5)) 
                            for window_size in self.window_sizes]
         if self.add_bbox_dense_layer:
             self.bbox_dense = [tf.keras.layers.Dense(self.anchors*4, kernel_initializer='zeros', trainable=self.bbox_training) for _ in input_shape]
 
 
-        self.confidence_convs = [tf.keras.layers.Conv2D(self.anchors, kernel_size=window_size, strides=window_size, padding='same', trainable=self.confidence_training) 
-                                 for window_size in self.window_sizes]
+        
 
         windows_nums = [math.ceil(shape[1]/window_size)*math.ceil(shape[2]/window_size) for shape, window_size in zip(input_shape, self.window_sizes)]
         print(f'windows nums: {windows_nums}')

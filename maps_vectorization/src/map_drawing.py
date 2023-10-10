@@ -1,5 +1,7 @@
 import os
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
+import sys
+sys.path.append(os.path.abspath(".../"))
+#os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 from google.cloud import bigquery
 from google.auth import default
@@ -10,7 +12,7 @@ import numpy as np
 import math
 import random
 from PIL import Image, ImageFont, ImageDraw
-from patterns import text_label_randomization, gen_colors, drawing_patterns
+from src.patterns import text_label_randomization, gen_colors, drawing_patterns
 import copy
 import cv2 as cv
 import warnings

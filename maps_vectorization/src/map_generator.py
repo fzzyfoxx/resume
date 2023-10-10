@@ -1,8 +1,10 @@
 import os
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
+import sys
+sys.path.append(os.path.abspath(".../"))
+#os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-from map_drawing import map_drawer_input_generator, map_drawer_arg_randomizer, map_drawer
-from legend import load_vocab, gen_random_legend_properties, draw_legend
+from src.map_drawing import map_drawer_input_generator, map_drawer_arg_randomizer, map_drawer
+from src.legend import load_vocab, gen_random_legend_properties, draw_legend
 
 import numpy as np
 import math

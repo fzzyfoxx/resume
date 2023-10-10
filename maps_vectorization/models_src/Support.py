@@ -8,7 +8,6 @@ import time
 import src.map_generator as mg
 import numpy as np
 from google.cloud import storage
-import shutil
 import warnings
 import math
 

@@ -380,6 +380,7 @@ class RPNloss():
                  name='RPNL',
                  **kwargs):
 
+        self.name = name
         self.NMS = NonMaxSupression(init_top_k_proposals, iou_threshold, output_proposals)
         self.return_matching = return_matching
         self.matching = MultivariantHungarianLoss(mask=False, losses_weights=[0.,1.,0.], output_proposals=label_proposals, 
@@ -428,7 +429,7 @@ class RPNloss():
         scores = tf.reduce_max(IoU(target_bboxes, pred_bboxes), axis=2) # [B,P]
 
         if not self.confidence_score:
-            weighted_confidence = tf.nn.softmax(confidence, axis=-1) # [B,P]
+            weighted_confidence = confidence/tf.reduce_sum(confidence, axis=-1, keepdims=True)#tf.nn.softmax(confidence, axis=-1) # [B,P]
             loss_value = 1-tf.reduce_sum(scores*weighted_confidence, axis=-1)
         else:
             confidence = tf.clip_by_value(confidence, 1e-5, 1-1e-5)
