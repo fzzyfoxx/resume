@@ -259,7 +259,7 @@ class DatasetGenerator:
             blob.upload_from_filename(filepath)
             pb.add(1)
 
-    def download_dataset_from_storage(self, name, ds_path='./datasets/train'):
+    def download_dataset_from_storage(self, name, storage_client, ds_path='./datasets/train'):
         create_path_if_needed(ds_path)
         bucket_name = storage_client.project + name
         bucket = storage_client.get_bucket(bucket_name)
@@ -276,7 +276,7 @@ class DatasetGenerator:
         storage_client.get_bucket(bucket_name).delete(force=True)
 
 
-    def new_dataset(self, repeat=True, from_saved=False, batch=True, format_output=True, ds_path='./datasets/train'):
+    def new_dataset(self, repeat=True, from_saved=False, batch=True, format_output=True, validation=False, val_idxs=[], shuffle_buffer_size=0, fold_size=512, ds_path='./datasets/train'):
         '''
             create new random dataset based on cfg parameters
             number of rows is defined by cfg.fold_size
@@ -289,7 +289,7 @@ class DatasetGenerator:
         else:
             feature_description = self._gen_feature_description()
             output_types = self.output_types[str(self.cfg.output_type)]['output']
-            ds_files = [os.path.join(ds_path, filename) for filename in os.listdir(ds_path)]
+            ds_files = [os.path.join(ds_path, filename) for i, filename in enumerate(os.listdir(ds_path)) if (i in val_idxs if validation else i not in val_idxs)]
             ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.cfg.num_parallel_calls)
             ds = ds.map(lambda x: _parse_function(x, output_types, feature_description), num_parallel_calls=self.cfg.num_parallel_calls)
         
@@ -302,7 +302,7 @@ class DatasetGenerator:
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
             if self.cfg.output_type==6:
-                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': tf.transpose(x[2], perm=[1,2,0])}), num_parallel_calls=self.cfg.num_parallel_calls)
 
         # batch and padding definitions
         if batch:
@@ -328,13 +328,22 @@ class DatasetGenerator:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'bbox': [self.cfg.max_shapes_num,4],
-                                                                            'mask':[self.cfg.max_shapes_num]+[self.cfg.target_size]*2}), 
+                                                                            'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
 
         if repeat:
             ds = ds.repeat()
-        self.ds = ds
-        self.ds_iter = iter(ds)
+        
+        if not validation:
+            if shuffle_buffer_size>0:
+                ds = ds.shuffle(shuffle_buffer_size, reshuffle_each_iteration=True)
+            self.ds = ds
+            self.ds_iter = iter(ds)
+            self.train_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files)
+        else:
+            self.val_ds = ds
+            self.val_iter = iter(ds)
+            self.val_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files)
 
     def dataset_speed_test(self,test_iters=20):
         print('\n\033[1mDataset generator speed test\033[0m')

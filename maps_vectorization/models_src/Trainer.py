@@ -117,14 +117,21 @@ class TrainingProcessor:
                 custom_objects[c.__class__.__name__] = c
         return custom_objects
 
-    def train_model(self, epochs, callbacks=None, continue_run=False, export_final_state=True, export_model=True):
+    def train_model(self, epochs, callbacks=None, continue_run=False, export_final_state=True, export_model=True, validation_freq=0):
         if continue_run:
             self._log_mlflow_params()
             if export_model:
                 mlflow.tensorflow.log_model(self.model, 'model', custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.model.fit(self.dg.ds, epochs=epochs+self.initial_epoch, steps_per_epoch=self.steps_per_epoch, callbacks=callbacks, initial_epoch=self.initial_epoch)
+            self.model.fit(self.dg.ds, 
+                           validation_data=self.dg.val_ds if validation_freq>0 else None,
+                           validation_steps=self.dg.val_steps if validation_freq>0 else None,
+                           validation_freq=validation_freq,
+                           epochs=epochs+self.initial_epoch, 
+                           steps_per_epoch=self.dg.train_steps, 
+                           callbacks=callbacks, 
+                           initial_epoch=self.initial_epoch)
         self.initial_epoch += epochs
 
         if export_final_state:

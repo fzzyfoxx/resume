@@ -427,11 +427,12 @@ class RPNloss():
 
     def __call__(self, y_true, y_pred):
         target_bboxes, target_class = y_true['bbox'], y_true['class'] # [B,T,4], [B,T]
-        confidence, bboxes = y_pred['class'], y_pred['bbox'] # [B,P], [B,P,4]
+        confidence = y_pred['class'] # [B,P], [B,P,4]
+        bboxes = y_pred['bbox'] if not self.confidence_score else self.anchors
 
         T, P = tf.shape(target_bboxes)[1], tf.shape(bboxes)[1]
         target_bboxes = tf.repeat(tf.expand_dims(target_bboxes, axis=1), P, axis=1) # [B,P,T,4]
-        pred_bboxes = tf.repeat(tf.expand_dims(bboxes if not self.confidence_score else self.anchors, 2), T, axis=2) # [B,P,T,4]
+        pred_bboxes = tf.repeat(tf.expand_dims(bboxes, 2), T, axis=2) # [B,P,T,4]
 
         if self.confidence_score:
             B = tf.shape(target_bboxes)[0]
@@ -454,6 +455,8 @@ class RPNloss():
             loss_value = self.BC(scores, confidence)
 
         if self.return_matching:
+            if self.confidence_score:
+                bboxes = tf.repeat(bboxes, B, axis=0)
             confidence, bboxes = self.NMS([confidence, bboxes])
             _, y_true_match, y_pred_match = self.matching(y_true,{'class': confidence, 'bbox': bboxes})
             return loss_value, y_true_match, y_pred_match
