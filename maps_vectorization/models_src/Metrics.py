@@ -17,7 +17,7 @@ class F12D(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
 
-        self.score.assign_add(self.f1(self.flatten(y_true), self.flatten(y_pred)))
+        self.score.assign_add(self.f1(self.flatten(tf.cast(y_true, tf.float32)), self.flatten(y_pred)))
         self.iterations.assign_add(1.0)
 
     def result(self):

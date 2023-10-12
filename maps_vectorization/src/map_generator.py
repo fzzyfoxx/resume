@@ -480,6 +480,7 @@ class full_map_generator:
             #4 - single pattern type classification - returns class of pattern type in one-hot format
             #5 - shapes bboxes - returns N bboxes coordinates [Ymin,Xmin,Ymax,Xmax] for N shapes
             #6 - shapes bboxes and masks - combination of output types #3 & #5
+            #7 - single shapes mask - returns 1 mask containing all shapes
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -543,6 +544,10 @@ class full_map_generator:
             bboxes = self._gen_bboxes(patterns_info)
             masks = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.transpose(tf.concat(masks, axis=-1), perm=[2,0,1]), tf.bool)
+        
+        elif self.output_type==7:
+            labels = self._gen_labels_masks(patterns_info)
+            return tf.constant(img, tf.float32)/255, tf.cast(tf.reduce_max(tf.concat(labels, axis=-1), axis=-1, keepdims=True), tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########

@@ -197,6 +197,10 @@ class DatasetGenerator:
             '6': {'output': [tf.float32, tf.float32, tf.bool], 
                   'input_shapes': [img_shape, (None, 4), (None,self.cfg.target_size, self.cfg.target_size)],
                   'feature_names': ['Afeatures', 'Bbbox','Cmask']
+                  },
+            '7': {'output': [tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size,1)],
+                  'feature_names': ['features', 'label']
                   }
         }
 
@@ -330,6 +334,8 @@ class DatasetGenerator:
                                                                             'bbox': [self.cfg.max_shapes_num,4],
                                                                             'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
+            elif self.cfg.output_type==7:
+                ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
             ds = ds.repeat()
@@ -339,11 +345,11 @@ class DatasetGenerator:
                 ds = ds.shuffle(shuffle_buffer_size, reshuffle_each_iteration=True)
             self.ds = ds
             self.ds_iter = iter(ds)
-            self.train_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files)
+            self.train_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files) if from_saved else self.cfg.fold_size
         else:
             self.val_ds = ds
             self.val_iter = iter(ds)
-            self.val_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files)
+            self.val_steps = fold_size//(self.cfg.ds_batch_size if batch else 1)*len(ds_files) if from_saved else self.cfg.fold_size
 
     def dataset_speed_test(self,test_iters=20):
         print('\n\033[1mDataset generator speed test\033[0m')

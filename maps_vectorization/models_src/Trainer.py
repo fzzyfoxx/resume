@@ -217,8 +217,17 @@ class TrainingProcessor:
             **tuner_args
         )
 
-    def run_tuner(self, epochs, callbacks=[], callbacks_classes=[], callbacks_hp=[]):
-        self.tuner.search(self.dg.ds, epochs=epochs, steps_per_epoch=self.steps_per_epoch, callbacks=callbacks, callbacks_classes=callbacks_classes, callbacks_hp=callbacks_hp)
+    def run_tuner(self, epochs, callbacks=[], callbacks_classes=[], callbacks_hp=[], validation_freq=1):
+        self.tuner.search(self.dg.ds, 
+                           validation_data=self.dg.val_ds if validation_freq>0 else None,
+                           validation_steps=self.dg.val_steps if validation_freq>0 else None,
+                           validation_freq=validation_freq,
+                           epochs=epochs, 
+                           steps_per_epoch=self.dg.train_steps,
+                           callbacks=callbacks, 
+                           callbacks_classes=callbacks_classes, 
+                           callbacks_hp=callbacks_hp
+        )
         print('Best Parameters')
         print(self.tuner.get_best_hyperparameters()[0].values) 
 

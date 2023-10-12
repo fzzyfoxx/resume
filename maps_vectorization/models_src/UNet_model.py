@@ -1,10 +1,10 @@
 import tensorflow as tf
 
 class UNetConvBlock(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size, activation, padding, pooling_size, dropout, **kwargs):
+    def __init__(self, filters, kernel_size, activation, padding, pooling_size, dropout, conv_num=2, **kwargs):
         super().__init__(**kwargs)
 
-        self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(2)]
+        self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(conv_num)]
         self.MaxPool = tf.keras.layers.MaxPooling2D(pooling_size)
         self.Dropout = tf.keras.layers.Dropout(dropout)
 
@@ -17,11 +17,11 @@ class UNetConvBlock(tf.keras.layers.Layer):
         return self.Dropout(x_pool, training=training), x
     
 class UNetUpConvBlock(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size, activation, padding, strides, dropout, **kwargs):
+    def __init__(self, filters, kernel_size, activation, padding, strides, dropout, conv_num=2, **kwargs):
         super().__init__(**kwargs)
 
         self.conv_transpose = tf.keras.layers.Conv2DTranspose(filters, kernel_size, strides, activation=activation, padding=padding)
-        self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(2)]
+        self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(conv_num)]
         self.Dropout = tf.keras.layers.Dropout(dropout)
 
     def build(self, input_shapes):
@@ -45,7 +45,7 @@ class UNetUpConvBlock(tf.keras.layers.Layer):
 
         return x
 
-class UNet(tf.keras.Model):
+'''class UNet(tf.keras.Model):
     def __init__(self, out_dims=1, out_activation='sigmoid', init_filters_power=6, levels=5, kernel_size=(3,3), pooling_size=(2,2), init_dropout=0.25, dropout=0.5, padding='same', **kwargs):
         super(UNet, self).__init__(self, **kwargs)
         conv2D_args = {'kernel_size': kernel_size, 'activation': 'relu', 'padding': padding}
@@ -77,4 +77,51 @@ class UNet(tf.keras.Model):
         for x_saved, upconv in zip(conv_levels[:-1][::-1], self.upsize_layers):
             x = upconv([x, x_saved])
 
-        return self.final_conv(x)
+        return self.final_conv(x)'''
+    
+class UNet(tf.keras.Model):
+    def __init__(self, 
+                 input_shape=(256,256,3), 
+                 out_dims=1, 
+                 out_activation='sigmoid', 
+                 init_filters_power=6, 
+                 levels=5, 
+                 level_convs=2,
+                 kernel_size=(3,3), 
+                 pooling_size=(2,2), 
+                 init_dropout=0.25, 
+                 dropout=0.5, 
+                 padding='same', 
+                 **kwargs):
+        conv2D_args = {'kernel_size': kernel_size, 'activation': 'relu', 'padding': padding, 'conv_num': level_convs}
+
+        conv_dropout_list = [init_dropout]+[dropout]*(levels-1)
+        upconv_dropout_list = [dropout]*(levels-1)
+
+        init_filters = 2**init_filters_power
+
+        # downsize layers
+        downsize_layers = [UNetConvBlock(init_filters*2**i, **conv2D_args, pooling_size=pooling_size, dropout=d, name='down_conv_'+str(i+1)) for i,d in enumerate(conv_dropout_list)]
+        upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d, name='up_conv_'+str(i+1)) for i,d in enumerate(upconv_dropout_list)]
+
+        final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation, name='out_conv')
+
+        conv_levels = []
+        inputs = tf.keras.layers.Input((input_shape), name='unet_input')
+        x = inputs
+
+        # downsize part
+        for conv in downsize_layers:
+            x, x_saved = conv(x)
+            conv_levels.append(x_saved)
+
+        # upsize part
+        x = x_saved # last convolution output (without pooling)
+
+        # iterate descending over convolution outputs without the last one
+        for x_saved, upconv in zip(conv_levels[:-1][::-1], upsize_layers):
+            x = upconv([x, x_saved])
+
+        output = final_conv(x)
+
+        super(UNet, self).__init__(inputs=inputs, outputs=output, **kwargs)
