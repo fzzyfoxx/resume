@@ -122,6 +122,7 @@ class MHA(tf.keras.layers.Layer):
                  value_dim,
                  key_dim,
                  num_heads,
+                 transpose_weights=False,
                  **kwargs):
         super(MHA, self).__init__(**kwargs)
 
@@ -137,6 +138,8 @@ class MHA(tf.keras.layers.Layer):
         self.V_head_extractior = HeadsPermuter(num_heads, value_dim//num_heads, reverse=False)
         self.output_perm = HeadsPermuter(num_heads, value_dim//num_heads, reverse=True)
 
+        self.T = transpose_weights
+
     def call(self, V, Q, K):
         Q = self.QK_head_extractior(self.Q_d(Q))
         K = self.QK_head_extractior(self.K_d(K))
@@ -145,8 +148,12 @@ class MHA(tf.keras.layers.Layer):
         weights = self.softmax(scores, axis=-1)
 
         V = self.V_head_extractior(self.V_d(V))
+        if not self.T:
+            V = tf.matmul(weights, V)
+        else:
+            V *= tf.transpose(weights, perm=[0,1,3,2])
 
-        return self.O_d(self.output_perm(tf.matmul(weights, V)))
+        return self.O_d(self.output_perm(V))
 
 
 class DeepLayerNormalization(tf.keras.layers.Layer):

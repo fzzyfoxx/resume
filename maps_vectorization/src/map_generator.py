@@ -446,7 +446,7 @@ class full_map_generator:
         cv.polylines(edge_mask, pts, False, 1, 1)
         return edge_mask
     
-    def _gen_labels_masks(self, patterns_info):
+    def _gen_labels_masks(self, patterns_info, agg=False):
         labels = []
         for info in patterns_info:
 
@@ -457,16 +457,38 @@ class full_map_generator:
                 drawing_kwargs = {}
                 drawing_func = cv.fillPoly
             
-            for shape in info['map_args']['shapes']:
-                label = np.zeros((self.target_size, self.target_size, 1))  
-                drawing_func(label, [shape], color=1, **drawing_kwargs)
-                labels.append(label)
+            if agg:
+                label = np.zeros((self.target_size, self.target_size, 1))
+                if len(info['map_args']['shapes'])>0:
+                    for shape in info['map_args']['shapes']:  
+                        drawing_func(label, [shape], color=1, **drawing_kwargs)
+                    labels.append(label)
+            else:
+                for shape in info['map_args']['shapes']:
+                    label = np.zeros((self.target_size, self.target_size, 1))  
+                    drawing_func(label, [shape], color=1, **drawing_kwargs)
+                    labels.append(label)
 
         return labels[:self.max_shapes_num]
     
     def _gen_bboxes(self, patterns_info):
         return np.concatenate([np.concatenate([np.min(shape, axis=0)[:,::-1], np.max(shape, axis=0)[:,::-1]], axis=-1) for 
                                  pattern in patterns_info for shape in pattern['map_args']['shapes']], axis=0)[:self.max_shapes_num]/self.target_size
+    
+    @staticmethod
+    def _concat_bboxes(shapes):
+        bboxes = np.concatenate([
+            np.concatenate([np.min(shape, axis=0)[:,::-1], np.max(shape, axis=0)[:,::-1]], axis=-1) for shape in shapes
+            ] , axis=0)
+        
+        top_left = np.min(bboxes[:,:2], axis=0, keepdims=True)
+        bot_right = np.max(bboxes[:,2:], axis=0, keepdims=True)
+
+        return np.concatenate([top_left, bot_right], axis=-1)
+
+    def _gen_bbox(self, patterns_info):
+        return np.concatenate([self._concat_bboxes(pattern['map_args']['shapes'])
+                for pattern in patterns_info if len(pattern['map_args']['shapes'])>0], axis=0)
         
 
 
@@ -481,6 +503,7 @@ class full_map_generator:
             #5 - shapes bboxes - returns N bboxes coordinates [Ymin,Xmin,Ymax,Xmax] for N shapes
             #6 - shapes bboxes and masks - combination of output types #3 & #5
             #7 - single shapes mask - returns 1 mask containing all shapes
+            #8 - shapes bboxes and masks - different version of #6 where one mask level contains all shapes for single pattern
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -548,6 +571,11 @@ class full_map_generator:
         elif self.output_type==7:
             labels = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.cast(tf.reduce_max(tf.concat(labels, axis=-1), axis=-1, keepdims=True), tf.bool)
+        
+        elif self.output_type==8:
+            bboxes = self._gen_bbox(patterns_info)
+            masks = self._gen_labels_masks(patterns_info, agg=True)
+            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.transpose(tf.concat(masks, axis=-1), perm=[2,0,1]), tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########

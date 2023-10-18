@@ -201,6 +201,10 @@ class DatasetGenerator:
             '7': {'output': [tf.float32, tf.bool], 
                   'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size,1)],
                   'feature_names': ['features', 'label']
+                  },
+            '8': {'output': [tf.float32, tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (None, 4), (None,self.cfg.target_size, self.cfg.target_size)],
+                  'feature_names': ['Afeatures', 'Bbbox','Cmask']
                   }
         }
 
@@ -305,7 +309,7 @@ class DatasetGenerator:
             if self.cfg.output_type==5:
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
-            if self.cfg.output_type==6:
+            if self.cfg.output_type in (6,8):
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': tf.transpose(x[2], perm=[1,2,0])}), num_parallel_calls=self.cfg.num_parallel_calls)
 
         # batch and padding definitions
@@ -328,7 +332,7 @@ class DatasetGenerator:
                                                                             'bbox': [self.cfg.max_shapes_num,4]}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0}))
             
-            elif self.cfg.output_type==6:
+            elif self.cfg.output_type in (6,8):
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'bbox': [self.cfg.max_shapes_num,4],

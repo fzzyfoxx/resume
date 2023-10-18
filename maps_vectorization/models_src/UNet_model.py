@@ -1,4 +1,5 @@
 import tensorflow as tf
+from models_src.Support import SmoothOutput
 
 class UNetConvBlock(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size, activation, padding, pooling_size, dropout, conv_num=2, **kwargs):
@@ -24,20 +25,20 @@ class UNetUpConvBlock(tf.keras.layers.Layer):
         self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(conv_num)]
         self.Dropout = tf.keras.layers.Dropout(dropout)
 
-    def build(self, input_shapes):
+    '''def build(self, input_shapes):
         x_shape = input_shapes[0][1:-1]
         saved_x_shape = input_shapes[1][1:-1]
 
         padding = tuple([(0,b-2*a) for a,b in zip(x_shape, saved_x_shape)])
 
-        self.pad = tf.keras.layers.ZeroPadding2D(padding)
+        self.pad = tf.keras.layers.ZeroPadding2D(padding)'''
 
     def call(self, inputs, training=False):
         x = inputs[0]
         saved_x = inputs[1]
 
         x = self.conv_transpose(x)
-        x = self.pad(x)
+        #x = self.pad(x)
         x = tf.keras.layers.Concatenate()([x, saved_x])
         x = self.Dropout(x, training=training)
         for conv in self.conv_layers:
@@ -91,7 +92,9 @@ class UNet(tf.keras.Model):
                  pooling_size=(2,2), 
                  init_dropout=0.25, 
                  dropout=0.5, 
-                 padding='same', 
+                 padding='same',
+                 batch_normalization=True, 
+                 output_smoothing=True,
                  **kwargs):
         conv2D_args = {'kernel_size': kernel_size, 'activation': 'relu', 'padding': padding, 'conv_num': level_convs}
 
@@ -101,14 +104,17 @@ class UNet(tf.keras.Model):
         init_filters = 2**init_filters_power
 
         # downsize layers
-        downsize_layers = [UNetConvBlock(init_filters*2**i, **conv2D_args, pooling_size=pooling_size, dropout=d, name='down_conv_'+str(i+1)) for i,d in enumerate(conv_dropout_list)]
-        upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d, name='up_conv_'+str(i+1)) for i,d in enumerate(upconv_dropout_list)]
+        downsize_layers = [UNetConvBlock(init_filters*2**i, **conv2D_args, pooling_size=pooling_size, dropout=d, name='Down-Conv_'+str(i+1)) for i,d in enumerate(conv_dropout_list)]
+        upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d, name='Up-Conv_'+str(i+1)) for i,d in enumerate(upconv_dropout_list)]
 
-        final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation, name='out_conv')
+        final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation, name='Out-Conv')
+        output_smoothing = SmoothOutput(name='Smppth-Output')
 
         conv_levels = []
         inputs = tf.keras.layers.Input((input_shape), name='unet_input')
         x = inputs
+        if batch_normalization:
+            x = tf.keras.layers.BatchNormalization(name='Batch-Normalization')(x)
 
         # downsize part
         for conv in downsize_layers:
@@ -121,7 +127,8 @@ class UNet(tf.keras.Model):
         # iterate descending over convolution outputs without the last one
         for x_saved, upconv in zip(conv_levels[:-1][::-1], upsize_layers):
             x = upconv([x, x_saved])
+        
+        if output_smoothing:
+            x = output_smoothing(final_conv(x))
 
-        output = final_conv(x)
-
-        super(UNet, self).__init__(inputs=inputs, outputs=output, **kwargs)
+        super(UNet, self).__init__(inputs=inputs, outputs=x, **kwargs)
