@@ -503,7 +503,7 @@ class full_map_generator:
             #5 - shapes bboxes - returns N bboxes coordinates [Ymin,Xmin,Ymax,Xmax] for N shapes
             #6 - shapes bboxes and masks - combination of output types #3 & #5
             #7 - single shapes mask - returns 1 mask containing all shapes
-            #8 - shapes bboxes and masks - different version of #6 where one mask level contains all shapes for single pattern
+            #8 - shapes and masks - different version of #6 where one mask level contains all shapes for single pattern and mask for background, bboxes are not returned
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -566,16 +566,18 @@ class full_map_generator:
         elif self.output_type==6:
             bboxes = self._gen_bboxes(patterns_info)
             masks = self._gen_labels_masks(patterns_info)
-            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.transpose(tf.concat(masks, axis=-1), perm=[2,0,1]), tf.bool)
+            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.concat(masks, axis=-1), tf.bool)
         
         elif self.output_type==7:
             labels = self._gen_labels_masks(patterns_info)
             return tf.constant(img, tf.float32)/255, tf.cast(tf.reduce_max(tf.concat(labels, axis=-1), axis=-1, keepdims=True), tf.bool)
         
         elif self.output_type==8:
-            bboxes = self._gen_bbox(patterns_info)
             masks = self._gen_labels_masks(patterns_info, agg=True)
-            return tf.constant(img, tf.float32)/255, tf.constant(bboxes, tf.float32), tf.cast(tf.transpose(tf.concat(masks, axis=-1), perm=[2,0,1]), tf.bool)
+            masks = tf.concat(masks, axis=-1)
+            background_mask = 1-np.max(masks, axis=-1, keepdims=True)
+            masks = np.concatenate([masks, background_mask], axis=-1)
+            return tf.constant(img, tf.float32)/255, tf.cast(masks, tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########

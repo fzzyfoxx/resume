@@ -2,14 +2,14 @@
  "random_grid_input": {
   "legend_positions_range": [
    1,
-   10
+   15
   ],
   "single_pattern_type": 0,
   "pattern_types_probs": {
-   "solid": 0.5,
-   "striped": 0.5,
-   "line_border": 0.0,
-   "line_filled": 0.0
+   "solid": 0.25,
+   "striped": 0.25,
+   "line_border": 0.25,
+   "line_filled": 0.25
   },
   "center_oversized_description_prob": 0.5,
   "center_fitting_description_prob": 0.7,
@@ -292,9 +292,9 @@
  },
  "map_drawing_randomize_args": {
   "line_border_types_probs": {
-   "parcel_polygon": 0.6,
-   "random_polygon": 0.2,
-   "random_line": 0.2
+   "parcel_polygon": 0.7,
+   "random_polygon": 0.3,
+   "random_line": 0.0
   },
   "line_filled_types_probs": {
    "parcel_polygon": 0.7,

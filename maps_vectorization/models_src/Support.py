@@ -309,8 +309,11 @@ class DatasetGenerator:
             if self.cfg.output_type==5:
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
-            if self.cfg.output_type in (6,8):
-                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': tf.transpose(x[2], perm=[1,2,0])}), num_parallel_calls=self.cfg.num_parallel_calls)
+            if self.cfg.output_type==6:
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            if self.cfg.output_type==8:
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'mask': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
         # batch and padding definitions
         if batch:
@@ -332,7 +335,7 @@ class DatasetGenerator:
                                                                             'bbox': [self.cfg.max_shapes_num,4]}), 
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0}))
             
-            elif self.cfg.output_type in (6,8):
+            elif self.cfg.output_type==6:
                 ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'bbox': [self.cfg.max_shapes_num,4],
@@ -340,6 +343,12 @@ class DatasetGenerator:
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0, 'mask': False}))
             elif self.cfg.output_type==7:
                 ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type==8:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
+                                                                            {'class': [self.cfg.max_shapes_num],
+                                                                            'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'mask': False}))
 
         if repeat:
             ds = ds.repeat()
