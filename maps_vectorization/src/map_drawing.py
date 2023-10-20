@@ -423,7 +423,9 @@ class map_drawer:
         all_shapes_num = len(self.shapes)
         available_shape_idxs = list(range(all_shapes_num))
         available_shape_probs = self.probs
-        all_shapes_idxs = list(range(all_shapes_num))
+        transparent_shape_idxs = list(range(all_shapes_num))
+        transparent_shape_probs = self.probs
+        #all_shapes_idxs = list(range(all_shapes_num))
 
         for info in self.patterns_info:
             shape_type, shapes_num, transparent = info['map_args'].values()
@@ -431,13 +433,17 @@ class map_drawer:
             if shape_type=='parcel_polygon':
                 shapes_num = min(shapes_num, len(available_shape_idxs)) if not transparent else min(shapes_num, all_shapes_num)
                 if shapes_num>0:
-                    p = self.probs if transparent else available_shape_probs
-                    selected_parcels_idxs = np.random.choice(all_shapes_idxs if transparent else available_shape_idxs, size=shapes_num, replace=False, p=p)
+                    p = transparent_shape_probs if transparent else available_shape_probs
+                    selected_parcels_idxs = np.random.choice(transparent_shape_idxs if transparent else available_shape_idxs, size=shapes_num, replace=False, p=p)
                     info['map_args']['shapes'] = copy.deepcopy(list(map(self.shapes.__getitem__, selected_parcels_idxs)))
                     if not transparent:
                         available_shape_idxs = [idx for idx in available_shape_idxs if idx not in selected_parcels_idxs]
                         available_shape_probs = self.probs[available_shape_idxs].copy()
                         available_shape_probs = available_shape_probs/np.sum(available_shape_probs)
+                    else:
+                        transparent_shape_idxs = [idx for idx in transparent_shape_idxs if idx not in selected_parcels_idxs]
+                        transparent_shape_probs = self.probs[transparent_shape_idxs].copy()
+                        transparent_shape_probs = transparent_shape_probs/np.sum(transparent_shape_probs)
                 else:
                     info['map_args']['shapes'] = []
             elif shape_type=='random_polygon':

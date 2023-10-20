@@ -195,16 +195,16 @@ class DatasetGenerator:
                   'feature_names': ['Afeatures', 'Bbbox']
                   },
             '6': {'output': [tf.float32, tf.float32, tf.bool], 
-                  'input_shapes': [img_shape, (None, 4), (None,self.cfg.target_size, self.cfg.target_size)],
+                  'input_shapes': [img_shape, (None, 4), (self.cfg.target_size, self.cfg.target_size, None)],
                   'feature_names': ['Afeatures', 'Bbbox','Cmask']
                   },
             '7': {'output': [tf.float32, tf.bool], 
                   'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size,1)],
                   'feature_names': ['features', 'label']
                   },
-            '8': {'output': [tf.float32, tf.float32, tf.bool], 
-                  'input_shapes': [img_shape, (None, 4), (None,self.cfg.target_size, self.cfg.target_size)],
-                  'feature_names': ['Afeatures', 'Bbbox','Cmask']
+            '8': {'output': [tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, None)],
+                  'feature_names': ['Afeatures', 'Cmask']
                   }
         }
 
