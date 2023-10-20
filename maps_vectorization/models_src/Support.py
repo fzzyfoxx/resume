@@ -310,10 +310,10 @@ class DatasetGenerator:
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
             if self.cfg.output_type==6:
-                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'bbox': x[1], 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'bbox': x[1], 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
             if self.cfg.output_type==8:
-                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((len(x[1]),)), 'mask': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'mask': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
         # batch and padding definitions
         if batch:
