@@ -39,8 +39,10 @@ class WeightedF12D(tf.keras.metrics.Metric):
 
         self.score.update_state(score)
 
-    def reset_states(self):
-        self.score.reset_states()
+    def reset_state(self):
+        self.score.reset_state()
+        self.precision.reset_state()
+        self.recall.reset_state()
 
     def result(self):
         return self.score.result()
