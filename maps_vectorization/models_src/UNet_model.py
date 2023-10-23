@@ -108,7 +108,7 @@ class UNet(tf.keras.Model):
         upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d, name='Up-Conv_'+str(i+1)) for i,d in enumerate(upconv_dropout_list)]
 
         final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation, name='Out-Conv')
-        output_smoothing = SmoothOutput(name='Smppth-Output')
+        smooth_layer = SmoothOutput(name='Smppth-Output')
 
         conv_levels = []
         inputs = tf.keras.layers.Input((input_shape), name='unet_input')
@@ -128,7 +128,8 @@ class UNet(tf.keras.Model):
         for x_saved, upconv in zip(conv_levels[:-1][::-1], upsize_layers):
             x = upconv([x, x_saved])
         
+        x = final_conv(x)
         if output_smoothing:
-            x = output_smoothing(final_conv(x))
+            x = smooth_layer(x)
 
         super(UNet, self).__init__(inputs=inputs, outputs=x, **kwargs)
