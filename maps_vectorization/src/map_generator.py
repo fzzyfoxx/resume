@@ -364,11 +364,13 @@ class map_concatenation:
 
 
 class full_map_generator:
-    def __init__(self, cfg, vocab, map_args_path, minimap_args_path, map_concatenation_args_path, parcel_input_args_path, bigquery_client):
+    def __init__(self, cfg, vocab, map_args_path, minimap_args_path, map_concatenation_args_path, parcel_input_args_path, bigquery_client, cluster_gen=None):
 
         self.map_args = self._load_args(map_args_path)
         if cfg.output_type==4:
             self.map_args['random_grid_input']['single_pattern_type'] = 1
+        if cfg.output_type==10:
+            self.IC = cluster_gen
         self.minimap_args = self._load_args(minimap_args_path)
         
         map_concatenation_args = self._load_args(map_concatenation_args_path)
@@ -492,7 +494,7 @@ class full_map_generator:
         
 
 
-    def gen_full_map(self, ):
+    def gen_full_map(self,):
         '''
             output_types:
             #0 - test mode - returns numpy map image, patterns_info and dicts for position of legend and minimap
@@ -504,6 +506,8 @@ class full_map_generator:
             #6 - shapes bboxes and masks - combination of output types #3 & #5
             #7 - single shapes mask - returns 1 mask containing all shapes
             #8 - shapes and masks - different version of #6 where one mask level contains all shapes for single pattern and mask for background, bboxes are not returned
+            #9 - img sharpening autoencoder - features with 3x3 bluring filter and origial image as labels
+            #10 - clustered image with shape masks - return original image, boolean masks of N-clusters (N,H,W,1) and shape masks stackend in one level for same shape
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -578,6 +582,21 @@ class full_map_generator:
             background_mask = 1-np.max(masks, axis=-1, keepdims=True)
             masks = np.concatenate([masks, background_mask], axis=-1)
             return tf.constant(img, tf.float32)/255, tf.cast(masks, tf.bool)
+        
+        elif self.output_type==9:
+            kernel = np.ones((3,3), np.float32)/9
+            blured = cv.filter2D(img, -1, kernel)
+
+            return tf.constant(blured, tf.float32)/255, tf.constant(img, tf.float32)/255
+        
+        elif self.output_type==10:
+            masks = self._gen_labels_masks(patterns_info, agg=True)
+            masks = tf.concat(masks, axis=-1)
+            background_mask = 1-np.max(masks, axis=-1, keepdims=True)
+            masks = np.concatenate([masks, background_mask], axis=-1)
+            out_img = tf.constant(img, tf.float32)/255
+            clusters = self.IC.gen_smoothed_clusters(out_img)
+            return out_img, tf.constant(clusters, tf.bool), tf.cast(masks, tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########

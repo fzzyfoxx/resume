@@ -431,7 +431,7 @@ class map_drawer:
             shape_type, shapes_num, transparent = info['map_args'].values()
 
             if shape_type=='parcel_polygon':
-                shapes_num = min(shapes_num, len(available_shape_idxs)) if not transparent else min(shapes_num, all_shapes_num)
+                shapes_num = min(shapes_num, len(available_shape_idxs)) if not transparent else min(shapes_num, len(transparent_shape_idxs))
                 if shapes_num>0:
                     p = transparent_shape_probs if transparent else available_shape_probs
                     selected_parcels_idxs = np.random.choice(transparent_shape_idxs if transparent else available_shape_idxs, size=shapes_num, replace=False, p=p)
