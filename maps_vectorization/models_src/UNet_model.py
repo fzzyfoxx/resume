@@ -21,7 +21,7 @@ class UNetUpConvBlock(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size, activation, padding, strides, dropout, conv_num=2, **kwargs):
         super().__init__(**kwargs)
 
-        self.conv_transpose = tf.keras.layers.Conv2DTranspose(filters, kernel_size, strides, activation=activation, padding=padding)
+        self.conv_transpose = tf.keras.layers.Conv2DTranspose(filters, strides, strides, activation=activation, padding=padding)
         self.conv_layers = [tf.keras.layers.Conv2D(filters, kernel_size, activation=activation, padding=padding) for _ in range(conv_num)]
         self.Dropout = tf.keras.layers.Dropout(dropout)
 
