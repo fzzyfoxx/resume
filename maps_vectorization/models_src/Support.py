@@ -214,6 +214,10 @@ class DatasetGenerator:
                   'input_shapes': [img_shape, (None, self.cfg.target_size, self.cfg.target_size, 1), (self.cfg.target_size, self.cfg.target_size, None)],
                   'feature_names': ['Afeatures', 'Bclusters', 'Cmask']
                   },
+            '11': {'output': [tf.float32, tf.bool], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, 5)],
+                  'feature_names': ['Afeatures', 'Cmask']
+                  }
         }
 
         self.map_decoder = mg.map_generator_decoder(cfg)
@@ -371,6 +375,9 @@ class DatasetGenerator:
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
                                     padding_values=(0.0, {'class': 0.0, 'mask': False}))
+                
+            elif self.cfg.output_type==11:
+                ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
             ds = ds.repeat()

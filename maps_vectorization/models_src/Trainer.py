@@ -40,11 +40,9 @@ class TrainingProcessor:
         return [(a, getattr(self.cfg, a)) for a in dir(self.cfg) if not a.startswith('__')]
 
     def _gen_UNet(self, model_args):
-        inputs = tf.keras.layers.Input((self.cfg.target_size,self.cfg.target_size,3), dtype=tf.float32, name='Map_Input')
-        x = UNet(**model_args, name='UNet')(inputs)
-        outputs = SmoothOutput()(x)
+        x = UNet(**model_args, name='UNet')
 
-        return tf.keras.Model(inputs, outputs)
+        return x
     
     def _gen_SegNet(self, model_args):
         inputs = tf.keras.layers.Input((self.cfg.target_size,self.cfg.target_size,3), dtype=tf.float32, name='Map_Input')
