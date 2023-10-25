@@ -33,7 +33,9 @@ def gen_random_position_properties(pattern_type, use_common_borderline4filled_pr
     if pattern_type=='common_borderline':
         pattern_type = 'line_border'
 
-    any_borderline = np.random.binomial(1, use_any_borderline_prob) if pattern_type=='line_filled' else 1
+    any_borderline = np.random.binomial(1, use_any_borderline_prob) if pattern_type in ['line_filled','striped', 'solid'] else 1
+    if not any_borderline:
+        use_common_borderline = 0
 
     return {
         'pattern_type': pattern_type,

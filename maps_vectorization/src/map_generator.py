@@ -508,6 +508,7 @@ class full_map_generator:
             #8 - shapes and masks - different version of #6 where one mask level contains all shapes for single pattern and mask for background, bboxes are not returned
             #9 - img sharpening autoencoder - features with 3x3 bluring filter and origial image as labels
             #10 - clustered image with shape masks - return original image, boolean masks of N-clusters (N,H,W,1) and shape masks stackend in one level for same shape
+            #11 - pattern types masks - label contains mask with 5-channels for four pattern types and background
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -597,6 +598,21 @@ class full_map_generator:
             out_img = tf.constant(img, tf.float32)/255
             clusters = self.IC.gen_smoothed_clusters(out_img)
             return out_img, tf.constant(clusters, tf.bool), tf.cast(masks, tf.bool)
+        
+        elif self.output_type==11:
+            types_masks = []
+            for pattern_type in ['solid', 'line_border','striped','line_filled']:
+                filtered_info = [info for info in patterns_info if info['pattern_style']['pattern_type']==pattern_type]
+                type_masks = self._gen_labels_masks(filtered_info, agg=True)
+                if len(type_masks)==0:
+                    type_masks = np.zeros(((self.target_size, self.target_size, 1)))
+                else:
+                    type_masks = np.concatenate(type_masks, axis=-1)
+                type_masks = np.max(type_masks, axis=-1, keepdims=True)
+                types_masks.append(type_masks)
+            types_masks = np.concatenate(types_masks, axis=-1)
+            types_masks = np.concatenate([types_masks, 1-np.max(types_masks, axis=-1, keepdims=True)], axis=-1)
+            return tf.constant(img, tf.float32)/255, tf.constant(types_masks, tf.bool)
 ####
 
 ######### MAP GENERATOR DECODER ###########

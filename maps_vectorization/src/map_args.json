@@ -6,15 +6,15 @@
   ],
   "single_pattern_type": 0,
   "pattern_types_probs": {
-   "solid": 0.25,
-   "striped": 0.25,
-   "line_border": 0.25,
-   "line_filled": 0.25
+   "solid": 0.15,
+   "striped": 0.3,
+   "line_border": 0.35,
+   "line_filled": 0.2
   },
   "center_oversized_description_prob": 0.5,
   "center_fitting_description_prob": 0.7,
   "use_common_borderline4filled_prob": 0.5,
-  "use_any_borderline_prob": 0.5,
+  "use_any_borderline_prob": 0.0,
   "put_text_label_on_pattern_prob": 0.5,
   "use_common_text_label_prob": 0.5,
   "show_common_borderline_on_pattern_prob": 0.5,
@@ -23,8 +23,8 @@
    1.1
   ],
   "patterns_size_range": [
-   80,
-   160
+   30,
+   70
   ],
   "no_space_between_prob": 0.2,
   "vertical_space_size_range": [
@@ -147,7 +147,7 @@
     0.15,
     0.6
    ],
-   "same_size_prob": 0.8,
+   "same_size_prob": 0.6,
    "different_width_ratio_range": [
     0.3,
     0.8
@@ -160,12 +160,12 @@
   "line_filled_randomize_args": {
    "light_limit": 200,
    "line_size_range": [
-    1,
-    4
+    2,
+    6
    ],
    "space_ratio_range": [
-    5,
-    15
+    3,
+    6
    ],
    "angle_range": [
     0,
@@ -174,11 +174,11 @@
   },
   "line_border_randomize_args": {
    "symbols_in_width_range": [
-    6,
+    3,
     12
    ],
    "minimum_symbol_width": 4,
-   "no_symbols_prob": 0.5,
+   "no_symbols_prob": 0.3,
    "no_line_prob": 0.5,
    "symbols_probs": {
     "triangle": 0.3,
@@ -195,12 +195,12 @@
     0.0,
     4.0
    ],
-   "filled_prob": 0.8,
+   "filled_prob": 0.5,
    "light_limit": 150,
    "force_grayscale_prob": 0.5,
    "lineshape_thickness_range": [
-    1,
-    3
+    3,
+    5
    ],
    "solid_line_thickness_range": [
     2,
@@ -292,13 +292,13 @@
  },
  "map_drawing_randomize_args": {
   "line_border_types_probs": {
-   "parcel_polygon": 0.7,
-   "random_polygon": 0.3,
+   "parcel_polygon": 0.5,
+   "random_polygon": 0.5,
    "random_line": 0.0
   },
   "line_filled_types_probs": {
-   "parcel_polygon": 0.7,
-   "random_polygon": 0.3
+   "parcel_polygon": 0.5,
+   "random_polygon": 0.5
   },
   "single_shape_prob": 0.5,
   "multishape_range": [
@@ -327,8 +327,8 @@
   "min_distance": 15
  },
  "map_drawing_args": {
-  "draw_parcels_prob": 0.8,
-  "draw_background_prob": 0.8,
+  "draw_parcels_prob": 0.0,
+  "draw_background_prob": 0.0,
   "grayscale_prob": 0.8,
   "light_limit": 200,
   "background_labels_prob": 0.7,
