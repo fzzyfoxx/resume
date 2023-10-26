@@ -88,6 +88,7 @@ class UNet(tf.keras.Model):
                  init_filters_power=6, 
                  levels=5, 
                  level_convs=2,
+                 color_embeddings=False,
                  kernel_size=(3,3), 
                  pooling_size=(2,2), 
                  init_dropout=0.25, 
@@ -106,13 +107,15 @@ class UNet(tf.keras.Model):
         # downsize layers
         downsize_layers = [UNetConvBlock(init_filters*2**i, **conv2D_args, pooling_size=pooling_size, dropout=d, name='Down-Conv_'+str(i+1)) for i,d in enumerate(conv_dropout_list)]
         upsize_layers = [UNetUpConvBlock(init_filters*2**(levels-i-2), **conv2D_args, strides=pooling_size, dropout=d, name='Up-Conv_'+str(i+1)) for i,d in enumerate(upconv_dropout_list)]
-
+        
         final_conv = tf.keras.layers.Conv2D(out_dims, (1,1), activation=out_activation, name='Out-Conv')
         smooth_layer = SmoothOutput(name='Smppth-Output')
 
         conv_levels = []
         inputs = tf.keras.layers.Input((input_shape), name='unet_input')
         x = inputs
+        if color_embeddings:
+            x = tf.keras.layers.Dense(init_filters, activation='relu')(x)
         if batch_normalization:
             x = tf.keras.layers.BatchNormalization(name='Batch-Normalization')(x)
 
