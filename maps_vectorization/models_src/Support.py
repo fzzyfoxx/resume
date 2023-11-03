@@ -512,3 +512,96 @@ def plot_mask_preds(features, labels, preds, threshold=0.5, target_size=256, plo
         axs[row, 3].imshow(img)
         axs[row, 3].imshow(binary_pred_mask, cmap='gray', alpha=alpha)
         axs[row, 3].set_title('Pred Mask SUM on map', fontsize=12)
+
+
+
+
+class MiniShapeGenerator:
+    def __init__(self,
+                max_colors = 10,
+                max_points = 6,
+                max_thickness = 3,
+                max_scale = 5,
+                window_size = 64,
+                add_background_mask = False
+                ):
+        
+        for key, value in locals().items():
+            setattr(self, key, value)
+
+    @staticmethod
+    def mini_shape_generation(window_size=16, lines_range=(1,6), line_points_range=(2,6), thickness_range=(1,3), scale_range=(2,5)):
+        scale = np.random.randint(*scale_range)
+        lines_num = np.random.randint(*lines_range)
+        points_num = np.random.randint(*line_points_range)
+        colors = np.reshape(np.random.randint(0, 250, lines_num*3, dtype=np.uint8), (lines_num, 3)).astype(np.float32)
+        thickness = np.random.randint(*thickness_range, lines_num)
+        
+        #backgrund_color = np.random.randint(230,250)
+        #img = np.ones((window_size*(2**scale), window_size*(2**scale), 3), np.uint8)*backgrund_color
+        img = np.reshape(np.random.uniform(230,250, (window_size*(2**scale))**2*3), (window_size*(2**scale), window_size*(2**scale), 3)).astype(np.uint8)
+        masks = []
+        for th, clr in zip(thickness, colors):
+            points = np.reshape(np.random.randint(0, window_size*2**scale, points_num*2), (points_num, 1, 2))
+            img = cv.polylines(img, [points], False, clr.tolist(), th)
+            mask = np.zeros((window_size*(2**scale), window_size*(2**scale), 1), np.uint8)
+            clr_mask = cv.polylines(mask, [points], False, 1, th)
+            clr_mask = tf.keras.layers.MaxPool2D(pool_size=2**scale)(clr_mask[tf.newaxis])
+            masks.append(clr_mask[0].numpy())
+
+        img2 = cv.resize(img, (window_size, window_size), interpolation=cv.INTER_AREA)
+        
+        return img, img2, masks
+    
+    def reload_parcel_inputs(self, ):
+        None
+    
+    def gen_full_map(self, ):
+        _, img2, mask = self.mini_shape_generation(window_size=self.window_size, lines_range=(1,self.max_colors+1), line_points_range=(2,self.max_points+1), thickness_range=(1,self.max_thickness+1), scale_range=(2,self.max_scale+1))
+        features = tf.constant(img2/255, tf.float32)
+        mask = tf.cast(tf.stack(mask, axis=0), tf.float32)
+        #padding = self.max_colors-len(mask)
+        #mask_mask = tf.concat([tf.ones((len(mask)+(1 if self.add_background_mask else 0))), tf.zeros((padding,))], axis=0)
+        background_mask = 1-tf.reduce_max(mask, axis=0, keepdims=True)
+        mask = tf.concat([mask]+ ([background_mask] if self.add_background_mask else []), axis=0)
+        mask = tf.transpose(tf.squeeze(mask, axis=-1), perm=[1,2,0])
+
+        return features, tf.cast(mask, tf.bool)
+    
+    def gen_dataset(self, batch_size, examples_num, from_saved=False, repeat=True, format_output=True, **kwargs):
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if not from_saved:
+            ds = tf.data.Dataset.range(examples_num)
+            ds = ds.map(lambda x: tf.py_function(self.gen_full_map, [], [tf.float32, tf.bool]), num_parallel_calls=4)
+        if format_output:
+            ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'mask': x[1]}), num_parallel_calls=4)
+        if batch_size>0:
+            #ds = ds.batch(batch_size)
+            ds = ds.padded_batch(batch_size, padded_shapes=([self.window_size]*2+[3], 
+                                                                            {'class': [self.max_colors],
+                                                                            'mask':[self.window_size]*2+[self.max_colors]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'mask': False}))
+        if repeat:
+            ds = ds.repeat()
+
+        self.ds = ds
+        self.ds_iter = iter(ds)
+    
+    def plot_example(self, examples=1):
+        imgs, labels = next(self.ds_iter)
+
+        masks = tf.transpose(labels['mask'], perm=[0,3,1,2])
+        mask_masks = labels['class']
+
+        for img, mask, mask_mask, _ in zip(imgs, masks, mask_masks, range(examples)):
+            masks_num = int(np.sum(mask_mask))
+            fig, ax = plt.subplots(1,1, figsize=(4,4))
+            ax.imshow(1-img)
+            fig, axs = plt.subplots(1, masks_num, figsize=(4*masks_num, 4))
+            for i, ax in enumerate(axs.flat):
+                ax.imshow(1-img, cmap='gray')
+                ax.imshow(mask[i], alpha=0.5, cmap='gray')
+        plt.show()
