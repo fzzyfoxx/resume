@@ -217,6 +217,10 @@ class DatasetGenerator:
             '11': {'output': [tf.float32, tf.bool], 
                   'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, 5)],
                   'feature_names': ['Afeatures', 'Cmask']
+                  },
+            '12': {'output': [tf.float32, tf.float32], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, None)],
+                  'feature_names': ['Afeatures', 'Cmask']
                   }
         }
 
@@ -330,6 +334,8 @@ class DatasetGenerator:
             elif self.cfg.output_type==10:
                 ds = ds.map(lambda *x: (x[0][tf.newaxis]*tf.cast(x[1], tf.float32), {'class': tf.ones((tf.shape(x[2])[-1],)), 'mask': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
 
+            elif self.cfg.output_type==12:
+                ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'mask': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
             
 
         # batch and padding definitions
@@ -378,6 +384,12 @@ class DatasetGenerator:
                 
             elif self.cfg.output_type==11:
                 ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type==12:
+                ds = ds.padded_batch(self.cfg.ds_batch_size, padded_shapes=([self.cfg.target_size]*2+[3], 
+                                                                            {'class': [self.cfg.max_shapes_num],
+                                                                            'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'mask': 0.0}))
 
         if repeat:
             ds = ds.repeat()

@@ -317,6 +317,9 @@ class drawing_patterns:
         }
 
         self.masks = []
+
+    def _get_drawing_mask(self):
+        return Image.fromarray(np.zeros(self.img.size[::-1], np.uint8))
     
     def set_pattern_size(self, width, height):
         self.pattern_size = (width, height)
@@ -361,8 +364,10 @@ class drawing_patterns:
                 mask = shape_mask'''
 
         if type(mask).__name__!='NoneType':
-            self.masks.append(mask)
             mask = Image.fromarray(mask, mode='L')
+            drawing_mask = self._get_drawing_mask()
+            drawing_mask.paste(mask, xy)
+            self.masks.append(np.array(drawing_mask))
 
         try:
             self.img.paste(Image.fromarray(self.pattern_img, mode='RGB'), xy, mask)

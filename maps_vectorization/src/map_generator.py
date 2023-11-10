@@ -258,11 +258,12 @@ class map_concatenation:
         pad.append((0,0))
         return pad, np.array([pad[1][0], pad[0][0]], np.int32)
 
-    def concatenate_images(self, map_img, legend_img, patterns_info, background_color, is_minimap, minimap_img=None):
+    def concatenate_images(self, map_img, legend_img, patterns_info, background_color, is_minimap, minimap_img=None, mask_adjust=False):
         if type(legend_img).__name__!='NoneType':
             concatenation_args = self._randomize_concatenation_args(**self.map_concatenation_args)
 
             buffer = self._calc_buffer_for_img(legend_img.shape[:-1])
+
 
             legend_pos, padding4legend, coords_shift, legend_polygon = self._random_legend_placement(patterns_info, buffer, 
                                                                                         map_img.shape[:-1][::-1], 
@@ -337,18 +338,22 @@ class map_concatenation:
                 return img
         else:
             # no legend and minimap
-            img, rescale_ratio = self._resize_img(Image.fromarray(map_img, mode='RGB'), self.target_size)
+            img_mode = 'RGB' if not mask_adjust else 'L'
+            img, rescale_ratio = self._resize_img(Image.fromarray(map_img, mode=img_mode), self.target_size)
             padding, pad_shift = self._calc_img_padding(img)
 
-            patterns_info = self._rescale_positions(patterns_info, legend_shift=[0,0], map_shift=[0,0], scale=rescale_ratio, pad_shift=pad_shift)
+            if patterns_info is not None:
+                patterns_info = self._rescale_positions(patterns_info, legend_shift=[0,0], map_shift=[0,0], scale=rescale_ratio, pad_shift=pad_shift)
 
-            pad_shift = pad_shift[np.newaxis, np.newaxis]
-            if sum(np.squeeze(pad_shift))!=0:
-                for row_info in patterns_info:
-                    for shape in row_info['map_args']['shapes']:
-                        shape += pad_shift
-                        shape = self.clockwise_points.sort_points(shape)
+                pad_shift = pad_shift[np.newaxis, np.newaxis]
+                if sum(np.squeeze(pad_shift))!=0:
+                    for row_info in patterns_info:
+                        for shape in row_info['map_args']['shapes']:
+                            shape += pad_shift
+                            shape = self.clockwise_points.sort_points(shape)
             
+            if mask_adjust:
+                padding = padding[:-1]
             img = np.pad(np.array(img), padding, constant_values=background_color)
 
             return img, patterns_info, None, None
@@ -431,7 +436,7 @@ class full_map_generator:
 
         md.draw_map()
 
-        return md.img, md.patterns_info, md.background_color
+        return md.img, md.patterns_info, md.background_color, md.pattern_drawer.masks
     
     
     def _shape_padding(self, shape):
@@ -491,8 +496,21 @@ class full_map_generator:
     def _gen_bbox(self, patterns_info):
         return np.concatenate([self._concat_bboxes(pattern['map_args']['shapes'])
                 for pattern in patterns_info if len(pattern['map_args']['shapes'])>0], axis=0)
-        
+    
+    def _concat_drawing_masks(self, map_masks, patterns_info):
+        masks_coll = np.stack(map_masks, axis=0)/255
+        cutted_masks = [m-m*np.max(masks_coll[i+1:], axis=0) for i,m in enumerate(masks_coll[:-1])]+[masks_coll[-1]]
+        concatenated_masks = []
+        cutted_masks = iter(cutted_masks)
+        for info in patterns_info:
+            pattern_masks = []
+            for shape in info['map_args']['shapes']:
+                pattern_masks.append(next(cutted_masks))
+            pattern_masks = np.clip(np.sum(np.stack(pattern_masks, axis=0), axis=0), 0.0, 1.0)
+            concatenated_masks.append(pattern_masks)
+        concatenated_masks = np.stack(concatenated_masks, axis=-1)
 
+        return concatenated_masks
 
     def gen_full_map(self,):
         '''
@@ -509,6 +527,7 @@ class full_map_generator:
             #9 - img sharpening autoencoder - features with 3x3 bluring filter and origial image as labels
             #10 - clustered image with shape masks - return original image, boolean masks of N-clusters (N,H,W,1) and shape masks stackend in one level for same shape
             #11 - pattern types masks - label contains mask with 5-channels for four pattern types and background
+            #12 - pixel masks - return masks containing only coloured pixels instead of filled shapes
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -517,7 +536,7 @@ class full_map_generator:
         legend_img, patterns_info = self._gen_legend_img(self.map_args['random_grid_input'], self.map_args['pattern_randomization_args_collection'])
 
         # gen map
-        map_img, patterns_info, background_color = self._gen_map_img(patterns_info,
+        map_img, patterns_info, background_color, map_masks = self._gen_map_img(patterns_info,
                                                         self.map_arg_randomizer,
                                                         self.map_args['random_shapes_args'], 
                                                         self.map_args['map_drawing_args'], 
@@ -528,7 +547,7 @@ class full_map_generator:
         # gen minimap
         if self.add_minimap:
             minimap_legend_img, minimap_patterns_info = self._gen_legend_img(self.minimap_args['random_grid_input'], self.minimap_args['pattern_randomization_args_collection'])
-            minimap_img, minimap_patterns_info, minimap_background_color = self._gen_map_img(minimap_patterns_info,
+            minimap_img, minimap_patterns_info, minimap_background_color, _ = self._gen_map_img(minimap_patterns_info,
                                                         self.minimap_arg_randomizer,
                                                         self.minimap_args['random_shapes_args'], 
                                                         self.minimap_args['map_drawing_args'], 
@@ -544,8 +563,9 @@ class full_map_generator:
             legend_img = None
         img, patterns_info, legend_label, minimap_label = self.mc.concatenate_images(map_img, legend_img, patterns_info, background_color, is_minimap=False, minimap_img=minimap_img)
         
+        
         if self.output_type==0:
-            return img, patterns_info, legend_label, minimap_label
+            return img, patterns_info, legend_label, minimap_label, map_masks, parcels_example['img_size'], parcels_example['padding']
         
         elif self.output_type==1:
             shape_label = self._prepare_label_for_shapes(patterns_info)
@@ -613,6 +633,11 @@ class full_map_generator:
             types_masks = np.concatenate(types_masks, axis=-1)
             types_masks = np.concatenate([types_masks, 1-np.max(types_masks, axis=-1, keepdims=True)], axis=-1)
             return tf.constant(img, tf.float32)/255, tf.constant(types_masks, tf.bool)
+        
+        elif self.output_type==12:
+            map_masks = [self.mc.concatenate_images(m, None, None, 0, is_minimap=False, minimap_img=None, mask_adjust=True)[0] for m in map_masks]
+            map_masks = self._concat_drawing_masks(map_masks, patterns_info)
+            return tf.constant(img, tf.float32)/255, tf.constant(map_masks, tf.float32)
 ####
 
 ######### MAP GENERATOR DECODER ###########

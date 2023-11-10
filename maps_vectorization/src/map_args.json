@@ -2,20 +2,20 @@
  "random_grid_input": {
   "legend_positions_range": [
    1,
-   15
+   10
   ],
   "single_pattern_type": 0,
   "pattern_types_probs": {
-   "solid": 0.15,
-   "striped": 0.3,
+   "solid": 0.3,
+   "striped": 0.0,
    "line_border": 0.35,
-   "line_filled": 0.2
+   "line_filled": 0.35
   },
   "center_oversized_description_prob": 0.5,
   "center_fitting_description_prob": 0.7,
   "use_common_borderline4filled_prob": 0.5,
   "use_any_borderline_prob": 0.0,
-  "put_text_label_on_pattern_prob": 0.5,
+  "put_text_label_on_pattern_prob": 0.0,
   "use_common_text_label_prob": 0.5,
   "show_common_borderline_on_pattern_prob": 0.5,
   "height2width_ratio_range": [
@@ -331,7 +331,7 @@
   "draw_background_prob": 0.0,
   "grayscale_prob": 0.8,
   "light_limit": 200,
-  "background_labels_prob": 0.7,
+  "background_labels_prob": 0.0,
   "background_labels_range": [
    5,
    30
