@@ -506,8 +506,9 @@ class full_map_generator:
             pattern_masks = []
             for shape in info['map_args']['shapes']:
                 pattern_masks.append(next(cutted_masks))
-            pattern_masks = np.clip(np.sum(np.stack(pattern_masks, axis=0), axis=0), 0.0, 1.0)
-            concatenated_masks.append(pattern_masks)
+            if len(pattern_masks)>0:
+                pattern_masks = np.clip(np.sum(np.stack(pattern_masks, axis=0), axis=0), 0.0, 1.0)
+                concatenated_masks.append(pattern_masks)
         concatenated_masks = np.stack(concatenated_masks, axis=-1)
 
         return concatenated_masks
