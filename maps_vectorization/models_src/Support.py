@@ -559,10 +559,13 @@ class MiniShapeGenerator:
             mask = np.zeros((window_size*(2**scale), window_size*(2**scale), 1), np.uint8)
             clr_mask = cv.polylines(mask, [points], False, 1, th)
             clr_mask = tf.keras.layers.MaxPool2D(pool_size=2**scale)(clr_mask[tf.newaxis])
-            masks.append(clr_mask[0].numpy())
+            masks.append(np.squeeze(clr_mask[0].numpy(), axis=-1))
 
         img2 = cv.resize(img, (window_size, window_size), interpolation=cv.INTER_AREA)
-        
+
+        masks = [m-m*np.max(masks[i+1:], axis=0) for i,m in enumerate(masks[:-1])]+[masks[-1]]
+        masks = np.expand_dims(np.stack(masks, axis=0), axis=-1)
+
         return img, img2, masks
     
     def reload_parcel_inputs(self, ):
@@ -571,14 +574,15 @@ class MiniShapeGenerator:
     def gen_full_map(self, ):
         _, img2, mask = self.mini_shape_generation(window_size=self.window_size, lines_range=(1,self.max_colors+1), line_points_range=(2,self.max_points+1), thickness_range=(1,self.max_thickness+1), scale_range=(2,self.max_scale+1))
         features = tf.constant(img2/255, tf.float32)
-        mask = tf.cast(tf.stack(mask, axis=0), tf.float32)
+        #mask = tf.cast(tf.stack(mask, axis=0), tf.float32)
+        mask = tf.cast(mask, tf.float32)
         #padding = self.max_colors-len(mask)
         #mask_mask = tf.concat([tf.ones((len(mask)+(1 if self.add_background_mask else 0))), tf.zeros((padding,))], axis=0)
         background_mask = 1-tf.reduce_max(mask, axis=0, keepdims=True)
         mask = tf.concat([mask]+ ([background_mask] if self.add_background_mask else []), axis=0)
         mask = tf.transpose(tf.squeeze(mask, axis=-1), perm=[1,2,0])
 
-        return features, tf.cast(mask, tf.bool)
+        return features, mask
     
     def gen_dataset(self, batch_size, examples_num, from_saved=False, repeat=True, format_output=True, **kwargs):
 
@@ -587,15 +591,16 @@ class MiniShapeGenerator:
 
         if not from_saved:
             ds = tf.data.Dataset.range(examples_num)
-            ds = ds.map(lambda x: tf.py_function(self.gen_full_map, [], [tf.float32, tf.bool]), num_parallel_calls=4)
+            ds = ds.map(lambda x: tf.py_function(self.gen_full_map, [], [tf.float32, tf.float32]), num_parallel_calls=4)
         if format_output:
             ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'mask': x[1]}), num_parallel_calls=4)
         if batch_size>0:
             #ds = ds.batch(batch_size)
+            pad_size = self.max_colors + (1 if self.add_background_mask else 0)
             ds = ds.padded_batch(batch_size, padded_shapes=([self.window_size]*2+[3], 
-                                                                            {'class': [self.max_colors],
-                                                                            'mask':[self.window_size]*2+[self.max_colors]}), 
-                                    padding_values=(0.0, {'class': 0.0, 'mask': False}))
+                                                                            {'class': [pad_size],
+                                                                            'mask':[self.window_size]*2+[pad_size]}), 
+                                    padding_values=(0.0, {'class': 0.0, 'mask': 0.0}))
         if repeat:
             ds = ds.repeat()
 
