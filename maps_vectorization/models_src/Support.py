@@ -535,36 +535,45 @@ class MiniShapeGenerator:
                 max_thickness = 3,
                 max_scale = 5,
                 window_size = 64,
-                add_background_mask = False
+                add_background_mask = False,
+                color_mask = False
                 ):
         
         for key, value in locals().items():
             setattr(self, key, value)
 
     @staticmethod
-    def mini_shape_generation(window_size=16, lines_range=(1,6), line_points_range=(2,6), thickness_range=(1,3), scale_range=(2,5)):
+    def mini_shape_generation(window_size=16, lines_range=(1,6), line_points_range=(2,6), thickness_range=(1,3), scale_range=(2,5), color_mask=False):
         scale = np.random.randint(*scale_range)
         lines_num = np.random.randint(*lines_range)
         points_num = np.random.randint(*line_points_range)
-        colors = np.reshape(np.random.randint(0, 250, lines_num*3, dtype=np.uint8), (lines_num, 3)).astype(np.float32)
+        colors = np.reshape(np.random.randint(1, 250, lines_num*3, dtype=np.uint8), (lines_num, 3)).astype(np.float32)
         thickness = np.random.randint(*thickness_range, lines_num)
         
         #backgrund_color = np.random.randint(230,250)
         #img = np.ones((window_size*(2**scale), window_size*(2**scale), 3), np.uint8)*backgrund_color
         img = np.reshape(np.random.uniform(230,250, (window_size*(2**scale))**2*3), (window_size*(2**scale), window_size*(2**scale), 3)).astype(np.uint8)
         masks = []
+        if color_mask:
+            label_masks = []
         for th, clr in zip(thickness, colors):
             points = np.reshape(np.random.randint(0, window_size*2**scale, points_num*2), (points_num, 1, 2))
             img = cv.polylines(img, [points], False, clr.tolist(), th)
             mask = np.zeros((window_size*(2**scale), window_size*(2**scale), 1), np.uint8)
             clr_mask = cv.polylines(mask, [points], False, 1, th)
             clr_mask = tf.keras.layers.MaxPool2D(pool_size=2**scale)(clr_mask[tf.newaxis])
-            masks.append(np.squeeze(clr_mask[0].numpy(), axis=-1))
+            if color_mask:
+                label_mask = clr_mask * tf.constant(clr, tf.uint8)[tf.newaxis, tf.newaxis, tf.newaxis]
+                label_masks.append(label_mask[0].numpy())
+            masks.append(clr_mask[0].numpy())
 
         img2 = cv.resize(img, (window_size, window_size), interpolation=cv.INTER_AREA)
 
-        masks = [m-m*np.max(masks[i+1:], axis=0) for i,m in enumerate(masks[:-1])]+[masks[-1]]
-        masks = np.expand_dims(np.stack(masks, axis=0), axis=-1)
+        if not color_mask:
+            masks = [m-m*np.max(masks[i+1:], axis=0) for i,m in enumerate(masks[:-1])]+[masks[-1]]
+        else:
+            masks = [m-m*np.max(masks[i+1:], axis=0) for i,m in enumerate(label_masks[:-1])]+[label_masks[-1]]
+        masks = np.stack(masks, axis=0)
 
         return img, img2, masks
     
@@ -572,15 +581,20 @@ class MiniShapeGenerator:
         None
     
     def gen_full_map(self, ):
-        _, img2, mask = self.mini_shape_generation(window_size=self.window_size, lines_range=(1,self.max_colors+1), line_points_range=(2,self.max_points+1), thickness_range=(1,self.max_thickness+1), scale_range=(2,self.max_scale+1))
+        _, img2, mask = self.mini_shape_generation(window_size=self.window_size, lines_range=(1,self.max_colors+1), line_points_range=(2,self.max_points+1), thickness_range=(1,self.max_thickness+1), scale_range=(2,self.max_scale+1), color_mask=self.color_mask)
         features = tf.constant(img2/255, tf.float32)
         #mask = tf.cast(tf.stack(mask, axis=0), tf.float32)
-        mask = tf.cast(mask, tf.float32)
         #padding = self.max_colors-len(mask)
         #mask_mask = tf.concat([tf.ones((len(mask)+(1 if self.add_background_mask else 0))), tf.zeros((padding,))], axis=0)
-        background_mask = 1-tf.reduce_max(mask, axis=0, keepdims=True)
-        mask = tf.concat([mask]+ ([background_mask] if self.add_background_mask else []), axis=0)
-        mask = tf.transpose(tf.squeeze(mask, axis=-1), perm=[1,2,0])
+        if not self.color_mask:
+            mask = tf.cast(mask, tf.float32)
+            background_mask = 1-tf.reduce_max(mask, axis=0, keepdims=True)
+            mask = tf.concat([mask]+ ([background_mask] if self.add_background_mask else []), axis=0)
+            mask = tf.transpose(tf.squeeze(mask, axis=-1), perm=[1,2,0])
+        else:
+            mask = tf.reduce_max(mask, axis=0)
+            mask = tf.where(mask==0, 255, mask)
+            mask = tf.cast(mask, tf.float32)/255
 
         return features, mask
     
@@ -596,11 +610,14 @@ class MiniShapeGenerator:
             ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[-1],)), 'mask': x[1]}), num_parallel_calls=4)
         if batch_size>0:
             #ds = ds.batch(batch_size)
-            pad_size = self.max_colors + (1 if self.add_background_mask else 0)
-            ds = ds.padded_batch(batch_size, padded_shapes=([self.window_size]*2+[3], 
-                                                                            {'class': [pad_size],
-                                                                            'mask':[self.window_size]*2+[pad_size]}), 
-                                    padding_values=(0.0, {'class': 0.0, 'mask': 0.0}))
+            if not self.color_mask:
+                pad_size = self.max_colors + (1 if self.add_background_mask else 0)
+                ds = ds.padded_batch(batch_size, padded_shapes=([self.window_size]*2+[3], 
+                                                                                {'class': [pad_size],
+                                                                                'mask':[self.window_size]*2+[pad_size]}), 
+                                        padding_values=(0.0, {'class': 0.0, 'mask': 0.0}))
+            else:
+                ds = ds.batch(batch_size)
         if repeat:
             ds = ds.repeat()
 
@@ -622,3 +639,20 @@ class MiniShapeGenerator:
                 ax.imshow(1-img, cmap='gray')
                 ax.imshow(mask[i], alpha=0.5, cmap='gray')
         plt.show()
+
+
+class WeightedMaskME(tf.keras.losses.Loss):
+    def __init__(self, alpha=0.5, L=1, name='wMSE', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super(WeightedMaskME, self).__init__(**kwargs)
+
+        self.alpha = alpha
+        self.L = L
+        self.flatten = tf.keras.layers.Flatten()
+
+    def call(self, y_true, y_pred):
+        diff = y_pred-y_true
+        over_est = tf.nn.relu(diff)**self.L*self.alpha
+        under_est = tf.nn.relu(-diff)**self.L
+        diff = self.flatten(over_est+under_est)
+        diff = tf.reduce_mean(diff)
+        return diff

@@ -24,8 +24,8 @@ class F12D(tf.keras.metrics.Metric):
         return self.score/self.iterations
     
 class WeightedF12D(tf.keras.metrics.Metric):
-    def __init__(self, name='F1', threshold=0.5, average='micro'):
-        super().__init__(name=name)
+    def __init__(self, name='F1', threshold=0.5, average='micro', **kwargs):
+        super().__init__(name=name, **kwargs)
 
         self.score = tf.keras.metrics.Mean()
         self.precision = tf.keras.metrics.Precision(thresholds=threshold)

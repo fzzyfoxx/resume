@@ -275,11 +275,14 @@ class SampleExtractor(tf.keras.layers.Layer):
         if self.squeeze_input:
             H, W, C = input_shape[1], input_shape[2], input_shape[3]
             self.in_reshape = tf.keras.layers.Reshape((H*W,C))
+            self.mask_reshape = tf.keras.layers.Reshape((H*W,1))
         
-    def call(self, inputs):
+    def call(self, inputs, mask=None):
 
         if self.squeeze_input:
             sources = self.in_reshape(inputs)
+            if mask is not None:
+                mask = self.mask_reshape(mask)
         else:
             sources = inputs
         sources = tf.expand_dims(sources, axis=-2)
@@ -291,6 +294,8 @@ class SampleExtractor(tf.keras.layers.Layer):
             samples_idxs = []
         for i in range(self.prop_num):
             dists = tf.reduce_min(tf.reduce_mean(tf.abs(sources-samples), axis=-1), axis=-1)
+            if mask is not None:
+                dists = dists*mask[...,0]
             idxs = tf.argmax(dists, axis=-1)
             new_sample = tf.expand_dims(tf.gather(sources, idxs, axis=-3, batch_dims=self.batch_dims), axis=-2)
             samples_coll.append(new_sample)
@@ -483,7 +488,7 @@ class MaskedDecoder(tf.keras.layers.Layer):
     def gen_query_mask(w):
         # w: [B,N,HW]
         w = tf.transpose(w, perm=[0,2,1]) # [B,HW,N]
-        mx = tf.reduce_max(w, axis=-1, keepdims=True) # [B,HW,1]
+        mx = tf.reduce_max(w, axis=-1, keepdims=True)+1e-4 # [B,HW,1]
         #w = tf.nn.sigmoid(2*(w/mx-0.5)) # [B,HW,N]: [0,1]
         w = tf.nn.softmax(w/mx)
         w = tf.transpose(w, perm=[0,2,1]) # [B,N,HW]
@@ -491,19 +496,22 @@ class MaskedDecoder(tf.keras.layers.Layer):
         w = w/tf.reduce_max(tf.reduce_max(w, axis=-1, keepdims=1), axis=-1, keepdims=1)
         return w
        
-    def call(self, inputs):
+    def call(self, inputs, mask=None):
         Q = inputs[0]
         embs = inputs[1]
         query_mask = inputs[2]
         w = tf.nn.softmax(tf.matmul(Q, embs, transpose_b=True)+query_mask, axis=-1)
         #query_mask = self.conv(query_mask)
         query_mask = self.gen_query_mask(w)
-        Q = Q + tf.matmul(w, embs)
+        if mask is not None:
+            query_mask = query_mask * mask
+        Q = Q + tf.matmul(query_mask, embs)
         Q = self.cross_norm(Q)
+        #Q = tf.matmul(query_mask, embs)
 
-        qw = tf.nn.softmax(tf.matmul(Q, Q, transpose_b=True), axis=-1)
-        Q = Q + tf.matmul(qw, Q)
-        Q = self.self_norm(Q)
+        #qw = tf.nn.softmax(tf.matmul(Q, Q, transpose_b=True), axis=-1)
+        #Q = Q + tf.matmul(qw, Q)
+        #Q = self.self_norm(Q)
         #Q = self.out_dense(Q)
         return Q, query_mask
     
@@ -515,3 +523,36 @@ class ZeroQueryMask(tf.keras.layers.Layer):
 
     def call(self, inputs):
         return self.mask
+    
+
+def gen_spatial_embeddings(anchors_num, shape=(32,32)):
+    pos = tf.cast(tf.expand_dims(LinearPositions(shape, normalize=True), axis=-2), tf.float32)
+    anchors = tf.constant([[x/(anchors_num-1),y/(anchors_num-1)] for x in range(anchors_num) for y in range(anchors_num)], tf.float32)[tf.newaxis, tf.newaxis]
+
+    pos_emb = (2**0.5-tf.reduce_sum((pos-anchors)**2, axis=-1)**0.5)/(2**0.5)
+    pos_emb = tf.reshape(pos_emb, (-1,anchors_num**2))
+    return pos_emb
+
+class AddPosEmbs(tf.keras.layers.Layer):
+    def __init__(self, anchors_num, init_scale=1.0, **kwargs):
+        super(AddPosEmbs, self).__init__(**kwargs)
+
+        self.anchors_num = anchors_num
+        self.scale = self.add_weight(shape=(), initializer='ones', trainable=True)
+        self.init_scale = init_scale
+
+    def build(self, input_shape):
+        H,W = input_shape[1], input_shape[2]
+
+        self.pos_emb = gen_spatial_embeddings(self.anchors_num, shape=(H,W))*self.scale*self.init_scale
+
+        self.grid_emb = tf.reshape(self.pos_emb, (1,H,W,self.anchors_num**2))
+
+    def call(self, features, samples=None, idxs=None):
+        B = tf.shape(features)[0]
+        features_emb = tf.concat([features, tf.repeat(self.grid_emb, B, axis=0)], axis=-1)
+
+        if samples is not None:
+            samples_emb = tf.concat([samples,tf.gather(self.pos_emb, idxs, axis=0)], axis=-1)
+            return features_emb, samples_emb
+        return features_emb
