@@ -221,6 +221,10 @@ class DatasetGenerator:
             '12': {'output': [tf.float32, tf.float32], 
                   'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, None)],
                   'feature_names': ['Afeatures', 'Cmask']
+                  },
+            '13': {'output': [tf.float32, tf.float32], 
+                  'input_shapes': [img_shape, (self.cfg.target_size, self.cfg.target_size, 1)],
+                  'feature_names': ['Afeatures', 'Cmask']
                   }
         }
 
@@ -390,6 +394,9 @@ class DatasetGenerator:
                                                                             {'class': [self.cfg.max_shapes_num],
                                                                             'mask':[self.cfg.target_size]*2+[self.cfg.max_shapes_num]}), 
                                     padding_values=(0.0, {'class': 0.0, 'mask': 0.0}))
+            
+            elif self.cfg.output_type==13:
+                ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
             ds = ds.repeat()

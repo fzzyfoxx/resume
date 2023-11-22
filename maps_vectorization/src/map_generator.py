@@ -512,6 +512,13 @@ class full_map_generator:
         concatenated_masks = np.stack(concatenated_masks, axis=-1)
 
         return concatenated_masks
+    
+    def _gen_vertex_mask(self, patterns_info):
+        verts = np.unique(np.squeeze(np.array([vert for info in patterns_info for shape in info['map_args']['shapes'] for vert in shape]), axis=-2), axis=0)
+        vertex_mask = tf.sparse.to_dense(tf.sparse.reorder(tf.SparseTensor(verts[:,::-1], [1.0]*len(verts), (self.target_size,self.target_size))))[tf.newaxis,...,tf.newaxis]
+        vertex_mask = tf.nn.avg_pool2d(tf.nn.max_pool2d(vertex_mask, 3, 1, padding='SAME'), 3, 1, padding='SAME')[0]
+
+        return vertex_mask
 
     def gen_full_map(self,):
         '''
@@ -528,7 +535,8 @@ class full_map_generator:
             #9 - img sharpening autoencoder - features with 3x3 bluring filter and origial image as labels
             #10 - clustered image with shape masks - return original image, boolean masks of N-clusters (N,H,W,1) and shape masks stackend in one level for same shape
             #11 - pattern types masks - label contains mask with 5-channels for four pattern types and background
-            #12 - pixel masks - return masks containing only coloured pixels instead of filled shapes
+            #12 - pixel masks - returns masks containing only coloured pixels instead of filled shapes
+            #13 - vertices mask = returns signle mask with positive values for pixels around shapes vertices
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -639,6 +647,9 @@ class full_map_generator:
             map_masks = [self.mc.concatenate_images(m, None, None, 0, is_minimap=False, minimap_img=None, mask_adjust=True)[0] for m in map_masks]
             map_masks = self._concat_drawing_masks(map_masks, patterns_info)
             return tf.constant(img, tf.float32)/255, tf.constant(map_masks, tf.float32)
+        
+        elif self.output_type==13:
+            return tf.constant(img, tf.float32)/255, self._gen_vertex_mask(patterns_info)
 ####
 
 ######### MAP GENERATOR DECODER ###########
