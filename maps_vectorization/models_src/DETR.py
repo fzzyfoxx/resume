@@ -123,6 +123,7 @@ class MHA(tf.keras.layers.Layer):
                  key_dim,
                  num_heads,
                  transpose_weights=False,
+                 softmax_axis=-1,
                  **kwargs):
         super(MHA, self).__init__(**kwargs)
 
@@ -139,13 +140,14 @@ class MHA(tf.keras.layers.Layer):
         self.output_perm = HeadsPermuter(num_heads, value_dim//num_heads, reverse=True)
 
         self.T = transpose_weights
+        self.softmax_axis = softmax_axis
 
     def call(self, V, Q, K):
         Q = self.QK_head_extractior(self.Q_d(Q))
         K = self.QK_head_extractior(self.K_d(K))
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
-        weights = self.softmax(scores, axis=-1)
+        weights = self.softmax(scores, axis=self.softmax_axis)
 
         V = self.V_head_extractior(self.V_d(V))
         if not self.T:
