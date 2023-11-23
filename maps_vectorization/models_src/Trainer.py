@@ -14,6 +14,7 @@ storage_client = storage.Client()
 from models_src.UNet_model import UNet
 from models_src.SegNet_model import SegNet
 from models_src.DETR import DETRTransformer
+from models_src.Deeplab import DeepLabModel
 
 from models_src.Support import SmoothOutput, DatasetGenerator, BuildHyperModel
 
@@ -27,7 +28,8 @@ class TrainingProcessor:
             'UNet': self._gen_UNet,
             'SegNet': self._gen_SegNet,
             'DETR': self._gen_DETR,
-            'ResNet': self._gen_ResNet
+            'ResNet': self._gen_ResNet,
+            'Deeplab': self._gen_Deeplab
         }
 
         self.steps_per_epoch = int(cfg.fold_size/cfg.ds_batch_size)
@@ -41,6 +43,11 @@ class TrainingProcessor:
 
     def _gen_UNet(self, model_args):
         x = UNet(**model_args, name='UNet')
+
+        return x
+    
+    def _gen_Deeplab(self, model_args):
+        x = DeepLabModel(**model_args)
 
         return x
     
