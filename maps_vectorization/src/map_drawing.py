@@ -261,7 +261,7 @@ class map_drawer_arg_randomizer:
         return [[x for x in arr if x!=None] for arr in np.transpose(np.array([self._split_types_to_columns(r) for r in patterns_info], dtype='object'), axes=[1,0])]
     
     def _gen_shapes_num(self,):
-        return np.random.randint(*self.multishape_range) if np.random.binomial(1, self.single_shape_prob) else 1 
+        return np.random.randint(*self.multishape_range) if not np.random.binomial(1, self.single_shape_prob) else 1 
         
     def _prepare_drawing_parameters(self, patterns_info):
         for r in patterns_info: r['map_args']={}
