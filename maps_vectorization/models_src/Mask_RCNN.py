@@ -84,12 +84,14 @@ class NonMaxSupression(tf.keras.layers.Layer):
                  init_top_k_proposals=0.5, 
                  iou_threshold=0.5, 
                  output_proposals=200,
+                 split_input=False,
                  **kwargs):
         super(NonMaxSupression, self).__init__(**kwargs)
 
         self.init_top_k_ratio = init_top_k_proposals
         self.output_proposals = output_proposals
         self.iou_threshold = iou_threshold
+        self.split = split_input
 
     def _top_k(self, confidence, bboxes, k):
         idxs = tf.math.top_k(confidence, k).indices
@@ -120,11 +122,17 @@ class NonMaxSupression(tf.keras.layers.Layer):
         return confidence, bboxes
 
     def build(self, input_shape):
-        anchors_num = input_shape[0][1]
+        if self.split:
+            anchors_num = input_shape[1]
+        else:
+            anchors_num = input_shape[0][1]
         self.init_top_k = int(anchors_num*self.init_top_k_ratio)
 
     def call(self, inputs, training=None):
-        confidence, bboxes = inputs[0], inputs[1]
+        if self.split:
+            confidence, bboxes = inputs[...,0], inputs[...,1:]
+        else:
+            confidence, bboxes = inputs[0], inputs[1]
         # limit proposals to k with best scores
         confidence, bboxes = self._top_k(confidence, bboxes, k=self.init_top_k)
 

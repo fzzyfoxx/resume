@@ -51,19 +51,37 @@ def extract_coords(bbox):
         return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
     
 def calc_area(Y1,X1,Y2,X2):
-        return (X2-X1)*(Y2-Y1)
+        return tf.abs(X2-X1)*tf.abs(Y2-Y1)
 
 def IoU(a,b):
     aY1, aX1, aY2, aX2 = extract_coords(a)
     bY1, bX1, bY2, bX2 = extract_coords(b)
 
-    xI = tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2)
-    yI = tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2)
+    xI = tf.abs(tf.clip_by_value(bX2, aX1, aX2) - tf.clip_by_value(bX1, aX1, aX2))
+    yI = tf.abs(tf.clip_by_value(bY2, aY1, aY2) - tf.clip_by_value(bY1, aY1, aY2))
 
     I = xI*yI
     U = calc_area(aY1, aX1, aY2, aX2)+calc_area(bY1, bX1, bY2, bX2)-I
 
     return tf.math.divide_no_nan(I,U)
+
+class MultiLevelFocalCrossentropy(tf.keras.losses.Loss):
+    def __init__(self, pooling_levels=2, alpha=0.75, gamma=2, reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(name="MLBFC",reduction=reduction,**kwargs)
+        
+        self.alpha = alpha
+        self.gamma = gamma
+        self.pooling_levels = pooling_levels
+        self.flatten = tf.keras.layers.Flatten()
+
+    def call(self, y_true, y_pred):
+        loss = tf.keras.losses.binary_focal_crossentropy(self.flatten(y_true), self.flatten(y_pred), apply_class_balancing=True, alpha=self.alpha, gamma=self.gamma)
+        for i in range(self.pooling_levels):
+            y_true = tf.nn.max_pool2d(y_true, 3, 2, 'VALID')
+            y_pred = tf.nn.max_pool2d(y_pred, 3, 2, 'VALID')
+            loss += tf.keras.losses.binary_focal_crossentropy(self.flatten(y_true), self.flatten(y_pred), apply_class_balancing=True, alpha=self.alpha, gamma=self.gamma)
+
+        return loss/(1+self.pooling_levels)
     
 
 class IoUMetric(tf.keras.metrics.Metric):

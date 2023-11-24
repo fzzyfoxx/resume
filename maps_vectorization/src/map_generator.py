@@ -520,6 +520,13 @@ class full_map_generator:
 
         return vertex_mask
 
+    def _gen_edges_list(self, patterns_info):
+        edges = np.unique(np.array([np.concatenate(([vert_a[::-1], vert_b[::-1]] if vert_a[0]<=vert_b[0] else [vert_b[::-1], vert_a[::-1]]), axis=0) for 
+                                    info in patterns_info for shape in info['map_args']['shapes'] for vert_a, vert_b in zip(shape[:-1,0],shape[1:,0])]), axis=0)
+        
+        return edges
+
+
     def gen_full_map(self,):
         '''
             output_types:
@@ -536,7 +543,8 @@ class full_map_generator:
             #10 - clustered image with shape masks - return original image, boolean masks of N-clusters (N,H,W,1) and shape masks stackend in one level for same shape
             #11 - pattern types masks - label contains mask with 5-channels for four pattern types and background
             #12 - pixel masks - returns masks containing only coloured pixels instead of filled shapes
-            #13 - vertices mask = returns signle mask with positive values for pixels around shapes vertices
+            #13 - vertices mask - returns single mask with positive values for pixels around shapes vertices
+            #14 - edges endpoints - returns list of all shapes edges with shape [ymin,x(ymin),ymax,x(ymax)]
         '''
         ####################
         parcels_example, background_example = next(self.map_input_gen)
@@ -650,6 +658,10 @@ class full_map_generator:
         
         elif self.output_type==13:
             return tf.constant(img, tf.float32)/255, self._gen_vertex_mask(patterns_info)
+
+        elif self.output_type==14:
+            edges = self._gen_edges_list(patterns_info)
+            return tf.constant(img, tf.float32)/255, tf.constant(edges/self.target_size, tf.float32)
 ####
 
 ######### MAP GENERATOR DECODER ###########
