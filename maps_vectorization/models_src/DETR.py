@@ -177,13 +177,14 @@ class EncoderLayer(tf.keras.layers.Layer):
                  FFN_mid_layers=1, 
                  FFN_mid_units=2048,
                  FFN_activation='relu',
+                 deep_normalization=True,
                  **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
 
         self.attn_dropout, self.output_dropout = [tf.keras.layers.Dropout(dropout) for _ in range(2)]
         self.attn_addnorm, self.output_addnorm = [tf.keras.Sequential([
             tf.keras.layers.Add(),
-            DeepLayerNormalization(norm_axis=1)])
+            (DeepLayerNormalization(norm_axis=1) if deep_normalization else tf.keras.layers.LayerNormalization())])
             for _ in range(2)]
 
         self.FFN = FFN(FFN_mid_layers, FFN_mid_units, attn_dim, dropout, FFN_activation)

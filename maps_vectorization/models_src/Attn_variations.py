@@ -1,6 +1,7 @@
 import tensorflow as tf
 import math
-from models_src.DETR import FFN, MHA
+import matplotlib.pyplot as plt
+from models_src.DETR import FFN, MHA, SinePositionEncoding
 
 
 class SineColorEmbeddigs(tf.keras.layers.Layer):
@@ -312,6 +313,17 @@ class SampleExtractor(tf.keras.layers.Layer):
             return samples, sources
         return samples
     
+def plot_furthest_points(features, idxs, cols=8, size=3, color='black'):
+    pos = LinearPositions(tf.shape(features)[1:-1], flat_output=True, normalize=False, invert_xy=True)
+
+    rows = math.ceil(tf.shape(features)[0]/cols)
+    fig, axs = plt.subplots(rows, cols, figsize=(cols*size, rows*size))
+    axs = axs if rows==1 else axs.flat
+    for n, ax in enumerate(axs):
+        samples_pos = tf.gather(pos, idxs[n], axis=0).numpy()
+        ax.imshow(features[n])
+        ax.scatter(samples_pos[:,0], samples_pos[:,1], marker='+', color=color)
+    
 class ExtractPatches(tf.keras.layers.Layer):
     def __init__(self, split_level, **kwargs):
         super(ExtractPatches, self).__init__(**kwargs)
@@ -556,3 +568,137 @@ class AddPosEmbs(tf.keras.layers.Layer):
             samples_emb = tf.concat([samples,tf.gather(self.pos_emb, idxs, axis=0)], axis=-1)
             return features_emb, samples_emb
         return features_emb
+    
+
+class SampleIdxAdjustment(tf.keras.layers.Layer):
+    def __init__(self, original_size, strides, **kwargs):
+        super(SampleIdxAdjustment, self).__init__(**kwargs)
+
+        self.original_size = original_size
+        self.out_size = original_size//strides
+        self.strides = strides
+    
+    def call(self, inputs):
+        y = (inputs//self.original_size)
+        x = (inputs-y*self.original_size)
+
+        y = y//self.strides
+        x = x//self.strides
+
+        return y*self.out_size+x
+    
+class SqueezeImg(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(SqueezeImg, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        preceeding_dims = input_shape[1:-3]
+        last_dim = (input_shape[-1],)
+        squeezed_dim = (input_shape[-3]*input_shape[-2])
+
+        self.reshape = tf.keras.layers.Reshape(preceeding_dims+squeezed_dim+last_dim)
+
+    def call(self, inputs):
+        return self.reshape(inputs)
+    
+class UnSqueezeImg(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(UnSqueezeImg, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        preceeding_dims = input_shape[1:-2]
+        last_dim = (input_shape[-1],)
+        squeezed_dim = input_shape[-2]
+        unsqueezed_dim = (int(squeezed_dim**0.5),)
+
+        self.reshape = tf.keras.layers.Reshape(preceeding_dims+unsqueezed_dim+unsqueezed_dim+last_dim)
+
+    def call(self, inputs):
+        return self.reshape(inputs)
+    
+class ExtractSampleByIdx(tf.keras.layers.Layer):
+    def __init__(self, batch_dims=1, axis=1, **kwargs):
+        super(ExtractSampleByIdx, self).__init__(**kwargs)
+
+        self.batch_dims = batch_dims
+        self.axis = axis
+
+    def call(self, x, idxs):
+        return tf.gather(x, idxs, axis=self.axis, batch_dims=self.batch_dims)
+    
+class SampleTransformerEncoder(tf.keras.layers.Layer):
+    def __init__(self, num_heads=4, **kwargs):
+        super(SampleTransformerEncoder, self).__init__(**kwargs)
+
+        self.extract_sample = ExtractSampleByIdx(batch_dims=1, axis=1)
+        self.norm1 = tf.keras.layers.LayerNormalization()
+        self.norm2 = tf.keras.layers.LayerNormalization()
+        self.pos = SinePositionEncoding(fixed_dims=False)
+
+        self.num_heads = num_heads
+
+    def build(self, input_shape):
+        D = input_shape[0][-1]
+        self.ffn = FFN(mid_layers=2, mid_units=D*2, output_units=D)
+
+        self.mha = MHA(D, D, D, self.num_heads, softmax_axis=-2)
+
+    def call(self, inputs, training=None):
+        x = inputs[0]
+        idxs = inputs[1]
+        pos_embs = inputs[2]
+
+        V = self.extract_sample(x, idxs)
+        Q = x + pos_embs
+        K = self.extract_sample(Q, idxs)
+
+        out = self.norm1(self.mha(V,Q,K)+x)
+        out = self.norm2(self.ffn(out)+out)
+
+        return out
+    
+def random_mask_representation(features, labels, num_points=1, single_mask_input=False):
+    H,W = features.shape[-3], features.shape[-2]
+    if single_mask_input:
+        selected_masks = labels
+    else:
+        selected_masks = tf.transpose(tf.gather(tf.transpose(labels['mask'], [0,3,1,2]), tf.random.categorical(tf.math.log(labels['class']), 1), axis=1, batch_dims=1), [0,2,3,1])
+    selected_point = tf.random.categorical(tf.math.log(tf.reshape(tf.nn.avg_pool2d(selected_masks, 2, 1, 'SAME')**2*selected_masks, (len(selected_masks),-1))), num_points)
+    selected_point = tf.where(selected_point==H*W, tf.constant(0, dtype=tf.int64), selected_point)
+    return (features, selected_point), selected_masks
+    
+def binarize_masks(features, labels, batch_size=1, size=256, shapes_num=10):
+    a = tf.reshape(labels['mask'], (batch_size,size**2,shapes_num))
+    global_mask = tf.reduce_max(a, axis=-1, keepdims=True)
+    a = tf.where(a==global_mask, 1.0, 0.0)
+    global_mask = tf.where(global_mask>0.0, 1.0, 0.0)
+    a = tf.reshape(a*global_mask, (batch_size,size,size,shapes_num))
+    labels['mask'] = a
+    return features, labels
+
+
+def extract_roi4point(features, selected_point, labels, window_size=32, input_size=256):
+    y = selected_point//input_size
+    x = selected_point-y*input_size
+    # shift point so bbox could fit in image borders
+    x_pad = tf.nn.relu(window_size//2-x)
+    y_pad = tf.nn.relu(window_size//2-y)
+    x = x + x_pad
+    y = y + y_pad
+
+    x_pad = tf.nn.relu(x+window_size//2-input_size)
+    y_pad = tf.nn.relu(y+window_size//2-input_size)
+    x = x - x_pad
+    y = y - y_pad
+
+    points_pos = tf.concat([y,x], axis=-1)
+    min_pos = points_pos-window_size//2
+    max_pos = points_pos+window_size//2
+    bboxes = tf.cast(tf.concat([min_pos, max_pos], axis=-1)/input_size, tf.float32)
+
+    box_indices = tf.range(len(features))
+    feature_windows = tf.image.crop_and_resize(features, bboxes, box_indices, [window_size,window_size], method='nearest')
+    label_windows = tf.image.crop_and_resize(labels, bboxes, box_indices, [window_size,window_size], method='nearest')
+    windows_idxs = tf.repeat([[(window_size//2)*(window_size+1)]], len(features), axis=0)
+
+    return (feature_windows, windows_idxs), label_windows
