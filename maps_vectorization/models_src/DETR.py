@@ -191,8 +191,11 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         self.MHA = MHA(attn_dim, attn_dim, key_dim, num_heads)
 
-    def call(self, V, pos_enc, training=None):
-        Q = K = V + pos_enc
+    def call(self, V, pos_enc=None, training=None):
+        if pos_enc is not None:
+            Q = K = V + pos_enc
+        else:
+            Q = K = V
 
         # Multi-Head-Attention
         V = self.attn_addnorm([V, self.attn_dropout(self.MHA(V, Q, K), training=training)])

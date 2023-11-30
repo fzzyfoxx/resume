@@ -2,7 +2,7 @@ import tensorflow as tf
 import transformers as t
 import math
 import tensorflow_models as tfm
-from models_src.Support import download_mlflow_weights
+from models_src.Trainer_support import download_mlflow_weights
 
 def ResNet4Classification(input_shape=(256,256,3), FN_filters=[512], dropout=0.2, output_classes=4, config_args={}, name='ResNet', output_hidden_states=False):
     inputs = tf.keras.layers.Input(input_shape)

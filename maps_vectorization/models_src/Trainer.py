@@ -2,12 +2,14 @@ import os
 import math
 import matplotlib.pyplot as plt
 import inspect
+import keras_tuner as kt
 import mlflow
 import warnings
 import tensorflow as tf
 import numpy as np
 import shutil
 from google.cloud import storage
+
 
 storage_client = storage.Client()
 
@@ -16,7 +18,10 @@ from models_src.SegNet_model import SegNet
 from models_src.DETR import DETRTransformer
 from models_src.Deeplab import DeepLabModel
 
-from models_src.Support import SmoothOutput, DatasetGenerator, BuildHyperModel
+from models_src.Support import SmoothOutput, DatasetGenerator
+from models_src.Trainer_support import BuildHyperModel
+
+mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
 
 
 class TrainingProcessor:
