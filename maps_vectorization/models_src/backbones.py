@@ -1,4 +1,5 @@
 import tensorflow as tf
+from models_src.DETR import FFN
 
 @tf.keras.saving.register_keras_serializable()
 class ResidualConvBlock(tf.keras.layers.Layer):
@@ -45,3 +46,19 @@ def gen_backbone(filters, stage_lengths, strides_list, block_length=2, kernel_si
         filters *= 2
 
     return tf.keras.Model(inputs, x, name=name)
+
+def gen_memorizing_res_backbone(filters, kernel_sizes=[3], block_length=2, add_pixel_conv=False, activation='relu', batch_norm=True, ffn_mid_layers=1, dropout=0.0, input_shape=(32,32,3), out_ind=None):
+    inputs = tf.keras.layers.Input(input_shape, name='Patch-Input')
+    x = FFN(mid_layers=ffn_mid_layers, mid_units=filters*2, output_units=filters, dropout=dropout, activation=activation, name='Color-Embeddings')(inputs)
+    memory = [x]
+    for i, kernel_size in enumerate(kernel_sizes):
+        x = ResidualConvBlock(filters, block_length, kernel_size, activation, batch_norm=batch_norm, name=f'Res-Block-{i+1}')(x)
+        memory.append(x)
+        if add_pixel_conv:
+            x = tf.keras.layers.Conv2D(filters, 1, activation='relu')(x)
+
+    if out_ind is not None:
+        memory = [m for i, m in enumerate(memory) if i in out_ind]
+    out = tf.keras.layers.Concatenate(name='Channels-Concat')(memory)
+
+    return tf.keras.Model(inputs, out)
