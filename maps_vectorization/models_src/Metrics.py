@@ -48,10 +48,10 @@ class WeightedF12D(tf.keras.metrics.Metric):
         return self.score.result()
 
 def extract_coords(bbox):
-        return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
+    return bbox[...,0], bbox[...,1], bbox[...,2], bbox[...,3]
     
 def calc_area(Y1,X1,Y2,X2):
-        return tf.abs(X2-X1)*tf.abs(Y2-Y1)
+    return tf.abs(X2-X1)*tf.abs(Y2-Y1)
 
 def IoU(a,b):
     aY1, aX1, aY2, aX2 = extract_coords(a)
