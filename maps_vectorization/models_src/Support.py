@@ -9,6 +9,7 @@ from google.cloud import storage
 import warnings
 import math
 
+
 storage_client = storage.Client()
 
 
@@ -171,6 +172,14 @@ class DatasetGenerator:
             'pmg1': {'output': [tf.float32, tf.bool], 
                   'input_shapes': [(self.cfg.target_size, self.cfg.target_size*2, 3), (self.cfg.target_size, self.cfg.target_size*2)],
                   'feature_names': ['Afeatures', 'Cmask']
+                  },
+            'pmg2': {'output': [tf.float32, tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.max_shapes_num, self.cfg.target_size, self.cfg.target_size), (self.cfg.max_shapes_num, 1), (self.cfg.max_shapes_num, 4)],
+                  'feature_names': ['Afeatures', 'Bangle', 'Cbbox']
+                  },
+            'pmg3': {'output': [tf.float32], 
+                  'input_shapes': [(self.cfg.max_shapes_num, self.cfg.target_size, self.cfg.target_size)],
+                  'feature_names': ['Afeatures']
                   }
         }
 
@@ -289,6 +298,12 @@ class DatasetGenerator:
 
             elif self.cfg.output_type==14:
                 ds = ds.map(lambda *x: (x[0], {'class': tf.ones((tf.shape(x[1])[0],)), 'bbox': x[1]}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='pmg2':
+                ds = ds.map(lambda *x: (x[0], {'angle': x[1], 'bbox': x[2]}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='pmg3':
+                ds = ds.map(lambda x: (x, x), num_parallel_calls=self.cfg.num_parallel_calls)
             
 
         # batch and padding definitions
@@ -354,6 +369,12 @@ class DatasetGenerator:
                                     padding_values=(0.0, {'class': 0.0, 'bbox': 0.0}))
                 
             elif self.cfg.output_type=='pmg1':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='pmg2':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='pmg3':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
@@ -600,3 +621,6 @@ class WeightedMaskME(tf.keras.losses.Loss):
         diff = self.flatten(over_est+under_est)
         diff = tf.reduce_mean(diff)
         return diff
+
+
+
