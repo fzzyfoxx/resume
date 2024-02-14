@@ -69,7 +69,7 @@ class PatternMatchingGenerator():
                  shape_args_collection
                  ):
         
-        self.target_size = (target_y*x_ratio,target_y)
+        self.target_size = (int(target_y*x_ratio),target_y)
         self.init_y_range = init_y_range
         self.x_ratio = x_ratio
         self.background_type = 'splitted' if output_type in ['pmg1'] else 'plain'
@@ -103,7 +103,7 @@ class PatternMatchingGenerator():
     
     def _random_img_size(self):
         y = np.random.randint(*self.init_y_range)
-        x = self.x_ratio*y
+        x = int(self.x_ratio*y)
         return (y,x)
     
     def reload_parcel_inputs(self):
@@ -135,6 +135,7 @@ class PatternMatchingGenerator():
     
     def gen_full_map(self):
         img_size = self._random_img_size()
+        
         #print(img_size)
         legend_properties = gen_random_legend_properties(**self.map_args['random_grid_input'])
 
@@ -155,7 +156,7 @@ class PatternMatchingGenerator():
 
         dominates = np.random.choice(choice_options, dominates_num, False)
         #print(len(dominates), dominates)
-        img = self._gen_plain_background(img_size) if self.background_type=='plain' else self._gen_splitted_background(img_size)
+        img = self._gen_plain_background(img_size[::-1]) if self.background_type=='plain' else self._gen_splitted_background(img_size[::-1])
         drawer = drawing_patterns(img)
         drawer.set_pattern_size(*img_size[::-1])
 
@@ -164,7 +165,7 @@ class PatternMatchingGenerator():
 
         shapes = []
         angles = []
-        shape_norm = np.array([[img_size]])
+        shape_norm = np.array([[img_size[::-1]]])
         for i, info in enumerate(pattern_styles):
             is_filled = 'filled' if info['pattern_style']['pattern_type'] in ['solid', 'striped', 'line_filled'] else 'line'
             is_dominate = 'dominate' if i in dominates else 'noise'
@@ -175,6 +176,7 @@ class PatternMatchingGenerator():
                 func = self.shape_func_matching[is_filled]
                 args = self.shape_args_matching[is_filled][is_dominate]
                 shape = func(**args, img_size=img_size)
+            
             shapes.append(shape/shape_norm)
             drawer.draw_single_pattern(shape, 
                                     info['pattern_style'], 
