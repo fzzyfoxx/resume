@@ -37,7 +37,7 @@ def gen_residual_stage(x, filters, name, stage_length=3, block_length=2, kernel_
     return x
 
 def gen_backbone(filters, stage_lengths, strides_list, block_length=2, kernel_size=3, activation='relu', batch_norm=True, input_shape=(32,32,3), name='Backbone'):
-    inputs = tf.keras.layers.Input(input_shape, dtype=tf.float32, name='IMG-Input')
+    inputs = tf.keras.layers.Input(input_shape, name='IMG-Input')
     x = tf.keras.layers.Dense(filters, activation=activation, name='Input-Embeddings')(inputs)
     i=1
     for stage_length, strides in zip(stage_lengths, strides_list):
