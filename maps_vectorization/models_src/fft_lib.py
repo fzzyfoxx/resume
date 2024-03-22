@@ -48,10 +48,10 @@ def rank(tensor):
   return len(tensor.get_shape())
 
 def decode1Dcoords(coords, width):
-   x = coords // width
-   y = coords % width
+   y = coords // width
+   x = coords % width
 
-   return tf.stack([y,x], axis=-1)
+   return tf.stack([x,y], axis=-1)
 
 def top_k2D(x, k=1, channel_dim=False):
     if channel_dim:
@@ -186,7 +186,9 @@ class ProperProposalsGenerator:
 
         return img_mask, proposal, pattern_mask, pattern
     
-    def gen_input(self):
+    def gen_input(self, output_type='proposals'):
+        # proposals: patch with drawed pattern
+        # masks: masks of patterns
 
         img = tf.random.uniform(self.img_shape+(3,), *self.background_range)
 
@@ -195,7 +197,10 @@ class ProperProposalsGenerator:
         for i in range(self.n_proposals):
             mask, proposal, _, pattern = self._gen_proposal()
             img = (1-mask)*img + pattern
-            proposals.append(proposal)
+            if output_type=='proposals':
+                proposals.append(proposal)
+            elif output_type=='masks':
+                proposals.append(mask)
 
         proposals = tf.stack(proposals, axis=0)
 
