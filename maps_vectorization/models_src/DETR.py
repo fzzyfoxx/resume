@@ -87,13 +87,14 @@ class FFN(tf.keras.layers.Layer):
                  output_units=512, 
                  dropout=0.0, 
                  activation='relu',
+                 kernel_initializer='he_normal',
                  **kwargs):
         super(FFN, self).__init__(**kwargs)
 
         self.seq = tf.keras.Sequential(
-            [tf.keras.layers.Dense(mid_units, activation=activation) for _ in range(mid_layers)] + \
+            [tf.keras.layers.Dense(mid_units, activation=activation, kernel_initializer=kernel_initializer) for _ in range(mid_layers)] + \
             [tf.keras.layers.Dropout(dropout)] + \
-            [tf.keras.layers.Dense(output_units)]
+            [tf.keras.layers.Dense(output_units, kernel_initializer=kernel_initializer)]
         )
 
     def call(self, inputs, training=None):

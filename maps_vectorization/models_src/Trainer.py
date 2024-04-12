@@ -34,7 +34,8 @@ class TrainingProcessor:
             'SegNet': self._gen_SegNet,
             'DETR': self._gen_DETR,
             'ResNet': self._gen_ResNet,
-            'Deeplab': self._gen_Deeplab
+            'Deeplab': self._gen_Deeplab,
+            'custom': self._gen_custom_model
         }
 
         self.steps_per_epoch = int(cfg.fold_size/cfg.ds_batch_size)
@@ -71,6 +72,9 @@ class TrainingProcessor:
         self.model_generator = model_generator
     
     def _gen_ResNet(self, model_args):
+        return self.model_generator(**model_args)
+    
+    def _gen_custom_model(self, model_args):
         return self.model_generator(**model_args)
 
     def reload_dataset(self, reload_parcels=True):
