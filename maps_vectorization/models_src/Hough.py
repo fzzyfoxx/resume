@@ -12,6 +12,7 @@ sys.path.append(os.path.abspath("../"))
 
 from models_src.fft_lib import xy_coords, FFT2D, amp_and_phase, top_k2D
 from models_src.Attn_variations import SqueezeImg
+from models_src.DETR import FFN, MHA
 
 from src.patterns import gen_colors
 
@@ -39,6 +40,22 @@ class FreqLinesGenerator():
     def random_freqs(self, examples_num, mean=4.0, std=4.0):
         sign = tf.cast(tf.random.uniform((examples_num,2), 0, 2, dtype=tf.int32)*2-1, tf.float32)
         Xuv = tf.clip_by_value(tf.random.normal((examples_num,2), mean, std, dtype=tf.float32), -self.M, self.M)*sign
+        lines_num = tf.reduce_sum(tf.abs(Xuv), axis=-1, keepdims=True)
+        Xuv = tf.where(lines_num<3, Xuv+tf.sign(Xuv)*2, Xuv)
+        phase = tf.random.uniform((examples_num,1), -1.0, 1.0)
+
+        return tf.cast(Xuv, tf.float32)+1e-4, phase
+    
+    def random_optimized_freqs(self, examples_num, mean=4.0, std=4.0, examples_mult=5):
+        diag_mask = xy_coords([examples_num*examples_mult]*2)
+        diag_mask = tf.where(diag_mask[...,0]==diag_mask[...,1], 0., 1.)
+
+        sign = tf.cast(tf.random.uniform((examples_num*examples_mult,2), 0, 2, dtype=tf.int32)*2-1, tf.float32)
+        Xuv = tf.clip_by_value(tf.random.normal((examples_num*examples_mult,2), mean, std, dtype=tf.float32), -self.M, self.M)*sign
+        angles = tf.math.atan2(*tf.split(Xuv, 2, axis=-1))
+        diffs = 1-tf.reduce_max((1-tf.abs(tf.sin(angles-tf.transpose(angles, [1,0]))))*diag_mask, axis=-1)
+        Xuv = tf.gather(Xuv, tf.math.top_k(diffs, k=examples_num)[1], axis=0)
+
         lines_num = tf.reduce_sum(tf.abs(Xuv), axis=-1, keepdims=True)
         Xuv = tf.where(lines_num<3, Xuv+tf.sign(Xuv)*2, Xuv)
         phase = tf.random.uniform((examples_num,1), -1.0, 1.0)
@@ -84,7 +101,7 @@ class VecDrawer():
         self.grayscale = grayscale
         self.size = size
 
-    def cut_vec(self, vec, vec_mask, length, img):
+    def cut_vec(self, vec, vec_mask, length, img, color):
 
         lines_num = tf.cast(tf.reduce_sum(vec_mask), tf.int32)
         filtered_lines_num = tf.random.uniform((), self.min_num, lines_num+1, dtype=tf.int32)
@@ -111,29 +128,28 @@ class VecDrawer():
         vec_side_widths = tf.random.uniform((filtered_lines_num,2,1), self.min_width, 1)
         cutted_vecs = (filtered_vecs-vec_diag[:,tf.newaxis])*vec_side_widths+vec_diag[:,tf.newaxis]
 
-        color = [clr/255 for clr in gen_colors(grayscale=self.grayscale)]
-
         thickness = np.random.randint(1,max(2,int(length/2//1)))
 
         img = cv.polylines(img, cutted_vecs.numpy().astype(np.int32), False, color, thickness=thickness)
         mask = cv.polylines(np.zeros((self.size, self.size, 1)), cutted_vecs.numpy().astype(np.int32), False, 1.0, thickness=thickness)
 
-        return img, mask, cutted_vec_mask, tf.pad(cutted_vecs, [[starting_pos, self.size-starting_pos-filtered_lines_num],[0,0],[0,0]]), color
+        return img, mask, cutted_vec_mask, tf.pad(cutted_vecs, [[starting_pos, self.size-starting_pos-filtered_lines_num],[0,0],[0,0]])
 
-    def draw_vecs(self, vecs_col, lines_mask, lengths):
+    def draw_vecs(self, vecs_col, lines_mask, lengths, colors=None):
         background_color = [clr/255 for clr in gen_colors(grayscale=self.grayscale)]
         img = np.ones((self.size,self.size,3))*np.array([[background_color]], np.float32)
         masks = []
         vec_masks = []
         cutted_vecs_col = []
-        colors = []
+        if colors is None:
+            colors =  [[clr/255 for clr in gen_colors(grayscale=self.grayscale)] for i in range(len(vecs_col))]
 
-        for vec, vec_mask, length in zip(vecs_col, lines_mask, lengths):
-            img, mask, cutted_vec_mask, cutted_vecs, color = self.cut_vec(vec, vec_mask, length, img)
+
+        for vec, vec_mask, length, color in zip(vecs_col, lines_mask, lengths, colors):
+            img, mask, cutted_vec_mask, cutted_vecs = self.cut_vec(vec, vec_mask, length, img, color)
             masks.append(tf.constant(mask, tf.float32))
             vec_masks.append(cutted_vec_mask)
             cutted_vecs_col.append(cutted_vecs)
-            colors.append(color)
 
         masks = tf.stack(masks+[np.ones((self.size,self.size,1))])
         #masks = tf.concat([1-tf.reduce_max(masks, axis=0, keepdims=True), masks], axis=0)
@@ -353,3 +369,67 @@ def gen_line_keypoints(vecs_slope, vecs_col, lines_mask, d=3, size=32):
     keypoints = (centroids + (shift_vecs[:,tf.newaxis]*keypoints_range[tf.newaxis, :,tf.newaxis])[:,tf.newaxis])*lines_mask[...,tf.newaxis, tf.newaxis]
 
     return keypoints, shift_vecs
+
+
+def positional_encoding(length, depth):
+  depth = depth/2
+
+  positions = np.arange(length)[:, np.newaxis]     # (seq, 1)
+  depths = np.arange(depth)[np.newaxis, :]/depth   # (1, depth)
+
+  angle_rates = 1 / (10000**depths)         # (1, depth)
+  angle_rads = positions * angle_rates      # (pos, depth)
+
+  pos_encoding = np.concatenate(
+      [np.sin(angle_rads), np.cos(angle_rads)],
+      axis=-1) 
+
+  return tf.cast(pos_encoding, dtype=tf.float32)
+
+class AddPosEnc(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.pos_enc = positional_encoding(input_shape[-2], input_shape[-1])[tf.newaxis]
+
+    def call(self, inputs):
+        return inputs+self.pos_enc    
+
+class EncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, 
+                 attn_dim=512, 
+                 key_dim=512, 
+                 num_heads=4, 
+                 dropout=0.0,
+                 FFN_mid_layers=1, 
+                 FFN_mid_units=2048,
+                 FFN_activation='relu',
+                 **kwargs):
+        super(EncoderLayer, self).__init__(**kwargs)
+
+        self.attn_dropout, self.output_dropout = [tf.keras.layers.Dropout(dropout) for _ in range(2)]
+        self.attn_addnorm, self.output_addnorm = [tf.keras.Sequential([
+            tf.keras.layers.Add(),
+            tf.keras.layers.LayerNormalization(axis=-2)])
+            for _ in range(2)]
+
+        self.FFN = FFN(FFN_mid_layers, FFN_mid_units, attn_dim, dropout, FFN_activation)
+
+        self.MHA = MHA(attn_dim, attn_dim, key_dim, num_heads)
+
+    def call(self, V, Q=None, K=None, training=None):
+
+        if Q is None:
+            Q = V
+
+        if K is None:
+            K = V
+
+        # Multi-Head-Attention
+        V = self.attn_addnorm([V, self.attn_dropout(self.MHA(V, Q, K), training=training)])
+
+        # Feed-Forward-Network
+        V = self.output_addnorm([V, self.output_dropout(self.FFN(V), training=training)])
+
+        return V

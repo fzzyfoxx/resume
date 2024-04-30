@@ -105,7 +105,7 @@ def create_path_if_needed(path):
 
 
 class DatasetGenerator:
-    def __init__(self, cfg, map_generator):
+    def __init__(self, cfg, map_generator, **kwargs):
         self.cfg = cfg
 
         self.fmg = map_generator
@@ -188,7 +188,24 @@ class DatasetGenerator:
             'vec2': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
                   'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), (3,),(self.cfg.target_size, self.cfg.target_size)],
                   'feature_names': ['Afeatures', 'Bfreqs', 'Cfreqs_features', 'Dmask']
-                  }
+                  },
+            'vec3': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), (3,),(3,)],
+                  'feature_names': ['Afeatures', 'Bfreqs', 'Cfreqs_features', 'Dfreq_labels']
+                  },
+            'vec4': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), (3,),(1,)],
+                  'feature_names': ['Afeatures', 'Bfreqs', 'Cfreqs_features', 'Dfreq_labels']
+                  },
+            'vec5': {'output': [tf.float32,tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,1),(self.cfg.target_size, self.cfg.target_size,1)],
+                  'feature_names': ['Afeatures', 'Dfreq_labels']
+                  },
+            'vec6': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), 
+                                   (self.cfg.target_size, self.cfg.target_size,1),(self.cfg.target_size, self.cfg.target_size, kwargs['angle_splits'])],
+                  'feature_names': ['Afeatures', 'Bendpoint', 'Cline', 'Dangle']
+            }
         }
 
         self.map_decoder = mg.map_generator_decoder(cfg)
@@ -318,6 +335,15 @@ class DatasetGenerator:
             
             elif self.cfg.output_type=='vec2':
                 ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec3':
+                ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec4':
+                ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec6':
+                ds = ds.map(lambda a,b,c,d: (a, {'endpoint_label': b, 'line_label': c, 'angle_label': d}), num_parallel_calls=self.cfg.num_parallel_calls)
             
 
         # batch and padding definitions
@@ -395,6 +421,18 @@ class DatasetGenerator:
                 ds = ds.batch(self.cfg.ds_batch_size)
 
             elif self.cfg.output_type=='vec2':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec3':
+                ds = ds.batch(self.cfg.ds_batch_size)
+            
+            elif self.cfg.output_type=='vec4':
+                ds = ds.batch(self.cfg.ds_batch_size)
+            
+            elif self.cfg.output_type=='vec5':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec6':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
