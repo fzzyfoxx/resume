@@ -405,20 +405,21 @@ class EncoderLayer(tf.keras.layers.Layer):
                  FFN_mid_layers=1, 
                  FFN_mid_units=2048,
                  FFN_activation='relu',
+                 norm_axis=-2,
                  **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
 
         self.attn_dropout, self.output_dropout = [tf.keras.layers.Dropout(dropout) for _ in range(2)]
         self.attn_addnorm, self.output_addnorm = [tf.keras.Sequential([
             tf.keras.layers.Add(),
-            tf.keras.layers.LayerNormalization(axis=-2)])
+            tf.keras.layers.LayerNormalization(axis=norm_axis)])
             for _ in range(2)]
 
         self.FFN = FFN(FFN_mid_layers, FFN_mid_units, attn_dim, dropout, FFN_activation)
 
         self.MHA = MHA(attn_dim, attn_dim, key_dim, num_heads)
 
-    def call(self, V, Q=None, K=None, training=None):
+    def call(self, V, Q=None, K=None, mask=None, training=None):
 
         if Q is None:
             Q = V
@@ -432,4 +433,6 @@ class EncoderLayer(tf.keras.layers.Layer):
         # Feed-Forward-Network
         V = self.output_addnorm([V, self.output_dropout(self.FFN(V), training=training)])
 
+        if mask is not None:
+            return V*mask
         return V

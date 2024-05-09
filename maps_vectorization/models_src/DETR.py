@@ -1,4 +1,5 @@
 import tensorflow as tf
+import math
 from models_src.Mask_RCNN import CombinedMetricsModel
 
 class SinePositionEncoding(tf.keras.layers.Layer):
@@ -143,11 +144,14 @@ class MHA(tf.keras.layers.Layer):
         self.T = transpose_weights
         self.softmax_axis = softmax_axis
 
-    def call(self, V, Q, K):
+    def call(self, V, Q, K, mask=None):
         Q = self.QK_head_extractior(self.Q_d(Q))
         K = self.QK_head_extractior(self.K_d(K))
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
+        if mask is not None:
+            cross_mask = tf.expand_dims(tf.matmul(mask, mask, transpose_b=True), axis=1)
+            scores = scores+((cross_mask-1)*math.inf)
         weights = self.softmax(scores, axis=self.softmax_axis)
 
         V = self.V_head_extractior(self.V_d(V))
@@ -156,7 +160,11 @@ class MHA(tf.keras.layers.Layer):
         else:
             V *= tf.transpose(weights, perm=[0,1,3,2])
 
-        return self.O_d(self.output_perm(V))
+        V = self.O_d(self.output_perm(V))
+
+        if mask is not None:
+            return V*mask
+        return V
 
 
 class DeepLayerNormalization(tf.keras.layers.Layer):

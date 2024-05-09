@@ -205,6 +205,16 @@ class DatasetGenerator:
                   'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), 
                                    (self.cfg.target_size, self.cfg.target_size,1),(self.cfg.target_size, self.cfg.target_size, kwargs['angle_splits'])],
                   'feature_names': ['Afeatures', 'Bendpoint', 'Cline', 'Dangle']
+            },
+            'vec7': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(kwargs['endpoints_num'],2), 
+                                   (kwargs['endpoints_num'],1),(kwargs['endpoints_num'], kwargs['endpoints_num'])],
+                  'feature_names': ['Afeatures', 'Bendpoint', 'Cendpoint_mask', 'Dendpoint_cross']
+            },
+            'vec8': {'output': [tf.float32,tf.float32,tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(1,), 
+                                   (2,),(2,2)],
+                  'feature_names': ['Afeatures', 'Bangle', 'Cref_point', 'Dvec_label']
             }
         }
 
@@ -344,6 +354,12 @@ class DatasetGenerator:
 
             elif self.cfg.output_type=='vec6':
                 ds = ds.map(lambda a,b,c,d: (a, {'endpoint_label': b, 'line_label': c, 'angle_label': d}), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec7':
+                ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec8':
+                ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
             
 
         # batch and padding definitions
@@ -433,6 +449,12 @@ class DatasetGenerator:
                 ds = ds.batch(self.cfg.ds_batch_size)
 
             elif self.cfg.output_type=='vec6':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec7':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec8':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
