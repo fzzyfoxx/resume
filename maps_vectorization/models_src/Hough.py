@@ -133,7 +133,7 @@ class VecDrawer():
         img = cv.polylines(img, cutted_vecs.numpy().astype(np.int32), False, color, thickness=thickness)
         mask = cv.polylines(np.zeros((self.size, self.size, 1)), cutted_vecs.numpy().astype(np.int32), False, 1.0, thickness=thickness)
 
-        return img, mask, cutted_vec_mask, tf.pad(cutted_vecs, [[starting_pos, self.size-starting_pos-filtered_lines_num],[0,0],[0,0]])
+        return img, mask, cutted_vec_mask, tf.pad(cutted_vecs, [[starting_pos, self.size-starting_pos-filtered_lines_num],[0,0],[0,0]]), thickness
 
     def draw_vecs(self, vecs_col, lines_mask, lengths, colors=None):
         background_color = [clr/255 for clr in gen_colors(grayscale=self.grayscale)]
@@ -141,21 +141,29 @@ class VecDrawer():
         masks = []
         vec_masks = []
         cutted_vecs_col = []
+        thickness_col = []
         if colors is None:
             colors =  [[clr/255 for clr in gen_colors(grayscale=self.grayscale)] for i in range(len(vecs_col))]
 
 
         for vec, vec_mask, length, color in zip(vecs_col, lines_mask, lengths, colors):
-            img, mask, cutted_vec_mask, cutted_vecs = self.cut_vec(vec, vec_mask, length, img, color)
+            img, mask, cutted_vec_mask, cutted_vecs, thickness = self.cut_vec(vec, vec_mask, length, img, color)
             masks.append(tf.constant(mask, tf.float32))
             vec_masks.append(cutted_vec_mask)
             cutted_vecs_col.append(cutted_vecs)
+            thickness_col.append(thickness)
 
         masks = tf.stack(masks+[np.ones((self.size,self.size,1))])
         #masks = tf.concat([1-tf.reduce_max(masks, axis=0, keepdims=True), masks], axis=0)
 
 
-        return tf.constant(img, tf.float32), masks, tf.stack(vec_masks+[tf.zeros((self.size,))]), tf.math.floor(tf.stack(cutted_vecs_col+[tf.zeros((self.size,2,2))])), tf.stack(colors+[background_color])
+        return (tf.constant(img, tf.float32), 
+                masks, 
+                tf.stack(vec_masks+[tf.zeros((self.size,))]), 
+                tf.math.floor(tf.stack(cutted_vecs_col+[tf.zeros((self.size,2,2))])), 
+                tf.stack(colors+[background_color]),
+                tf.constant(thickness_col, tf.float32)
+        )
 
 
 class TopKFreqs(tf.keras.layers.Layer):
