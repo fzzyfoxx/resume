@@ -215,6 +215,12 @@ class DatasetGenerator:
                   'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(1,), 
                                    (2,),(2,2)],
                   'feature_names': ['Afeatures', 'Bangle', 'Cref_point', 'Dvec_label']
+            },
+            'vec9': {'output': [tf.float32,tf.float32,tf.float32, tf.float32, tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1), 
+                                   (self.cfg.target_size, self.cfg.target_size,1),(self.cfg.target_size, self.cfg.target_size,1),
+                                   (self.cfg.target_size, self.cfg.target_size,2)],
+                  'feature_names': ['Afeatures', 'Blines_mask', 'Cangle_label', 'Dthickness_label', 'Ecenter_vec_label']
             }
         }
 
@@ -360,6 +366,10 @@ class DatasetGenerator:
 
             elif self.cfg.output_type=='vec8':
                 ds = ds.map(lambda a,b,c,d: ((a,b,c),d), num_parallel_calls=self.cfg.num_parallel_calls)
+
+            elif self.cfg.output_type=='vec9':
+                ds = ds.map(lambda a,b,c,d,e: (a,b,c,d,e, b/tf.reduce_mean(b)), num_parallel_calls=self.cfg.num_parallel_calls)
+                ds = ds.map(lambda a,b,c,d,e,f: (a, {'lines_mask': b, 'angle': c, 'thickness': d, 'center_vec': e}, {'angle': f, 'thickness': f, 'center_vec': f}), num_parallel_calls=self.cfg.num_parallel_calls)
             
 
         # batch and padding definitions
@@ -455,6 +465,9 @@ class DatasetGenerator:
                 ds = ds.batch(self.cfg.ds_batch_size)
 
             elif self.cfg.output_type=='vec8':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec9':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
