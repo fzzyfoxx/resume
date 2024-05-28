@@ -306,7 +306,7 @@ class ROIAligner(tf.keras.layers.Layer):
 
 class CombinedMetricsModel(tf.keras.Model):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(CombinedMetricsModel, self).__init__(*args, **kwargs)
 
         self.custom_metrics = [tf.keras.metrics.Mean(name='loss')]
     
@@ -322,6 +322,13 @@ class CombinedMetricsModel(tf.keras.Model):
             metric.label = metric_def['label']
             metric.weight_label = metric_def['weight_label']
             self.custom_metrics += [metric]
+
+    '''def get_config(self):
+        config = super().get_config()
+        config.update({
+            'custom_metrics': self.custom_metrics
+        })
+        return config'''
 
     @property
     def metrics(self):
@@ -368,6 +375,9 @@ class CombinedMetricsModel(tf.keras.Model):
 
     def compute_loss(self, y=None, y_pred=None):
         return self.loss(y, y_pred)
+    
+    def save(self, *args, **kwargs):
+        tf.keras.Model(self.input, self.output).save(*args, **kwargs)
     
 
 class ProposalPooling(tf.keras.layers.Layer):

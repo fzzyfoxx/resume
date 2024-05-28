@@ -53,6 +53,9 @@ def decode1Dcoords(coords, width):
 
    return tf.stack([x,y], axis=-1)
 
+def encode1Dcoords(coords, width):
+    return tf.expand_dims(coords[...,1]*width+coords[...,0], axis=-1)
+
 def top_k2D(x, k=1, channel_dim=False):
     if channel_dim:
       x = tf.reduce_mean(x, axis=-1)

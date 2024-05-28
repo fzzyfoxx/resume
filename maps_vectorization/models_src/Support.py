@@ -221,6 +221,10 @@ class DatasetGenerator:
                                    (self.cfg.target_size, self.cfg.target_size,1),(self.cfg.target_size, self.cfg.target_size,1),
                                    (self.cfg.target_size, self.cfg.target_size,2)],
                   'feature_names': ['Afeatures', 'Blines_mask', 'Cangle_label', 'Dthickness_label', 'Ecenter_vec_label']
+            },
+            'vec10': {'output': [tf.float32,tf.float32], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(kwargs['max_examples_num']+1,self.cfg.target_size, self.cfg.target_size,1)],
+                  'feature_names': ['Afeatures', 'Bmasks']
             }
         }
 
@@ -468,6 +472,9 @@ class DatasetGenerator:
                 ds = ds.batch(self.cfg.ds_batch_size)
 
             elif self.cfg.output_type=='vec9':
+                ds = ds.batch(self.cfg.ds_batch_size)
+            
+            elif self.cfg.output_type=='vec10':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:
