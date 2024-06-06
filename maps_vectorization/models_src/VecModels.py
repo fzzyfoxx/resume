@@ -437,15 +437,17 @@ class VecEndpointsDataset():
             mask_label, n = self._random_visible_mask(masks, min_points=1)
             vec_label = tf.reshape(gen_visible_endpoints(mask_label, vecs_mask[n], vecs_col[n], n, masks), (-1,2,2))
             vec_num = len(vec_label)
-            vec_mask = tf.pad(tf.ones((vec_num,1)), [[0,self.size//2-vec_num], [0,0]])
-            vec_label = tf.pad(vec_label, [[0,self.size//2-vec_num], [0,0], [0,0]])
+            vec_mask = tf.pad(tf.ones((vec_num,1)), [[0,self.size-vec_num], [0,0]])
+            vec_label = tf.pad(vec_label, [[0,self.size-vec_num], [0,0], [0,0]])
             angle_label = tf.atan(tf.tan(-vec_angle[n]))
 
             points = tf.where(mask_label[...,0]>0)
             m = tf.py_function(np.random.randint, [0,len(points)], tf.int32)
             point = points[m]
 
-        return I, vec_label, vec_mask, angle_label, point
+            return I, mask_label, vec_label, vec_mask, angle_label, point
+        
+        return I, masks, vecs_col, vecs_mask, thickness
     
     def gen_full_map(self):
         args = self._gen_parameters()

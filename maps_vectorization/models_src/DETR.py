@@ -126,6 +126,7 @@ class MHA(tf.keras.layers.Layer):
                  num_heads,
                  transpose_weights=False,
                  softmax_axis=-1,
+                 soft_mask=False,
                  **kwargs):
         super(MHA, self).__init__(**kwargs)
 
@@ -144,14 +145,19 @@ class MHA(tf.keras.layers.Layer):
         self.T = transpose_weights
         self.softmax_axis = softmax_axis
 
+        self.soft_mask = soft_mask
+
     def call(self, V, Q, K, mask=None):
         Q = self.QK_head_extractior(self.Q_d(Q))
         K = self.QK_head_extractior(self.K_d(K))
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
         if mask is not None:
-            cross_mask = tf.expand_dims(tf.matmul(mask, mask, transpose_b=True), axis=1)
-            scores = scores+((cross_mask-1)*math.inf)
+            if self.soft_mask:
+                scores = scores + mask
+            else:
+                cross_mask = tf.expand_dims(tf.matmul(mask, mask, transpose_b=True), axis=1)
+                scores = scores+((cross_mask-1)*math.inf)
         weights = self.softmax(scores, axis=self.softmax_axis)
 
         V = self.V_head_extractior(self.V_d(V))
@@ -162,7 +168,7 @@ class MHA(tf.keras.layers.Layer):
 
         V = self.O_d(self.output_perm(V))
 
-        if mask is not None:
+        if (mask is not None) & (self.soft_mask==False):
             return V*mask
         return V
 
@@ -187,6 +193,7 @@ class EncoderLayer(tf.keras.layers.Layer):
                  FFN_mid_units=2048,
                  FFN_activation='relu',
                  deep_normalization=True,
+                 soft_mask=False,
                  **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
 
@@ -198,7 +205,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         self.FFN = FFN(FFN_mid_layers, FFN_mid_units, attn_dim, dropout, FFN_activation)
 
-        self.MHA = MHA(attn_dim, attn_dim, key_dim, num_heads)
+        self.MHA = MHA(attn_dim, attn_dim, key_dim, num_heads, soft_mask)
 
     def call(self, V, pos_enc=None, Q=None, K=None, training=None):
 

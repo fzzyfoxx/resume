@@ -225,6 +225,11 @@ class DatasetGenerator:
             'vec10': {'output': [tf.float32,tf.float32], 
                   'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(kwargs['max_examples_num']+1,self.cfg.target_size, self.cfg.target_size,1)],
                   'feature_names': ['Afeatures', 'Bmasks']
+            },
+            'vec11': {'output': [tf.float32,tf.float32,tf.float32,tf.float32,tf.float32,tf.int64], 
+                  'input_shapes': [(self.cfg.target_size, self.cfg.target_size,3),(self.cfg.target_size, self.cfg.target_size,1),
+                                   (self.cfg.target_size, 2, 2), (self.cfg.target_size, 1), (1,)],
+                  'feature_names': ['Afeatures', 'Bmask', 'Cvec_label', 'Dvec_mask', 'Eangle_label', 'Fref_point']
             }
         }
 
@@ -375,6 +380,8 @@ class DatasetGenerator:
                 ds = ds.map(lambda a,b,c,d,e: (a,b,c,d,e, b/tf.reduce_mean(b)), num_parallel_calls=self.cfg.num_parallel_calls)
                 ds = ds.map(lambda a,b,c,d,e,f: (a, {'lines_mask': b, 'angle': c, 'thickness': d, 'center_vec': e}, {'angle': f, 'thickness': f, 'center_vec': f}), num_parallel_calls=self.cfg.num_parallel_calls)
             
+            elif self.cfg.output_type=='vec11':
+                ds = ds.map(lambda a,b,c,d,e,f: ((a,f), {'angle': e, 'mask': b}), num_parallel_calls=self.cfg.num_parallel_calls)
 
         # batch and padding definitions
         if batch:
@@ -475,6 +482,9 @@ class DatasetGenerator:
                 ds = ds.batch(self.cfg.ds_batch_size)
             
             elif self.cfg.output_type=='vec10':
+                ds = ds.batch(self.cfg.ds_batch_size)
+
+            elif self.cfg.output_type=='vec11':
                 ds = ds.batch(self.cfg.ds_batch_size)
 
         if repeat:

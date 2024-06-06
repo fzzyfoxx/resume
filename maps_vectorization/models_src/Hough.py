@@ -379,13 +379,13 @@ def gen_line_keypoints(vecs_slope, vecs_col, lines_mask, d=3, size=32):
     return keypoints, shift_vecs
 
 
-def positional_encoding(length, depth):
+def positional_encoding(length, depth, temperature):
   depth = depth/2
 
   positions = np.arange(length)[:, np.newaxis]     # (seq, 1)
   depths = np.arange(depth)[np.newaxis, :]/depth   # (1, depth)
 
-  angle_rates = 1 / (10000**depths)         # (1, depth)
+  angle_rates = 1 / (temperature**depths)         # (1, depth)
   angle_rads = positions * angle_rates      # (pos, depth)
 
   pos_encoding = np.concatenate(
@@ -395,11 +395,13 @@ def positional_encoding(length, depth):
   return tf.cast(pos_encoding, dtype=tf.float32)
 
 class AddPosEnc(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, temperature=10000, **kwargs):
         super().__init__(**kwargs)
 
+        self.temperature = temperature
+
     def build(self, input_shape):
-        self.pos_enc = positional_encoding(input_shape[-2], input_shape[-1])[tf.newaxis]
+        self.pos_enc = positional_encoding(input_shape[-2], input_shape[-1], self.temperature)[tf.newaxis]
 
     def call(self, inputs):
         return inputs+self.pos_enc    
