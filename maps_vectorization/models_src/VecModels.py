@@ -13,8 +13,8 @@ def tensor_from_coords(coords, values, size=32):
 
     return x
 
-def one_hot_angles(x, splits):
-    bins = tf.cast(tf.round(x/(2*math.pi)*splits) + splits//2, tf.int32)
+def one_hot_angles(x, splits, denom=2):
+    bins = tf.cast(tf.round(x/(denom*math.pi)*splits) + splits//2, tf.int32)
     bins = tf.where(bins==splits, 0, bins)
     return tf.one_hot(bins, splits)
 
