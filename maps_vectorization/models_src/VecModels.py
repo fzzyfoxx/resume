@@ -852,7 +852,7 @@ def sample_weighted_mean(x, sample_weight):
     return nom/denom
 
     
-class AngleLoss(tf.keras.losses.Loss):
+'''class AngleLoss(tf.keras.losses.Loss):
     def __init__(self, gamma=1., name='AL', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
         super().__init__(name=name, reduction=reduction, **kwargs)
 
@@ -875,7 +875,25 @@ class AngleLoss(tf.keras.losses.Loss):
 
         loss_value = loss_value**(1/self.gamma)
 
-        return tf.reduce_mean(loss_value)
+        return tf.reduce_mean(loss_value)'''
+    
+class AngleLoss(tf.keras.losses.Loss):
+    def __init__(self, gamma=1., name='AL', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(name=name, reduction=reduction, **kwargs)
+
+        self.gamma = gamma
+
+    def get_config(self):
+        return {
+            'name': self.name,
+            'reduction': self.reduction,
+            'gamma': self.gamma
+        }
+    
+    def call(self, y_true, y_pred):
+        diffs = two_side_angle_diff(y_true, y_pred, gamma=self.gamma)**(1/self.gamma)
+
+        return diffs
     
 class AngleLengthLoss(tf.keras.losses.Loss):
     def __init__(self, angle_gamma=1., length_gamma=1., dist_gamma=2., angle_weight=0.5, length_weight=0.5, dist_weight=0.5, name='AL', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
@@ -908,7 +926,27 @@ class AngleLengthLoss(tf.keras.losses.Loss):
     def _calc_dist(a,b, gamma):
         return tf.reduce_sum((a-b)**gamma, axis=-1, keepdims=True)**(1/gamma)
     
-    def __call__(self, y_true, y_pred, sample_weight=None):
+    def call(self, y_true, y_pred, sample_weight=None):
+        true_angle = calc_vec_angle(y_true)/2
+        pred_angle = calc_vec_angle(y_pred)/2
+
+        angle_diffs = two_side_angle_diff(true_angle, pred_angle, gamma=self.angle_gamma)
+
+        true_length = self._calc_length(y_true)
+        pred_length = self._calc_length(y_pred)
+
+        length_diffs = tf.abs(true_length-pred_length)**self.length_gamma
+
+        dists = self._calc_dist(y_true, y_pred, gamma=self.dist_gamma)
+
+        angle_diffs = angle_diffs**(1/self.angle_gamma)
+        length_diffs = length_diffs**(1/self.length_gamma)
+
+        loss_value = angle_diffs*self.angle_weight + length_diffs*self.length_weight + dists*self.dist_weight
+
+        return loss_value
+    
+    '''def __call__(self, y_true, y_pred, sample_weight=None):
         true_angle = calc_vec_angle(y_true)/2
         pred_angle = calc_vec_angle(y_pred)/2
 
@@ -935,7 +973,7 @@ class AngleLengthLoss(tf.keras.losses.Loss):
 
         loss_value = angle_loss*self.angle_weight + length_loss*self.length_weight + dist_loss*self.dist_weight
 
-        return tf.reduce_mean(loss_value)
+        return tf.reduce_mean(loss_value)'''
     
     
 class AngleActivationLayer(tf.keras.layers.Layer):
@@ -1017,3 +1055,12 @@ class RegularizedSigmoid(tf.keras.layers.Layer):
     def call(self, inputs):
 
         return tf.nn.sigmoid(self.mult*inputs+self.bias)
+    
+class SplitLayer(tf.keras.layers.Layer):
+  def __init__(self, splits, **kwargs):
+    super().__init__(**kwargs)
+
+    self.splits = splits
+
+  def call(self, inputs):
+    return tf.split(inputs, self.splits, axis=-1)

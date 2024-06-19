@@ -6,6 +6,7 @@ import math
 import cv2 as cv
 
 from models_src.fft_lib import xy_coords
+from models_src.VecModels import flatten
 from src.patterns import gen_colors
 
 from google.cloud import storage
@@ -848,12 +849,17 @@ def op_line_features(img, line_label, shape_label, angle_label, center_vec_label
     shape_class = tf.cast(tf.concat([1-all_shapes_mask, shape_class], axis=-1), tf.float32)
 
     line_label = tf.cast(line_label, tf.float32)
-    thickness_label = tf.cast(thickness_label, tf.float32)
     all_shapes_mask = tf.cast(all_shapes_mask, tf.float32)
+
+    line_label = tf.math.divide_no_nan(line_label, tf.reduce_mean(flatten(line_label), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
+    thickness_label = tf.cast(thickness_label, tf.float32)
+    all_shapes_mask = tf.math.divide_no_nan(all_shapes_mask, tf.reduce_mean(flatten(all_shapes_mask), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
+
+    class_mask = tf.ones(tf.shape(shape_class)[:-1], dtype=tf.float32)
 
     return (img, 
             {'shape_class': shape_class, 'angle': angle_label, 'thickness': thickness_label, 'center_vec': center_vec_label}, 
-            {'angle': line_label, 'thickness': all_shapes_mask, 'center_vec': all_shapes_mask}
+            {'shape_class': class_mask, 'angle': line_label, 'thickness': all_shapes_mask, 'center_vec': all_shapes_mask}
             )
 
 @tf.function
