@@ -99,7 +99,7 @@ class TrainingProcessor:
         except:
             None
 
-    def compile_model(self, model_type, model_args, optimizer, loss, metrics, print_summary=True, log=True, export_model=True):
+    def compile_model(self, model_type, model_args, optimizer, loss, metrics, loss_weights=None, print_summary=True, log=True, export_model=True):
         self.model_args = model_args
         self.model_type = model_type
         self.loss_args = loss.get_config()
@@ -111,7 +111,8 @@ class TrainingProcessor:
             self.model.compile(
                 optimizer=optimizer,
                 loss = loss,
-                metrics = metrics
+                metrics = metrics,
+                loss_weights = loss_weights
                 )
         
         if log:
