@@ -891,7 +891,7 @@ class AngleLoss(tf.keras.losses.Loss):
         }
     
     def call(self, y_true, y_pred):
-        diffs = two_side_angle_diff(y_true, y_pred, gamma=self.gamma)**(1/self.gamma)
+        diffs = two_side_angle_diff(y_true, y_pred, gamma=self.gamma)
 
         return diffs
     

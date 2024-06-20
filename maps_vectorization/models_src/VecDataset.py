@@ -1050,6 +1050,10 @@ class DatasetGenerator:
         if self.output_filter is not None:
             ds = ds.map(self._filter_outputs, num_parallel_calls=self.parallel_calls)
 
+        if not validation:
+            if shuffle_buffer_size>0:
+                ds = ds.shuffle(shuffle_buffer_size, reshuffle_each_iteration=True)
+
         if batch_size>0:
             steps = math.ceil(records/batch_size)
             if not self.padded_batch:

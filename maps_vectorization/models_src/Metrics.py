@@ -1,6 +1,19 @@
 import tensorflow as tf
 from scipy.optimize import linear_sum_assignment
 
+
+class LossBasedMetric(tf.keras.metrics.Mean):
+    def __init__(self, loss_func, **kwargs):
+        super().__init__(**kwargs)
+
+        self.loss_func = loss_func
+        self.loss_func.reduction = tf.keras.losses.Reduction.NONE
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        values = self.loss_func(y_true, y_pred, sample_weight)
+        values = tf.reduce_sum(values)/tf.cast(tf.reduce_prod(tf.shape(values)), tf.float32)
+        return super().update_state(values, None)
+
 class F12D(tf.keras.metrics.Metric):
     def __init__(self, threshold, name='F1', **kwargs):
         super(F12D, self).__init__(name=name, **kwargs)
