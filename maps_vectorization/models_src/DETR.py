@@ -1,6 +1,6 @@
 import tensorflow as tf
 import math
-from models_src.Mask_RCNN import CombinedMetricsModel
+from models_src.CombinedMetricsModel import CombinedMetricsModel
 
 class SinePositionEncoding(tf.keras.layers.Layer):
     def __init__(self, fixed_dims=False, temperature=10000, **kwargs):
