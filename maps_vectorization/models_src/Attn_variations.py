@@ -592,9 +592,9 @@ class SqueezeImg(tf.keras.layers.Layer):
         super(SqueezeImg, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        preceeding_dims = input_shape[1:-3]
-        last_dim = (input_shape[-1],)
-        squeezed_dim = (input_shape[-3]*input_shape[-2])
+        preceeding_dims = list(input_shape[1:-3])
+        last_dim = [input_shape[-1]]
+        squeezed_dim = [input_shape[-3]*input_shape[-2]]
 
         self.reshape = tf.keras.layers.Reshape(preceeding_dims+squeezed_dim+last_dim)
 
@@ -606,10 +606,10 @@ class UnSqueezeImg(tf.keras.layers.Layer):
         super(UnSqueezeImg, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        preceeding_dims = input_shape[1:-2]
-        last_dim = (input_shape[-1],)
+        preceeding_dims = list(input_shape[1:-2])
+        last_dim = [input_shape[-1]]
         squeezed_dim = input_shape[-2]
-        unsqueezed_dim = (int(squeezed_dim**0.5),)
+        unsqueezed_dim = [int(squeezed_dim**0.5)]
 
         self.reshape = tf.keras.layers.Reshape(preceeding_dims+unsqueezed_dim+unsqueezed_dim+last_dim)
 

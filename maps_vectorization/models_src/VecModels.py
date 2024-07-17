@@ -1078,8 +1078,8 @@ class PixelCrossSimilarityCrossentropy(tf.keras.losses.Loss):
     def get_config(self):
         return {
             'name': self.name,
-            'reduction': self.reduction,
-            'gamma': self.gamma
+            'label_smoothing': self.label_smoothing,
+            'axis': self.ce_axis
         }
     
     def call(self, y_true, y_pred):
