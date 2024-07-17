@@ -1067,6 +1067,30 @@ class SplitLayer(tf.keras.layers.Layer):
     return tf.split(inputs, self.splits, axis=-1)
   
 
+class PixelCrossSimilarityCrossentropy(tf.keras.losses.Loss):
+    def __init__(self, label_smoothing=0.0, axis=[-1,-2], name='PCS', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(name=name, reduction=reduction, **kwargs)
+
+        self.squeeze_img = SqueezeImg()
+        self.label_smoothing = label_smoothing
+        self.ce_axis = axis
+
+    def get_config(self):
+        return {
+            'name': self.name,
+            'reduction': self.reduction,
+            'gamma': self.gamma
+        }
+    
+    def call(self, y_true, y_pred):
+        y_true = tf.squeeze(self.squeeze_img(y_true), axis=-1)
+        y_true = tf.matmul(y_true, y_true, transpose_a=True)
+
+        loss_value = tf.keras.losses.binary_crossentropy(y_true, y_pred, label_smoothing=self.label_smoothing, axis=self.ce_axis)
+
+        return loss_value
+  
+
 
 def pixel_features_unet(input_shape, init_filters_power, levels, level_convs, init_dropout, dropout, batch_normalization, name='PxFeaturesUnet', **kwargs):
     unet_model = UNet(

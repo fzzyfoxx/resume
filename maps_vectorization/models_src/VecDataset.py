@@ -877,6 +877,12 @@ def random_flip(**kwargs):
     a, b  = dirs[0], dirs[1]
     return dict([(k, v[:,::a, ::b]) for k,v in kwargs.items()])
 
+@tf.function
+def op_pixel_similarity(img, pattern_masks, **kwargs):
+    background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
+    pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
+    return (img, tf.cast(pattern_masks, tf.float32))
+
 
 ### DATASET GENERATOR ###
 
@@ -1068,7 +1074,7 @@ class DatasetGenerator:
                 if (not validation) | (validation & if_validation):
                     ds = ds.map(lambda x: func(**x, **func_kwargs), num_parallel_calls=self.parallel_calls)
 
-        if tf.repeat:
+        if repeat:
             ds = ds.repeat()
 
         return ds, steps
