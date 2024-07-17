@@ -307,8 +307,8 @@ class TrainingProcessor2:
         self.val_ds = val_ds
         self.val_steps = val_steps
 
-        self.cfg.train_samples = train_steps*cfg.train_batch_size
-        self.cfg.val_samples = val_steps*cfg.val_batch_size
+        self.cfg.train_samples = train_steps*self.cfg.train_batch_size
+        self.cfg.val_samples = val_steps*self.cfg.val_batch_size
 
     def _get_cfg_attrs(self):
         return [(a, getattr(self.cfg, a)) for a in dir(self.cfg) if not a.startswith('__')]
@@ -394,8 +394,9 @@ class TrainingProcessor2:
             self._log_mlflow_params()
             if export_final_state:
                 #save weights
-                self.model.save_weights('./final_state/variables')
-                mlflow.log_artifacts('./final_state', 'final_state')
+                self._prepare_path('./final_state/temp')
+                self.model.save_weights('./final_state/temp/final_state.weights.h5')
+                mlflow.log_artifacts('./final_state/temp', '')
             if export_model:
                 mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
         
@@ -441,24 +442,37 @@ class TrainingProcessor2:
         print('\n\033[1mModel params\033[0m')
         print(model_args)
 
-    def save_temp_weights(self, weights_path):
+    @staticmethod
+    def _prepare_path(path):
         try:
-            os.mkdir(weights_path)
+            os.makedirs(path, exist_ok=True)
         except:
             None
-        self.model.save_weights(f'./{weights_path}/weights.keras', save_format='keras')
 
-    def load_temp_weights(self, weights_path, skip_mismatch=True, by_name=True):
-        self.model.load_weights(f'./{weights_path}/weights.keras', skip_mismatch, by_name)
+    def save_temp_weights(self, weights_path, filename='final_state', use_model_name=True):
 
-    def load_mlflow_weights(self, run_name):
+        if use_model_name:
+            weights_path = os.path.join(weights_path, self.model.name)
+
+        self._prepare_path(weights_path)
+        self.model.save_weights(f'./{weights_path}/{filename}.weights.h5')
+
+    def load_temp_weights(self, weights_path, skip_mismatch=True):
+        self.model.load_weights(f'./{weights_path}.weights.h5', skip_mismatch=skip_mismatch)
+
+    def load_mlflow_weights(self, run_name, weights_path='./', skip_mismatch=True):
         run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
         #self.initial_epoch = int(run_args['params.epochs'])
-        mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
-                                    dst_path='./')
-        self.model.load_weights('final_state/variables')
 
-    def load_model(self, run_name, load_final_state=True):
+        self._download_and_load_mlflow_weights(weights_path, run_args, skip_mismatch)
+
+    def _download_and_load_mlflow_weights(self, weights_path, run_args, skip_mismatch=True):
+        self._prepare_path(weights_path)
+        mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state.weights.h5',
+                                    dst_path=weights_path)
+        self.model.load_weights(os.path.join(weights_path,'final_state.weights.h5'), skip_mismatch=skip_mismatch)
+
+    def load_model(self, run_name, weights_path='./final_state/temp', load_final_state=True):
         run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
         self.initial_epoch = int(run_args['params.epochs']) #int(run_args['params.initial_epoch']) + 
         with warnings.catch_warnings():
@@ -466,8 +480,6 @@ class TrainingProcessor2:
             self.model = mlflow.tensorflow.load_model(os.path.join(run_args.artifact_uri, "model"))
 
         if load_final_state:
-            mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state',
-                                    dst_path='./')
-            self.model.load_weights('final_state/variables')
+            self._download_and_load_mlflow_weights(weights_path, run_args, skip_mismatch=False)
 
         self._load_mlflow_args(run_args)
