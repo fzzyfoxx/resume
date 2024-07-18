@@ -577,11 +577,11 @@ class MultishapeMapGenerator:
         self.tf_mask_dtype = tf.as_dtype(mask_dtype)
 
         self.generator_map = {
-            'line_filled': {'generator': LineFilledGenerator(size=size, dtype=mask_dtype, **line_args, **line_filled_args), 'angle_similarity_prevention': True, 'multi_pattern_color_diversity': True, 'single_vec': False, 'type': 'line'},
-            'double_line_filled': {'generator': DoubleLineFilledGenerator(size=size, dtype=mask_dtype, **line_args, **line_filled_args), 'angle_similarity_prevention': True, 'multi_pattern_color_diversity': True, 'single_vec': False, 'type': 'line'},
-            'polyline': {'generator': PolylineGenerator(size=size, dtype=mask_dtype, **line_args, **polyline_args), 'angle_similarity_prevention': False, 'multi_pattern_color_diversity': False, 'single_vec': False, 'type': 'line'},
-            'linear_shapes': {'generator': LinearShapesGenerator(size=size, dtype=mask_dtype, **shape_args, **linear_shapes_args), 'angle_similarity_prevention': False, 'multi_pattern_color_diversity': False, 'single_vec': True, 'type': 'shape'},
-            'spreaded_shapes': {'generator': SpreadedShapesGenerator(size=size, dtype=mask_dtype, **shape_args, **spreaded_shapes_args), 'angle_similarity_prevention': False, 'multi_pattern_color_diversity': True, 'single_vec': False, 'type': 'shape'}
+            'line_filled': {'generator': LineFilledGenerator(size=size, dtype=mask_dtype, **line_args, **line_filled_args), 'angle_similarity_prevention': True, 'multi_pattern_color_diversity': True, 'color_repetition_filter': ['polyline'], 'single_vec': False, 'type': 'line'},
+            'double_line_filled': {'generator': DoubleLineFilledGenerator(size=size, dtype=mask_dtype, **line_args, **line_filled_args), 'angle_similarity_prevention': True, 'multi_pattern_color_diversity': True, 'color_repetition_filter': ['polyline'], 'single_vec': False, 'type': 'line'},
+            'polyline': {'generator': PolylineGenerator(size=size, dtype=mask_dtype, **line_args, **polyline_args), 'angle_similarity_prevention': False, 'multi_pattern_color_diversity': False, 'color_repetition_filter': ['double_line_filled', 'line_filled','polyline'], 'single_vec': False, 'type': 'line'},
+            'linear_shapes': {'generator': LinearShapesGenerator(size=size, dtype=mask_dtype, **shape_args, **linear_shapes_args), 'angle_similarity_prevention': True, 'multi_pattern_color_diversity': False, 'color_repetition_filter': ['spreaded_shapes'], 'single_vec': True, 'type': 'shape'},
+            'spreaded_shapes': {'generator': SpreadedShapesGenerator(size=size, dtype=mask_dtype, **shape_args, **spreaded_shapes_args), 'angle_similarity_prevention': False, 'multi_pattern_color_diversity': True, 'color_repetition_filter': ['linear_shapes', 'spreaded_shapes'], 'single_vec': False, 'type': 'shape'}
         }
 
         self.patterns_prob = np.array(list(patterns_prob.values()))
@@ -691,13 +691,20 @@ class MultishapeMapGenerator:
         return x[::(np.random.randint(0,2)*2-1)]
     
     def gen_colors(self, patterns_num):
-        colors =  np.reshape(np.array([[clr/255 for clr in gen_colors(grayscale=self.grayscale)] for i in range(patterns_num*2)]), (patterns_num, 2, 3))
-        colors = np.concatenate([colors[:1], colors], axis=0)
-        previous_color_mask = np.random.binomial(1, self.use_previous_color_prob, (patterns_num,2,1))
+        if patterns_num%2>0:
+            patterns_num += 1
 
-        colors = colors[1:]*(1-previous_color_mask) + colors[:-1]*previous_color_mask
-        colors = np.array(list(map(self.random_sort, colors)))
+        colors =  np.reshape(np.array([[clr/255 for clr in gen_colors(grayscale=self.grayscale)] for i in range((patterns_num)*2)]), (patterns_num//2, 2, 2, 3))
+        #colors = np.concatenate([colors[:1], colors], axis=0)
+        previous_color_mask = np.random.binomial(1, self.use_previous_color_prob, (patterns_num//2,1,1,1))
 
+        #colors = colors[1:]*(1-previous_color_mask) + colors[:-1]*previous_color_mask
+        #colors = np.array(list(map(self.random_sort, colors)))
+
+        left_colors, right_colors = np.split(colors, 2, axis=1)
+        right_colors = right_colors*(1-previous_color_mask) + left_colors*previous_color_mask
+
+        colors = np.reshape(np.concatenate([left_colors, right_colors], axis=1), (patterns_num, 2, 3))
         return colors
     
     def gen_single_color_pair(self):
@@ -755,18 +762,20 @@ class MultishapeMapGenerator:
         #print(colors)
 
         background_color = np.array([[[clr/255 for clr in gen_colors(grayscale=self.grayscale)]]])
+        previous_pattern = ''
 
         i=1
+        r=0
         for pattern_type, color in zip(pattern_types, colors):
             #print(pattern_type)
-            generator, angle_similarity_prevention, multi_pattern_color_diversity, single_vec, general_type = self.generator_map[pattern_type].values()
+            generator, angle_similarity_prevention, multi_pattern_color_diversity, color_repetition_filter, single_vec, general_type = self.generator_map[pattern_type].values()
             shape_color, borderline_color = color
             j=0
 
             for shape_masks, borderline_masks, vecs, bboxes, angle, thickness in generator(max_components=components_left, previous_angles=previous_angles):
                 if shape_masks is not None:
                     pattern_mask, full_shape_masks, vis_shape_masks, vis_borderline_masks, vis_vecs, vis_bbox, angle = self.calc_visible_part(vecs, bboxes, shape_masks, borderline_masks, mask, angle, single_vec)
-                    if multi_pattern_color_diversity & (i>0):
+                    if (multi_pattern_color_diversity & (j>0)) | ((previous_pattern in color_repetition_filter) & (r>0)):
                         shape_color, borderline_color = self.gen_single_color_pair()
 
                     if pattern_mask is not None:
@@ -816,6 +825,9 @@ class MultishapeMapGenerator:
                     i+=1
                 if (i>self.max_patterns_num) | (components_left<1):
                     break
+            
+            previous_pattern = pattern_type
+            r = abs(r-1)
             if (i>self.max_patterns_num) | (components_left<1):
                 break
 
