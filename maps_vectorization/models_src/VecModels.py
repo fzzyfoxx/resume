@@ -5,6 +5,7 @@ from models_src.Hough import VecDrawer
 from models_src.fft_lib import xy_coords
 from models_src.Attn_variations import UnSqueezeImg, SqueezeImg
 from models_src.UNet_model import UNet
+from models_src.DETR import FFN, HeadsPermuter
 
 
 def tensor_from_coords(coords, values, size=32):
@@ -1118,3 +1119,135 @@ def pixel_features_unet(input_shape, init_filters_power, levels, level_convs, in
     out_center_vec = tf.keras.layers.Identity(name='center_vec')(out_center_vec)
     out_thickness = tf.keras.layers.Identity(name='thickness')(out_thickness)
     return tf.keras.Model(inputs, {'shape_class': out_shape_class, 'angle': out_angle, 'thickness': out_thickness, 'center_vec': out_center_vec}, name=name)
+
+class DotSimilarityLayer(tf.keras.layers.Layer):
+    def __init__(self, epsilon=1e-6, **kwargs):
+        super().__init__(**kwargs)
+
+        self.e = epsilon
+
+    def call(self, inputs):
+        x = tf.matmul(inputs, inputs, transpose_b=True)
+        x = tf.nn.softmax(x, axis=-1)
+        max_sim = tf.reduce_max(x, axis=-1, keepdims=True) + self.e
+        x = x/max_sim
+
+        return x
+    
+class PixelSimilarityF1(tf.keras.metrics.Metric):
+    def __init__(self, skip_first_pattern=True, threshold=0.5, name='F1', **kwargs):
+        super(PixelSimilarityF1, self).__init__(name=name, **kwargs)
+
+        self.f1 = tf.keras.metrics.F1Score(threshold=threshold, average='micro')
+        self.flatten = tf.keras.layers.Flatten()
+        self.score = self.add_weight(name='f1', initializer='zeros')
+        self.iterations = self.add_weight(name='iters', initializer='zeros')
+        self.threshold = threshold
+
+        self.squeeze_img = SqueezeImg()
+        self.squeeze_mask = SqueezeImg()
+        self.skip_first = skip_first_pattern
+
+    def get_config(self):
+        return {**super().get_config(), 
+                'threshold': self.threshold, 
+                'skip_first_pattern': self.skip_first}
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+
+        if self.skip_first:
+            y_true = y_true[:,1:]
+
+        y_true = tf.squeeze(self.squeeze_img(y_true), axis=-1)
+        y_true = tf.matmul(y_true, y_true, transpose_a=True)
+        y_pred = y_pred*tf.reduce_max(y_true, axis=-1, keepdims=True)
+
+        self.score.assign_add(self.f1(self.flatten(y_true), self.flatten(y_pred)))
+        self.iterations.assign_add(1.0)
+
+    def result(self):
+        return self.score/self.iterations
+    
+class WeightedPixelCrossSimilarityCrossentropy(tf.keras.losses.Loss):
+    def __init__(self, label_smoothing=0.0,  name='PCS', reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(name=name, reduction=reduction, **kwargs)
+
+        self.squeeze_img = SqueezeImg()
+        self.label_smoothing = label_smoothing
+
+    def get_config(self):
+        return {
+            'name': self.name,
+            'label_smoothing': self.label_smoothing,
+        }
+    
+    def call(self, y_true, y_pred):
+        y_true = tf.squeeze(self.squeeze_img(y_true), axis=-1) #[B,P,HW]
+
+        pattern_sums = tf.reduce_sum(y_true, axis=-1, keepdims=True)+1e-6 #[B,P,1]
+        weights = tf.reduce_sum(y_true/pattern_sums, axis=-2) #[B,HW]
+        weights_denom = tf.reduce_sum(weights, axis=-1, keepdims=True) #[B,1]
+        weights = weights/weights_denom #[B,HW]
+
+        y_true = tf.matmul(y_true, y_true, transpose_a=True) #[B,HW,HW]
+
+        loss_value = tf.keras.losses.binary_crossentropy(y_true, y_pred, label_smoothing=self.label_smoothing, axis=-1) #[B,HW]
+        loss_value = tf.reduce_sum(loss_value*weights, axis=-1) #[B]
+
+        return loss_value
+
+def backbone_based_pixel_similarity_dot_model(
+        backbone_args,
+        backbone_generator,
+        backbone_weights_path,
+        backbone_trainable,
+        backbone_last_layer,
+        backbone_init_layer,
+        color_embs_num,
+        color_embs_mid_layers,
+        conv_num,
+        conv_dim,
+        attn_dim,
+        heads_num,
+        use_heads,
+        pre_attn_ffn_mid_layers,
+        dropout,
+        name='PxSimDot'
+        ):
+    
+    conv_dim = attn_dim//2
+    
+    backbone_model = backbone_generator(**backbone_args)
+    if backbone_weights_path is not None:
+        backbone_model.load_weights(f'./{backbone_weights_path}.weights.h5')
+
+    backbone_model.trainable = backbone_trainable
+    inputs = backbone_model.input
+    memory = backbone_model.get_layer(backbone_last_layer).output
+    normed_img = backbone_model.get_layer(backbone_init_layer).output
+
+    normed_img = SqueezeImg(name='Squeeze-NormedImg')(normed_img)
+    color_embs_map = FFN(mid_layers=color_embs_mid_layers, mid_units=color_embs_num*2, output_units=color_embs_num, dropout=dropout, activation='relu')(normed_img)
+
+    if conv_num>0:
+        memory = tf.keras.layers.Conv2D(conv_dim, kernel_size=1, padding='same', activation='relu', name='Conv_init')(memory)
+        x = memory
+        for i in range(conv_num):
+            x = tf.keras.layers.Conv2D(conv_dim, kernel_size=3, padding='same', activation='relu', name=f'Conv_{i+1}')(x)
+
+        x = tf.keras.layers.Concatenate(name='Concat_Memory')([x, memory])
+    else:
+        x = memory
+    x = SqueezeImg(name='Squeeze-Memory')(x)
+    x = FFN(mid_layers=pre_attn_ffn_mid_layers, mid_units=attn_dim*2, output_units=attn_dim, dropout=dropout, activation='relu', name='features_FFN')(x)
+    x = tf.keras.layers.Concatenate(name='Concat_Color_Embs')([x, color_embs_map])
+
+    if use_heads:
+        x = HeadsPermuter(num_heads=heads_num, emb_dim=(attn_dim+color_embs_num)//heads_num, name='Heads_Permute')(x)
+        x = tf.keras.layers.LayerNormalization(axis=-1, name='Heads_Norm')(x)
+        x = HeadsPermuter(num_heads=heads_num, emb_dim=(attn_dim+color_embs_num)//heads_num, reverse=True, name='Heads_Unpermute')(x)
+    else:
+        x = tf.keras.layers.LayerNormalization(axis=-1, name='Norm')(x)
+    out = DotSimilarityLayer(epsilon=1e-6, name='Dot_Similarity')(x)
+
+    return tf.keras.Model(inputs, out, name=name)

@@ -44,6 +44,7 @@ class TrainingProcessor:
 
         self.reload_dataset(reload_parcels=False)
 
+
     def _get_cfg_attrs(self):
         return [(a, getattr(self.cfg, a)) for a in dir(self.cfg) if not a.startswith('__')]
 
@@ -297,9 +298,11 @@ class TrainingProcessor:
 
 
 class TrainingProcessor2:
-    def __init__(self, cfg):
+    def __init__(self, cfg, mlflow_instance=None):
         self.cfg = cfg
         self.cfg_attrs = self._get_cfg_attrs()
+
+        self.mlflow = mlflow_instance if mlflow_instance is not None else mlflow
 
     def load_dataset(self, ds, train_steps, val_ds=None, val_steps=None):
         self.ds = ds
@@ -323,14 +326,14 @@ class TrainingProcessor2:
     def _log_mlflow_params(self,):
         
         for key in self.model_args.keys():
-            mlflow.log_param(key, self.model_args[key])
+            self.mlflow.log_param(key, self.model_args[key])
 
         for key, value in self.cfg_attrs:
-            mlflow.log_param(key, value)
+            self.mlflow.log_param(key, value)
 
         for name, loss_args in self.loss_args:
             for key, value in loss_args.items():
-                mlflow.log_param('loss.'+name+'_'+key, value)
+                self.mlflow.log_param('loss.'+name+'_'+key, value)
 
             #mlflow.log_param('model_type', self.model_type)
 
@@ -369,12 +372,12 @@ class TrainingProcessor2:
     def train_model(self, epochs, log=True, callbacks=None, export_final_state=True, export_model=True, validation_freq=1):
 
         if log:
-            #mlflow.tensorflow.autolog(log_datasets=False, log_models=True, disable=False)
-            mlflow.start_run()
-            print(f'MLflow run: {mlflow.active_run().info.run_name}')
+            self.mlflow.tensorflow.autolog(log_datasets=False, log_models=True, disable=False)
+            self.mlflow.start_run()
+            print(f'MLflow run: {self.mlflow.active_run().info.run_name}')
         else:
             None
-            #mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
+            self.mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -396,12 +399,12 @@ class TrainingProcessor2:
                 #save weights
                 self._prepare_path('./final_state/temp')
                 self.model.save_weights('./final_state/temp/final_state.weights.h5')
-                mlflow.log_artifacts('./final_state/temp', '')
+                self.mlflow.log_artifacts('./final_state/temp', '')
             if export_model:
-                mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
+                self.mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
         
         try:
-            mlflow.end_run()
+            self.mlflow.end_run()
         except:
             None
 
@@ -461,23 +464,23 @@ class TrainingProcessor2:
         self.model.load_weights(f'./{weights_path}.weights.h5', skip_mismatch=skip_mismatch)
 
     def load_mlflow_weights(self, run_name, weights_path='./', skip_mismatch=True):
-        run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
+        run_args = self.mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
         #self.initial_epoch = int(run_args['params.epochs'])
 
         self._download_and_load_mlflow_weights(weights_path, run_args, skip_mismatch)
 
     def _download_and_load_mlflow_weights(self, weights_path, run_args, skip_mismatch=True):
         self._prepare_path(weights_path)
-        mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state.weights.h5',
+        self.mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state.weights.h5',
                                     dst_path=weights_path)
         self.model.load_weights(os.path.join(weights_path,'final_state.weights.h5'), skip_mismatch=skip_mismatch)
 
     def load_model(self, run_name, weights_path='./final_state/temp', load_final_state=True):
-        run_args = mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
+        run_args = self.mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]
         self.initial_epoch = int(run_args['params.epochs']) #int(run_args['params.initial_epoch']) + 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.model = mlflow.tensorflow.load_model(os.path.join(run_args.artifact_uri, "model"))
+            self.model = self.mlflow.tensorflow.load_model(os.path.join(run_args.artifact_uri, "model"))
 
         if load_final_state:
             self._download_and_load_mlflow_weights(weights_path, run_args, skip_mismatch=False)
