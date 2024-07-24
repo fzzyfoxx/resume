@@ -1126,8 +1126,10 @@ class DotSimilarityLayer(tf.keras.layers.Layer):
 
         self.e = epsilon
 
-    def call(self, inputs):
-        x = tf.matmul(inputs, inputs, transpose_b=True)
+    def call(self, a, b=None):
+        if b is None:
+            b = a
+        x = tf.matmul(a, b, transpose_b=True)
         x = tf.nn.softmax(x, axis=-1)
         max_sim = tf.reduce_max(x, axis=-1, keepdims=True) + self.e
         x = x/max_sim
