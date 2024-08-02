@@ -3,19 +3,22 @@ import math
 from models_src.CombinedMetricsModel import CombinedMetricsModel
 
 class SinePositionEncoding(tf.keras.layers.Layer):
-    def __init__(self, fixed_dims=False, temperature=10000, **kwargs):
+    def __init__(self, fixed_dims=False, temperature=10000, normalize=False, **kwargs):
         super(SinePositionEncoding, self).__init__(**kwargs)
 
         self.fixed_dims = fixed_dims
         self.temperature = temperature
-
-        self.fixed_dims = fixed_dims
+        self.normalize = normalize
 
     def build(self, input_shape):
         num_pos_features = input_shape[-1] // (1 if self.fixed_dims else 2)
-        mask = tf.ones((1,)+input_shape[1:-1], dtype=tf.float32)
+        mask = tf.ones((1,)+input_shape[-3:-1], dtype=tf.float32)
         y_embed = tf.math.cumsum(mask, axis=1)
         x_embed = tf.math.cumsum(mask, axis=2)
+
+        if self.normalize:
+            y_embed = y_embed/input_shape[-3]*math.pi*2
+            x_embed = x_embed/input_shape[-2]*math.pi*2
 
         dim_t = tf.range(num_pos_features, dtype=tf.float32)
         dim_t = self.temperature ** (2 * (dim_t // 2) / num_pos_features)
@@ -39,9 +42,9 @@ class SinePositionEncoding(tf.keras.layers.Layer):
             self.pos_emb = tf.concat([pos_y, pos_x], axis=3)
 
         #self.output_reshape = (tf.reduce_prod(input_shape[1:-1]), input_shape[-1])
-        self.pos_emb = tf.reshape(self.pos_emb, (tf.reduce_prod(input_shape[1:-1]), input_shape[-1]))
+        self.pos_emb = tf.reshape(self.pos_emb, (tf.reduce_prod(input_shape[-3:-1]), input_shape[-1]))
 
-    def call(self, inputs):        
+    def call(self, inputs=None):        
         return self.pos_emb
     
 class LearnablePositionalEncoding(tf.keras.layers.Layer):
@@ -76,7 +79,7 @@ class FlatLearnablePositionalEncoding(tf.keras.layers.Layer):
 
         self.pos = self.add_weight(shape=(1,self.num_queries, self.emb_dim), initializer=self.initializer, trainable=True)
 
-    def call(self, inputs):
+    def call(self, inputs=None):
         return self.pos
     
     def compute_output_shape(self, input_shape):
@@ -101,7 +104,7 @@ class FFN(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         return self.seq(inputs, training=training)
     
-class HeadsPermuter(tf.keras.layers.Layer):
+'''class HeadsPermuter(tf.keras.layers.Layer):
     def __init__(self, num_heads, emb_dim, reverse=False,**kwargs):
         super(HeadsPermuter, self).__init__(**kwargs)
 
@@ -115,7 +118,39 @@ class HeadsPermuter(tf.keras.layers.Layer):
         ][::direction])
 
     def call(self, inputs):
-        return self.seq(inputs)
+        return self.seq(inputs)'''
+
+class HeadsPermuter(tf.keras.layers.Layer):
+    def __init__(self, num_heads, reverse=False,**kwargs):
+        super(HeadsPermuter, self).__init__(**kwargs)
+
+        self.num_heads = num_heads
+        self.reverse = reverse
+
+    def build(self, input_shape):
+        dynamic_dims = 3 if self.reverse else 2
+        static_dims = len(input_shape)-dynamic_dims
+        self.extra_dims_shape = input_shape[1:-dynamic_dims]
+
+        self.length = input_shape[-2]
+        self.emb_dim = input_shape[-1] if self.reverse else input_shape[-1]//self.num_heads
+
+        self.perm = list(range(static_dims))+[d+static_dims for d in [1,0,2]]
+
+    def _permutation(self, x):
+        x = tf.reshape(x, (-1,)+self.extra_dims_shape+(self.length, self.num_heads, self.emb_dim))
+        x = tf.transpose(x, perm=self.perm)
+        return x
+
+    def _reverse_permutation(self, x):
+        x = tf.transpose(x, perm=self.perm)
+        x = tf.reshape(x, (-1,)+self.extra_dims_shape+(self.length, self.num_heads*self.emb_dim))
+        return x
+
+    def call(self, inputs):
+        if self.reverse:
+            return self._reverse_permutation(inputs)
+        return self._permutation(inputs)
 
     
 class MHA(tf.keras.layers.Layer):
@@ -138,9 +173,10 @@ class MHA(tf.keras.layers.Layer):
         self.softmax = tf.keras.activations.softmax
         self.denominator = tf.math.sqrt(tf.cast(key_dim, tf.float32))
 
-        self.QK_head_extractior = HeadsPermuter(num_heads, key_dim//num_heads, reverse=False)
-        self.V_head_extractior = HeadsPermuter(num_heads, value_dim//num_heads, reverse=False)
-        self.output_perm = HeadsPermuter(num_heads, value_dim//num_heads, reverse=True)
+        self.Q_head_extractior = HeadsPermuter(num_heads, reverse=False)
+        self.K_head_extractior = HeadsPermuter(num_heads, reverse=False)
+        self.V_head_extractior = HeadsPermuter(num_heads, reverse=False)
+        self.output_perm = HeadsPermuter(num_heads, reverse=True)
 
         self.T = transpose_weights
         self.softmax_axis = softmax_axis
@@ -148,8 +184,8 @@ class MHA(tf.keras.layers.Layer):
         self.soft_mask = soft_mask
 
     def call(self, V, Q, K, mask=None):
-        Q = self.QK_head_extractior(self.Q_d(Q))
-        K = self.QK_head_extractior(self.K_d(K))
+        Q = self.Q_head_extractior(self.Q_d(Q))
+        K = self.K_head_extractior(self.K_d(K))
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
         if mask is not None:
@@ -243,7 +279,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.QO_dropout, self.MEM_dropout, self.output_dropout = [tf.keras.layers.Dropout(dropout) for _ in range(3)]
         self.QO_addnorm, self.MEM_addnorm, self.output_addnorm = [tf.keras.Sequential([
             tf.keras.layers.Add(),
-            DeepLayerNormalization(norm_axis=1)])
+            tf.keras.LayerNormalization(axis=-1)])
             for _ in range(3)]
 
         self.FFN = FFN(FFN_mid_layers, FFN_mid_units, attn_dim, dropout, FFN_activation)
