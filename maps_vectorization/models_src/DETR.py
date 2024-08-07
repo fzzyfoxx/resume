@@ -104,6 +104,10 @@ class FFN(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         return self.seq(inputs, training=training)
     
+    def compute_output_shape(self, input_shape):
+        return self.seq.compute_output_shape(input_shape)
+        
+    
 '''class HeadsPermuter(tf.keras.layers.Layer):
     def __init__(self, num_heads, emb_dim, reverse=False,**kwargs):
         super(HeadsPermuter, self).__init__(**kwargs)

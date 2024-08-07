@@ -342,10 +342,11 @@ class ExtractPatches(tf.keras.layers.Layer):
         return P
     
 class ConcatenatePatches(tf.keras.layers.Layer):
-    def __init__(self, block_size=2, **kwargs):
+    def __init__(self, block_size=2, squeeze=False, **kwargs):
         super(ConcatenatePatches, self).__init__(**kwargs)
 
         self.block_size = block_size
+        self.squeeze = squeeze
 
     def build(self, input_shape):
         patches, pixels, channels = input_shape[1], input_shape[2], input_shape[3]
@@ -364,7 +365,10 @@ class ConcatenatePatches(tf.keras.layers.Layer):
                 
 
     def call(self, inputs):
-        return self.flatten_grid(self.unpermute_grid(self.concat_windows(self.permute_grid(self.reconstruct_grids(inputs)))))
+        x = self.flatten_grid(self.unpermute_grid(self.concat_windows(self.permute_grid(self.reconstruct_grids(inputs)))))
+        if self.squeeze:
+            return tf.squeeze(x, axis=1)
+        return x
     
 class SpatialSimilarityFeatures(tf.keras.layers.Layer):
     def __init__(self, 
@@ -612,9 +616,13 @@ class UnSqueezeImg(tf.keras.layers.Layer):
         unsqueezed_dim = [int(squeezed_dim**0.5)]
 
         self.reshape = tf.keras.layers.Reshape(preceeding_dims+unsqueezed_dim+unsqueezed_dim+last_dim)
+        self.calculated_output_shape = preceeding_dims+unsqueezed_dim+unsqueezed_dim+last_dim
 
     def call(self, inputs):
         return self.reshape(inputs)
+    
+    def compute_output_shape(self, input_shape):
+        return [input_shape[0]] + self.calculated_output_shape
     
 class ExtractSampleByIdx(tf.keras.layers.Layer):
     def __init__(self, batch_dims=1, axis=1, **kwargs):

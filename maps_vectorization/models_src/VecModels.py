@@ -607,10 +607,18 @@ class ExtractPointwiseEmbeddings(tf.keras.layers.Layer):
 class Squeeze2Batch(tf.keras.layers.Layer):
 
     def build(self, input_shape):
-        self.out_shape = tf.concat([[-1],input_shape[2:]], axis=0)
+        self.out_shape = (-1,)+input_shape[2:]
 
     def call(self, inputs):
         return tf.reshape(inputs, self.out_shape)
+    
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0]
+        if batch_size is not None:
+            batch_dim = batch_size*input_shape[1]
+        else:
+            batch_dim = None
+        return (batch_dim, ) + input_shape[2:]
     
 class ExtractFromBatch(tf.keras.layers.Layer):
     def __init__(self, extraction_dim_size, **kwargs):
@@ -619,10 +627,18 @@ class ExtractFromBatch(tf.keras.layers.Layer):
         self.dim = extraction_dim_size
 
     def build(self, input_shape):
-        self.out_shape = tf.concat([[-1, self.dim],input_shape[1:]], axis=0)
+        self.out_shape = (-1, self.dim) + input_shape[1:]
 
     def call(self, inputs):
-        return tf.reshape(inputs, self.out_shape)     
+        return tf.reshape(inputs, self.out_shape)   
+
+    def compute_output_shape(self, input_shape):
+        batch_size = input_shape[0]
+        if batch_size is not None:
+            batch_dim = batch_size//self.dim
+        else:
+            batch_dim = None
+        return (batch_dim, self.dim) + input_shape[1:]  
     
 class EndpointsSelection(tf.keras.layers.Layer):
 
