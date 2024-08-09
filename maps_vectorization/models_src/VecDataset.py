@@ -900,7 +900,7 @@ def op_pixel_similarity(img, pattern_masks, **kwargs):
 
 
 class DatasetGenerator:
-    def __init__(self, map_generator, ds_path, fold_size, parallel_calls, padded_batch, output_filter, preprocess_funcs, **kwargs):
+    def __init__(self, map_generator, ds_path, fold_size, parallel_calls, padded_batch, output_filter, preprocess_funcs, set_shapes=False, **kwargs):
 
         self.fmg = map_generator
 
@@ -916,6 +916,7 @@ class DatasetGenerator:
         self.output_filter = output_filter
         self.padded_shapes = dict([(elem, self.fmg.output_padded_shapes[elem]) for elem in output_filter]) if output_filter is not None else self.fmg.output_padded_shapes
 
+        self.set_shapes = set_shapes
 
     @tf.function
     def _filter_outputs(self, inputs):
@@ -1063,8 +1064,10 @@ class DatasetGenerator:
         else:
             ds, records = self._load_dataset(val_idxs, validation)
 
+        if self.set_shapes:
+            ds = ds.map(self._set_shapes, num_parallel_calls=self.parallel_calls)
+            
         ds = ds.map(self._map_names, num_parallel_calls=self.parallel_calls)
-
         if self.output_filter is not None:
             ds = ds.map(self._filter_outputs, num_parallel_calls=self.parallel_calls)
 
