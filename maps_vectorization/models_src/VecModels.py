@@ -684,8 +684,10 @@ class BBoxVecLoss(tf.keras.losses.Loss):
 
         a = self._dist(y_true, y_pred)
         b = self._dist(y_true[...,::-1,:], y_pred)
-        c = self._dist(y_true[...,::-1], y_pred)
-        d = self._dist(y_true[...,::-1,::-1], y_pred)
+        y, x = tf.split(y_true, 2, axis=-1)[::-1]
+        y_true_transposed = tf.concat([y, x[...,::-1,:]], axis=-1)
+        c = self._dist(y_true_transposed, y_pred)
+        d = self._dist(y_true_transposed[...,::-1,:], y_pred)
 
         scores = tf.reduce_min(tf.stack([a,b,c,d], axis=-1), axis=-1)
 

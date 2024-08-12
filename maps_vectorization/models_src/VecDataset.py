@@ -915,7 +915,7 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
     sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
 
     components_num = tf.reduce_sum(components_mask, axis=-1, keepdims=True)
-    class_weights = tf.math.divide_no_nan(components_mask,components_num)
+    class_weights = components_mask*tf.math.divide_no_nan(n,components_num) #tf.math.divide_no_nan(components_mask,components_num)
 
     vecs_label = (components_class*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
     bbox_label = ((1-components_class)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
@@ -925,7 +925,7 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
 
     return ({'img': img, 'sample_points': sample_points, 'class_split': components_class}, 
             {'vecs': mixed_label, 'class': components_class}, 
-            {'mixed_label': class_weights, 'class': class_weights})
+            {'vecs': class_weights, 'class': class_weights})
 
 
 ### DATASET GENERATOR ###
