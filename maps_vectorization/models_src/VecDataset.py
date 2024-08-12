@@ -914,8 +914,8 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
     flat_components_mask = tf.reshape(components_masks, (B, n, -1))
     sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
 
-    components_num = tf.reduce_sum(components_mask, axis=-1, keepdims=True)
-    class_weights = components_mask*tf.math.divide_no_nan(n,components_num) #tf.math.divide_no_nan(components_mask,components_num)
+    components_num = tf.reduce_sum(components_mask, axis=None, keepdims=True)
+    class_weights = components_mask*tf.math.divide_no_nan(tf.cast(n*B, tf.float32),components_num) #tf.math.divide_no_nan(components_mask,components_num)
 
     vecs_label = (components_class*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
     bbox_label = ((1-components_class)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
