@@ -5,7 +5,7 @@ from models_src.Hough import VecDrawer
 from models_src.fft_lib import xy_coords
 from models_src.Attn_variations import UnSqueezeImg, SqueezeImg
 from models_src.UNet_model import UNet
-from models_src.DETR import FFN, HeadsPermuter
+from models_src.DETR import FFN, HeadsPermuter, MHA
 
 
 def tensor_from_coords(coords, values, size=32):
@@ -665,10 +665,70 @@ class VecLoss(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
 
         a = self._dist(y_true, y_pred)
-        b = self._dist(y_true[:,::-1], y_pred)
+        b = self._dist(y_true[...,::-1,:], y_pred)
 
         scores = tf.reduce_min(tf.stack([a,b], axis=-1), axis=-1)
 
+        return scores
+
+class BBoxVecLoss(tf.keras.losses.Loss):
+    def __init__(self, gamma=1, reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(reduction=reduction,**kwargs)
+
+        self.gamma = gamma
+
+    def _dist(self, y_true, y_pred):
+        return tf.reduce_mean(tf.reduce_sum(tf.abs(y_true-y_pred)**self.gamma, axis=-1), axis=-1)
+    
+    def call(self, y_true, y_pred):
+
+        a = self._dist(y_true, y_pred)
+        b = self._dist(y_true[...,::-1,:], y_pred)
+        c = self._dist(y_true[...,::-1], y_pred)
+        d = self._dist(y_true[...,::-1,::-1], y_pred)
+
+        scores = tf.reduce_min(tf.stack([a,b,c,d], axis=-1), axis=-1)
+
+        return scores
+    
+class MixedBBoxVecLoss(tf.keras.losses.Loss):
+    def __init__(self, gamma=1, reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+        super().__init__(reduction=reduction,**kwargs)
+
+        self.gamma = gamma
+
+    def _dist(self, y_true, y_pred):
+        return tf.reduce_mean(tf.reduce_sum(tf.abs(y_true-y_pred)**self.gamma, axis=-1), axis=-1)
+    
+    def _bbox_loss(self, y_true, y_pred):
+        a = self._dist(y_true, y_pred)
+        b = self._dist(y_true[...,::-1,:], y_pred)
+        y, x = tf.split(y_true, 2, axis=-1)[::-1]
+        y_true_transposed = tf.concat([y, x[...,::-1,:]], axis=-1)
+        c = self._dist(y_true_transposed, y_pred)
+        d = self._dist(y_true_transposed[...,::-1,:], y_pred)
+
+        scores = tf.reduce_min(tf.stack([a,b,c,d], axis=-1), axis=-1)
+
+        return scores
+    
+    def _vec_loss(self, y_true, y_pred):
+        a = self._dist(y_true, y_pred)
+        b = self._dist(y_true[...,::-1,:], y_pred)
+
+        scores = tf.reduce_min(tf.stack([a,b], axis=-1), axis=-1)
+
+        return scores
+    
+    def call(self, y_true, y_pred):
+
+        vec_true, bbox_true = tf.split(y_true, 2, axis=-2)
+        vec_pred, bbox_pred = tf.split(y_pred, 2, axis=-2)
+
+        vec_scores = self._vec_loss(vec_true, vec_pred)
+        bbox_scores = self._bbox_loss(bbox_true, bbox_pred)
+
+        scores = vec_scores + bbox_scores
         return scores
     
 
@@ -1269,3 +1329,184 @@ def backbone_based_pixel_similarity_dot_model(
     out = DotSimilarityLayer(epsilon=1e-6, name='Dot_Similarity')(x)
 
     return tf.keras.Model(inputs, out, name=name)
+
+def prepare_components_vecs_to_plot(components_vecs, components_class):
+    vec_idxs = tf.squeeze(tf.where(components_class==1), axis=-1)
+    bbox_idxs = tf.squeeze(tf.where(components_class==0), axis=-1)
+
+    vecs = tf.gather(components_vecs, vec_idxs, axis=0)
+    vecs = tf.transpose(vecs, [2,1,0])[::-1]
+
+    bboxes = tf.gather(components_vecs, bbox_idxs, axis=0)
+    p0, p2 = tf.split(bboxes, 2, axis=-2)
+    p4 = p0
+    p1 = tf.stack([p2[...,0], p0[...,1]], axis=-1)
+    p3 = tf.stack([p0[...,0], p2[...,1]], axis=-1)
+
+    bboxes = tf.concat([p0,p1,p2,p3,p4], axis=-2)
+    bboxes = tf.transpose(bboxes, [2,1,0])[::-1]
+
+    return vecs, bboxes
+
+
+def clock_radial_enc(angles, shifts_num, period=2):
+    shifts = tf.reshape(tf.range(shifts_num, dtype=tf.float32), (1,1,1,shifts_num))
+
+    encodings = tf.nn.relu(tf.cos(angles + period*shifts*math.pi/shifts_num))**(shifts_num//2)
+
+    return encodings
+
+def radial_dists(points, yx, size):
+    return (tf.reduce_sum((yx[tf.newaxis]-points[:,tf.newaxis, tf.newaxis])**2, axis=-1, keepdims=True)**0.5)/(size*2**0.5)*math.pi
+
+def frequency_encoding(r_embed, num_pos_features, reg=1):
+    dim_t = tf.range(num_pos_features//2, dtype=tf.float32)
+    dim_freq = tf.reshape(tf.stack([dim_t]*2, axis=-1), (num_pos_features,))
+    dim_ph = dim_freq/(num_pos_features//2)*math.pi*2
+
+    pos_r = r_embed/reg * dim_freq + dim_ph*reg
+
+    encodings = tf.concat([tf.math.sin(pos_r[...,0::2]),
+                        tf.math.cos(pos_r[...,1::2])], axis=-1)
+    
+    return encodings
+
+def add_batch_dims(x, batch_dims):
+    return tf.reshape(x, tf.concat([tf.ones((batch_dims,), dtype=tf.int32), tf.shape(x)], axis=0))
+
+
+class RadialEncoding(tf.keras.layers.Layer):
+    def __init__(self, emb_dim, height, width=None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.H = height
+        self.W = height if width is None else width
+
+        self.C = emb_dim
+
+    def build(self, input_shape):
+
+        batch_dims = len(input_shape)-1
+
+        self.yx = add_batch_dims(xy_coords((self.H, self.W))[...,::-1], batch_dims)
+
+        self.shifts_num = tf.constant(self.C//2, tf.float32)
+        self.radial_period = tf.constant(2, tf.float32)
+        self.ring_period = tf.constant(-1, tf.float32)
+
+        self.shifts = add_batch_dims(tf.range(self.C//2, dtype=tf.float32), batch_dims+2)
+
+        self.diag = tf.constant((self.H**2 + self.W**2)**0.5, tf.float32)
+
+        self.radial_reg = tf.constant(self.C//4, tf.float32)
+
+    def calc_angles(self, sample_points):
+        return tf.math.atan2(*tf.split(self.yx-sample_points[...,tf.newaxis, tf.newaxis,:], 2, axis=-1))
+    
+    def clock_radial_enc(self, angles, period):
+        return tf.nn.relu(tf.cos(angles + period*self.shifts*math.pi/self.shifts_num))**self.radial_reg
+    
+    def radial_dists(self, sample_points):
+        return (tf.reduce_sum((self.yx-sample_points[...,tf.newaxis, tf.newaxis, :])**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
+    
+    def freq_variables(self):
+        dim_t = tf.range(self.radial_reg, dtype=tf.float32)
+        dim_freq = tf.reshape(tf.stack([dim_t]*2, axis=-1), (self.shifts_num,))
+        dim_ph = dim_freq/(self.radial_reg)*math.pi*2
+
+        return dim_freq, dim_ph
+    
+    def frequency_encoding(self, r_embed):
+
+        pos_r = r_embed * self.dim_freq + self.dim_ph
+
+        encodings = tf.concat([tf.math.sin(pos_r[...,0::2]),
+                            tf.math.cos(pos_r[...,1::2])], axis=-1)
+        
+        return encodings
+    
+
+class SeparateRadialEncoding(RadialEncoding):
+
+    def call(self, sample_points):
+
+        angles = self.calc_angles(sample_points)
+        dists = self.radial_dists(sample_points)
+
+        angle_encodings = self.clock_radial_enc(angles, self.radial_period)
+        ring_encodings = self.clock_radial_enc(dists, self.ring_period)
+        
+        encodings = tf.concat([angle_encodings, ring_encodings], axis=-1)
+
+        return encodings
+    
+class FrequencyRadialEncoding(RadialEncoding):
+
+    def build(self, input_shape):
+        super().build(input_shape)
+
+        self.dim_freq, self.dim_ph = self.freq_variables()
+
+    def call(self, sample_points):
+        
+        angles = self.calc_angles(sample_points)+math.pi
+        dists = self.radial_dists(sample_points)*2
+
+        angle_encodings = self.frequency_encoding(angles)
+        ring_encodings = self.frequency_encoding(dists)
+
+        encodings = tf.concat([angle_encodings, ring_encodings], axis=-1)
+
+        return encodings
+
+class ExtractSampleLayer(tf.keras.layers.Layer):
+    def __init__(self, batch_dims=1, **kwargs):
+        super().__init__(**kwargs)
+
+        self.batch_dims = batch_dims
+
+    def call(self, source, idxs):
+        return tf.gather_nd(source, tf.cast(idxs, tf.int32), batch_dims=self.batch_dims)
+
+class DetectionMHA(MHA):
+    def __init__(self, key_pos_enc=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.key_pos_enc = key_pos_enc
+
+    def call(self, V, Q, K, pos_enc, mask=None):
+        Q = self.Q_head_extractior(self.Q_d(Q))
+        K = self.K_head_extractior(self.K_d(K))
+
+        if self.key_pos_enc:
+            K = K + tf.expand_dims(pos_enc, axis=-3)
+
+        scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
+        if mask is not None:
+            if self.soft_mask:
+                scores = scores + mask
+            else:
+                cross_mask = tf.expand_dims(tf.matmul(mask, mask, transpose_b=True), axis=1)
+                scores = scores+((cross_mask-1)*math.inf)
+        weights = self.softmax(scores, axis=self.softmax_axis)
+
+        V = self.V_head_extractior(self.V_d(V))+tf.expand_dims(pos_enc, axis=-3)
+        if not self.T:
+            V = tf.matmul(weights, V)
+        else:
+            V *= tf.transpose(weights, perm=[0,1,3,2])
+
+        V = self.O_d(self.output_perm(V))
+
+        if (mask is not None) & (self.soft_mask==False):
+            return V*mask
+        return V, weights
+    
+class ExpandDimsLayer(tf.keras.layers.Layer):
+    def __init__(self, axis, **kwargs):
+        super().__init__(**kwargs)
+
+        self.axis = axis
+
+    def call(self, inputs):
+        return tf.expand_dims(inputs, axis=self.axis)

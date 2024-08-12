@@ -5,7 +5,7 @@ import tensorflow as tf
 import math
 import cv2 as cv
 
-from models_src.fft_lib import xy_coords
+from models_src.fft_lib import xy_coords, decode1Dcoords
 from models_src.VecModels import flatten
 from src.patterns import gen_colors
 
@@ -894,6 +894,38 @@ def op_pixel_similarity(img, pattern_masks, **kwargs):
     background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
     return (img, tf.cast(pattern_masks, tf.float32))
+
+@tf.function
+def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, **kwargs):
+    components_mask = tf.cast(tf.concat([vecs_mask, bbox_mask], axis=-1), tf.float32)
+    choosen_components = tf.math.top_k(components_mask-tf.random.uniform(tf.shape(components_mask), 0.0, 0.1), k=n).indices
+
+    components_mask = tf.cast(tf.gather(components_mask, choosen_components, axis=1, batch_dims=1), tf.float32)
+
+    components_class = tf.cast(tf.gather(tf.concat([tf.ones_like(vecs_mask), tf.zeros_like(bbox_mask)], axis=-1), choosen_components, axis=1, batch_dims=1), tf.float32)
+
+    components_vecs = tf.gather(tf.concat([vecs, bboxes[:,:,0::2]], axis=1), choosen_components, axis=1, batch_dims=1)
+
+    components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
+    components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
+
+    B = tf.shape(choosen_components)[0]
+    W = tf.shape(components_masks)[-2]
+    flat_components_mask = tf.reshape(components_masks, (B, n, -1))
+    sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
+
+    components_num = tf.reduce_sum(components_mask, axis=-1, keepdims=True)
+    class_weights = tf.math.divide_no_nan(components_mask,components_num)
+
+    vecs_label = (components_class*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
+    bbox_label = ((1-components_class)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
+
+    mixed_label = tf.concat([vecs_label, bbox_label], axis=-2)
+    #class_split = tf.stack([components_class, 1-components_class], axis=-1)
+
+    return ({'img': img, 'sample_points': sample_points, 'class_split': components_class}, 
+            {'vecs': mixed_label, 'class': components_class}, 
+            {'mixed_label': class_weights, 'class': class_weights})
 
 
 ### DATASET GENERATOR ###

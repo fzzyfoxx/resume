@@ -1,7 +1,7 @@
 import tensorflow as tf
 import transformers as t
 import math
-import tensorflow_models as tfm
+#import tensorflow_models as tfm
 
 from models_src.Trainer_support import download_mlflow_weights
 from models_src.CombinedMetricsModel import CombinedMetricsModel
@@ -294,7 +294,7 @@ class ROIAligner(tf.keras.layers.Layer):
                  **kwargs):
         super(ROIAligner, self).__init__(**kwargs)
         
-        self.roi_align = tfm.vision.layers.MultilevelROIAligner(crop_size=crop_size, sample_offset=sample_offset)
+        self.roi_align = None#tfm.vision.layers.MultilevelROIAligner(crop_size=crop_size, sample_offset=sample_offset)
 
         self.source_indices = source_indices
         self.pyramid_indices = pyramid_indices
