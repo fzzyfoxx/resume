@@ -100,7 +100,7 @@ class TrainingProcessor:
         except:
             None
 
-    def compile_model(self, model_type, model_args, optimizer, loss, metrics, loss_weights=None, print_summary=True, log=True, export_model=True):
+    def compile_model(self, model_type, model_args, optimizer, loss, metrics, loss_weights=None, print_summary=True, log=True, export_model=True, summary_kwargs={}):
         self.model_args = model_args
         self.model_type = model_type
         self.loss_args = loss.get_config()
@@ -122,7 +122,7 @@ class TrainingProcessor:
                 mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(loss, metrics))
 
         if print_summary:
-            print(self.model.summary(expand_nested=True))
+            print(self.model.summary(**summary_kwargs))
 
         self.initial_epoch = 0
 
@@ -337,7 +337,7 @@ class TrainingProcessor2:
 
             #mlflow.log_param('model_type', self.model_type)
 
-    def compile_model(self, model_args, optimizer, loss, metrics=None, weighted_metrics=None, loss_weights=None, print_summary=True):
+    def compile_model(self, model_args, optimizer, loss, metrics=None, weighted_metrics=None, loss_weights=None, print_summary=True, summary_kwargs={}):
         self.model_args = model_args
         #self.model_type = model_type
         self.loss_args = [(k, v.get_config()) for k, v in  loss.items()]
@@ -355,7 +355,7 @@ class TrainingProcessor2:
                 )
 
         if print_summary:
-            print(self.model.summary(expand_nested=True))
+            print(self.model.summary(**summary_kwargs))
 
         self.initial_epoch = 0
 

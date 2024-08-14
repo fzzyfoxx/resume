@@ -1471,17 +1471,29 @@ class ExtractSampleLayer(tf.keras.layers.Layer):
         return tf.gather_nd(source, tf.cast(idxs, tf.int32), batch_dims=self.batch_dims)
 
 class DetectionMHA(MHA):
-    def __init__(self, key_pos_enc=False, **kwargs):
+    def __init__(self, value_pos_enc=True, key_pos_enc=False, query_pos_enc=False, pos_enc_matmul=False,**kwargs):
         super().__init__(**kwargs)
 
         self.key_pos_enc = key_pos_enc
+        self.value_pos_enc = value_pos_enc
+        self.query_pos_enc = query_pos_enc
+        self.pos_enc_matmul = pos_enc_matmul
+
+        if pos_enc_matmul:
+            self.pe_d = tf.keras.layers.Dense(kwargs['output_dim'])
+            self.pe_output_perm = HeadsPermuter(kwargs['num_heads'], reverse=True)
 
     def call(self, V, Q, K, pos_enc, mask=None):
         Q = self.Q_head_extractior(self.Q_d(Q))
         K = self.K_head_extractior(self.K_d(K))
 
+        pos_enc = tf.expand_dims(pos_enc, axis=-3)
+
+        if self.query_pos_enc:
+            Q += pos_enc
+            
         if self.key_pos_enc:
-            K = K + tf.expand_dims(pos_enc, axis=-3)
+            K += pos_enc
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
         if mask is not None:
@@ -1492,13 +1504,18 @@ class DetectionMHA(MHA):
                 scores = scores+((cross_mask-1)*math.inf)
         weights = self.softmax(scores, axis=self.softmax_axis)
 
-        V = self.V_head_extractior(self.V_d(V))+tf.expand_dims(pos_enc, axis=-3)
+        V = self.V_head_extractior(self.V_d(V))
+        if self.value_pos_enc:
+            V += pos_enc
         if not self.T:
             V = tf.matmul(weights, V)
         else:
             V *= tf.transpose(weights, perm=[0,1,3,2])
 
         V = self.O_d(self.output_perm(V))
+
+        if self.pos_enc_matmul:
+            V += self.pe_output_perm(self.pe_d(tf.matmul(weights, pos_enc)))
 
         if (mask is not None) & (self.soft_mask==False):
             return V*mask
@@ -1512,3 +1529,281 @@ class ExpandDimsLayer(tf.keras.layers.Layer):
 
     def call(self, inputs):
         return tf.expand_dims(inputs, axis=self.axis)
+    
+
+### RADIAL ENC VEC MODEL
+    
+
+class SplitLayer(tf.keras.layers.Layer):
+    def __init__(self, splits, axis, **kwargs):
+        super().__init__(**kwargs)
+
+        self.splits = splits
+        self.axis = axis
+
+    def call(self, inputs):
+        return tf.split(inputs, self.splits, self.axis)
+    
+    @staticmethod
+    def _is_iter(x):
+        return hasattr(x, '__iter__')
+    
+    def non_iter_output_shape(self, shape, axis):
+        splitted_shape = tuple([d if (i!=axis) | (d is None) else d//self.splits for i,d in enumerate(shape)])
+        return tuple([splitted_shape for _ in range(self.splits)])
+
+    def iter_output_shape(self, shape, axis):
+        return tuple([tuple([d if (i!=axis) | (d is None) else s for i,d in enumerate(shape)]) for s in self.splits])
+    
+    def compute_output_shape(self, input_shape):
+        axis = self.axis if self.axis>0 else len(input_shape)+self.axis
+
+        if self._is_iter(self.splits):
+            output_shape = self.iter_output_shape(input_shape, axis)
+        else:
+            output_shape = self.non_iter_output_shape(input_shape, axis)
+
+        return output_shape
+    
+class VecClassSplit(tf.keras.layers.Layer):
+
+    def build(self, input_shape):
+        x_shape, splits_shape = input_shape
+        self.extra_dims = len(x_shape)-len(splits_shape)
+
+
+    def call(self, inputs):
+        x, splits = inputs[0], inputs[1]
+        #splits = splits[...,tf.newaxis, tf.newaxis]
+        splits = tf.reshape(splits, tf.concat([tf.shape(splits), tf.ones((self.extra_dims,), tf.int32)], axis=0))
+        return tf.concat([x*splits, x*(1-splits)], axis=-2)
+    
+    def compute_output_shape(self, input_shape):
+        x_shape = input_shape[0]
+        axis = len(x_shape)-2
+        return tuple([d if (i!=axis) | (d is None) else d*2 for i,d in enumerate(x_shape)])
+    
+class AddNorm(tf.keras.layers.Layer):
+    def __init__(self, norm_axis=-1, **kwargs):
+        super().__init__(**kwargs)
+
+        self.norm = tf.keras.layers.LayerNormalization(axis=norm_axis)
+
+    def call(self, inputs):
+        a, b = inputs[0], inputs[1]
+        return self.norm(a+b)
+    
+class SampleRadialSearchHead(tf.keras.Model):
+    def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, **kwargs):
+        super().__init__(**kwargs)
+
+        self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=5, dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
+        self.split = SplitLayer(splits=[4,1], axis=-1, name=f'{self.name}-Vec-Class-Split')
+        self.squeeze_class = tf.keras.layers.Reshape((num_samples,), name=f'{self.name}-Class-Pred-Squeeze')
+        self.class_sigmoid = tf.keras.layers.Activation('sigmoid', name=f'{self.name}-Class-Output')
+
+        self.vec_reshape = tf.keras.layers.Reshape((num_samples, 2,2), name=f'{self.name}-Out-Vec-Reshape')
+        self.sample_reshape = tf.keras.layers.Reshape((num_samples, 1,2), name=f'{self.name}Out-Samples-Reshape')
+        self.add = tf.keras.layers.Add(name=f'{self.name}-Coords-Add')
+
+        self.vecbbox_split = VecClassSplit(name=f'{self.name}-Vecs-Output')
+
+    def call(self, sample_features, sample_coords, split_mask, training=None):
+
+        x = self.ffn(sample_features, training=training)
+        x, class_pred = self.split(x)
+        class_pred = self.class_sigmoid(self.squeeze_class(class_pred))
+
+        x = self.vec_reshape(x)
+        sample_coords = self.sample_reshape(sample_coords)
+
+        x = self.add([x, sample_coords])
+        x = self.vecbbox_split([x, split_mask])
+
+        return x, class_pred
+    
+class SampleRadialSearchFeaturesExtraction(tf.keras.Model):
+    def __init__(self, embs_dim, color_embs_dim, mid_layers, activation, dropout=0.0, batch_dims=1, **kwargs):
+        super().__init__(**kwargs)
+
+
+        features_embs_dim = embs_dim-color_embs_dim
+        self.f_ffn = FFN(mid_layers=mid_layers, mid_units=features_embs_dim*2, output_units=features_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Memory-FFN')
+        self.c_ffn = FFN(mid_layers=mid_layers, mid_units=color_embs_dim*2, output_units=color_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-ColorEmbs-FFN')
+
+        self.f_concat = tf.keras.layers.Concatenate(name=f'{self.name}-Memory-Color-Concat')
+        self.fc_ffn = FFN(mid_layers=mid_layers, mid_units=embs_dim, output_units=embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Output-Embeddings')
+
+        self.extract_samples = ExtractSampleLayer(batch_dims=batch_dims, name=f'{self.name}-Extract-Sample')
+        self.expand_samples = ExpandDimsLayer(axis=-2, name=f'{self.name}-Expand-Samples')
+        self.squeeze_features = SqueezeImg(name=f'{self.name}-Squeeze-Features')
+        self.expand_features = ExpandDimsLayer(axis=-3, name=f'{self.name}-Expand-Features')
+        self.squeeze_enc = SqueezeImg(name=f'{self.name}-Squeeze-PosEnc')
+
+
+    def call(self, sample_inputs, memory, normed_img, pos_enc, training=None):
+
+        features = self.f_ffn(memory, training=training)
+        color_features = self.c_ffn(normed_img, training=training)
+
+        features = self.fc_ffn(self.f_concat([features, color_features]), training=training)
+        sample_features = self.expand_samples(self.extract_samples(features, sample_inputs))
+
+        features = self.expand_features(self.squeeze_features(features))
+        pos_enc = self.squeeze_enc(pos_enc)
+
+        return features, sample_features, pos_enc
+    
+
+class SampleRadialEncoding(RadialEncoding):
+    def __init__(self, expand_a=True, expand_b=True, **kwargs):
+        super().__init__(**kwargs)
+
+        self.expand_a = expand_a
+        self.expand_b = expand_b
+    
+    def calc_angles(self, a, b):
+
+        return tf.math.atan2(*tf.split((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a), 2, axis=-1))
+    
+    def clock_radial_enc(self, angles, period):
+        return tf.nn.relu(tf.cos(angles + period*self.shifts*math.pi/self.shifts_num))**self.radial_reg
+    
+    def radial_dists(self, a, b):
+        return (tf.reduce_sum(((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a))**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
+    
+class SampleSeparateRadialEncoding(SampleRadialEncoding):
+
+    def call(self, a, b):
+
+        angles = self.calc_angles(a,b)
+        dists = self.radial_dists(a,b)
+
+        angle_encodings = self.clock_radial_enc(angles, self.radial_period)
+        ring_encodings = self.clock_radial_enc(dists, self.ring_period)
+        
+        encodings = tf.concat([angle_encodings, ring_encodings], axis=-1)
+
+        return encodings
+    
+class SampleFrequencyRadialEncoding(SampleRadialEncoding):
+
+    def build(self, input_shape):
+        super().build(input_shape)
+
+        self.dim_freq, self.dim_ph = self.freq_variables()
+
+    def call(self, a, b):
+        
+        angles = self.calc_angles(a, b)+math.pi
+        dists = self.radial_dists(a, b)*2
+
+        angle_encodings = self.frequency_encoding(angles)
+        ring_encodings = self.frequency_encoding(dists)
+
+        encodings = tf.concat([angle_encodings, ring_encodings], axis=-1)
+
+        return encodings
+    
+class ExpandedQueriesMHA(MHA):
+
+    def call(self, V, Q, K, pos_enc):
+
+        Q = self.Q_head_extractior(self.Q_d(Q))
+        K = self.K_head_extractior(self.K_d(K))
+
+        Q += tf.expand_dims(pos_enc, axis=-3)
+
+        scores = tf.reduce_sum(Q*K, axis=-1)/self.denominator
+        weights = tf.expand_dims(tf.nn.softmax(scores, axis=-1), axis=-2)
+        
+        V = self.V_head_extractior(self.V_d(V))
+        V = tf.matmul(weights, V)
+
+        V = self.O_d(self.output_perm(V))
+
+        return V, weights
+    
+class QuerySamplingLayer(tf.keras.layers.Layer):
+    def __init__(self, queries_num, mid_layers, mid_units, activation, dropout=0.0, **kwargs):
+        super().__init__(**kwargs)
+
+        self.ffn = FFN(mid_layers=mid_layers, mid_units=mid_units, output_units=queries_num*2, dropout=dropout, activation=activation)
+        self.queries_num = queries_num
+
+    def build(self, input_shape):
+        self.sample_points_num = input_shape[0][-3]
+        
+    def call(self, inputs, training=None):
+
+        sample_features, sample_points = inputs[0], inputs[1]
+
+        query_points = self.ffn(sample_features, training=training)
+        query_points = tf.reshape(query_points, (-1, self.sample_points_num, self.queries_num, 2))
+        query_points += tf.expand_dims(sample_points, axis=-2)
+
+        return query_points
+    
+class SampleQueryExtractionLayer(tf.keras.layers.Layer):
+    def __init__(self, cut_off=1, gamma=2, method='bilinear', **kwargs):
+        super().__init__(**kwargs)
+
+        self.cut_off = cut_off
+        self.gamma = gamma
+        self.method = method
+
+    def build(self, input_shape):
+        f_shape, q_shape = input_shape[0], input_shape[1]
+        
+        self.size = int(f_shape[-2]**0.5)
+        self.C = f_shape[-1]
+
+        self.sample_points_num = q_shape[-3]
+        self.query_points_num = q_shape[-2]
+
+        self.yx = tf.reshape(xy_coords((self.size, self.size))[...,::-1], (1,1,1,self.size**2,2))
+
+    def _calc_interpolation_mask(self, p):
+        diffs = tf.reduce_sum(tf.abs(p-self.yx), axis=-1, keepdims=False)
+        interpolation_mask = tf.nn.relu(1-diffs+1e-4)**self.gamma
+        interpolation_mask /= tf.reduce_sum(interpolation_mask, axis=-1, keepdims=True)+1e-4
+
+        return interpolation_mask
+
+    def call(self, inputs):
+        features, query_points = inputs[0], inputs[1]
+
+        interpolation_mask = self._calc_interpolation_mask(tf.expand_dims(query_points, axis=-2))
+        query_samples = tf.matmul(interpolation_mask, features)
+
+        return query_samples
+    
+
+class SampleQueryMessagePassing(tf.keras.layers.Layer):
+    def __init__(self, mid_layers, mid_units, activation, dropout=0.0, **kwargs):
+        super().__init__(**kwargs)
+
+        self.mid_layers = mid_layers
+        self.mid_units = mid_units
+        self.activation = activation
+        self.dropout = dropout
+
+        self.message_norm = tf.keras.layers.LayerNormalization(axis=-1)
+        self.out_norm = tf.keras.layers.LayerNormalization(axis=-1)
+
+    def build(self, input_shape):
+        C = input_shape[-1]
+
+        self.ffn = FFN(mid_layers=self.mid_layers, mid_units=self.mid_units, output_units=C, dropout=self.dropout, activation=self.activation)
+
+    def call(self, sample_features, query_samples, pos_enc, training=None):
+
+        query_samples += pos_enc
+
+        message = tf.nn.sigmoid(self.ffn(tf.concat([sample_features - query_samples, query_samples], axis=-1), training=training))
+
+        message = self.message_norm(tf.reduce_sum(message, axis=-2, keepdims=True), training=training)
+
+        output = self.out_norm(sample_features+message, training=training)
+
+        return output
