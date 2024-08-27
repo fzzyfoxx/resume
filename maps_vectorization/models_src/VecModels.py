@@ -1135,15 +1135,6 @@ class RegularizedSigmoid(tf.keras.layers.Layer):
     def call(self, inputs):
 
         return tf.nn.sigmoid(self.mult*inputs+self.bias)
-    
-class SplitLayer(tf.keras.layers.Layer):
-  def __init__(self, splits, **kwargs):
-    super().__init__(**kwargs)
-
-    self.splits = splits
-
-  def call(self, inputs):
-    return tf.split(inputs, self.splits, axis=-1)
   
 
 class PixelCrossSimilarityCrossentropy(tf.keras.losses.Loss):
@@ -1535,7 +1526,7 @@ class ExpandDimsLayer(tf.keras.layers.Layer):
     
 
 class SplitLayer(tf.keras.layers.Layer):
-    def __init__(self, splits, axis, **kwargs):
+    def __init__(self, splits, axis=-1, **kwargs):
         super().__init__(**kwargs)
 
         self.splits = splits
@@ -1593,16 +1584,38 @@ class AddNorm(tf.keras.layers.Layer):
         a, b = inputs[0], inputs[1]
         return self.norm(a+b)
     
-class SampleRadialSearchHead(tf.keras.Model):
-    def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, **kwargs):
+class AngleLengthVecDecoder(tf.keras.layers.Layer):
+    def __init__(self, exp_activation=True, **kwargs):
         super().__init__(**kwargs)
 
+        self.exp_activation = exp_activation
+
+    def call(self, inputs):
+        a1, a2, len1, len2 = tf.split(inputs, 4, axis=-1)
+        angle = tf.math.atan2(tf.nn.tanh(a1), tf.nn.tanh(a2))
+        if self.exp_activation:
+            len1, len2 = tf.math.exp(len1), tf.math.exp(len2)
+
+        p1 = tf.concat([tf.sin(angle), tf.cos(angle)], axis=-1)*len1
+        p2 = tf.concat([tf.sin(angle-math.pi), tf.cos(angle-math.pi)], axis=-1)*len2
+
+        vec = tf.concat([p1,p2], axis=-2)
+
+        return vec
+    
+class SampleRadialSearchHead(tf.keras.Model):
+    def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, angle_pred=False, exp_activation=True, **kwargs):
+        super().__init__(**kwargs)
         self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=5, dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
         self.split = SplitLayer(splits=[4,1], axis=-1, name=f'{self.name}-Vec-Class-Split')
         self.squeeze_class = tf.keras.layers.Reshape((num_samples,), name=f'{self.name}-Class-Pred-Squeeze')
         self.class_sigmoid = tf.keras.layers.Activation('sigmoid', name=f'{self.name}-Class-Output')
 
-        self.vec_reshape = tf.keras.layers.Reshape((num_samples, 2,2), name=f'{self.name}-Out-Vec-Reshape')
+        if not angle_pred:
+            self.vec_reshape = tf.keras.layers.Reshape((num_samples, 2,2), name=f'{self.name}-Out-Vec-Formatter')
+        else:
+            self.vec_reshape = AngleLengthVecDecoder(exp_activation=exp_activation, name=f'{self.name}-Out-Vec-Formatter')
+
         self.sample_reshape = tf.keras.layers.Reshape((num_samples, 1,2), name=f'{self.name}Out-Samples-Reshape')
         self.add = tf.keras.layers.Add(name=f'{self.name}-Coords-Add')
 
@@ -1807,3 +1820,161 @@ class SampleQueryMessagePassing(tf.keras.layers.Layer):
         output = self.out_norm(sample_features+message, training=training)
 
         return output
+    
+
+class RadialSearchFeaturesExtraction(tf.keras.Model):
+    def __init__(self, embs_dim, color_embs_dim, mid_layers, activation, dropout=0.0, batch_dims=1, **kwargs):
+        super().__init__(**kwargs)
+
+        self.only_colors = embs_dim==color_embs_dim
+
+        features_embs_dim = embs_dim-color_embs_dim
+        self.c_ffn = FFN(mid_layers=mid_layers, mid_units=color_embs_dim*2, output_units=color_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-ColorEmbs-FFN')
+
+        if not self.only_colors:
+            self.f_ffn = FFN(mid_layers=mid_layers, mid_units=features_embs_dim*2, output_units=features_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Memory-FFN')
+            self.f_concat = tf.keras.layers.Concatenate(name=f'{self.name}-Memory-Color-Concat')
+            self.fc_ffn = FFN(mid_layers=mid_layers, mid_units=embs_dim, output_units=embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Output-Embeddings')
+
+        self.squeeze_features = SqueezeImg(name=f'{self.name}-Squeeze-Features')
+        #self.expand_features = vcm.ExpandDimsLayer(axis=-2, name=f'{self.name}-Expand-Features')
+        self.squeeze_enc = SqueezeImg(name=f'{self.name}-Squeeze-PosEnc')
+
+
+
+    def call(self, memory, normed_img, pos_enc, training=None):
+
+        if not self.only_colors:
+            color_features = self.c_ffn(normed_img, training=training)
+            features = self.f_ffn(memory, training=training)
+
+            features = self.squeeze_features(self.fc_ffn(self.f_concat([features, color_features]), training=training))
+            #features = self.expand_features(self.squeeze_features(features))
+        else:
+            features = self.squeeze_features(self.c_ffn(normed_img, training=training))
+        
+        pos_enc = self.squeeze_enc(pos_enc)
+
+        return features, pos_enc
+    
+class YXcoordsLayer(tf.keras.layers.Layer):
+    def __init__(self, size, squeeze_output=True, **kwargs):
+        super().__init__(**kwargs)
+
+        self.size = size
+        self.squeeze_output = squeeze_output
+
+        self.yx = xy_coords(size)[tf.newaxis,...,::-1]
+        if self.squeeze_output:
+            self.yx = tf.reshape(self.yx, (1,size[0]*size[1], 2))
+
+    def call(self, inputs=None):
+        return self.yx
+    
+class SelfRadialMHA(MHA):
+
+    def call(self, pos_enc, Q, K):
+
+        Q = self.Q_head_extractior(self.Q_d(Q))
+        K = self.K_head_extractior(self.K_d(K))
+
+        scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
+        weights = tf.nn.softmax(scores, axis=-1)
+        
+        V = tf.expand_dims(pos_enc, axis=-4)
+        V = tf.squeeze(tf.matmul(tf.expand_dims(weights, axis=-2), V), axis=-2)
+
+        V = self.O_d(self.output_perm(V))
+
+        return V, weights
+    
+def radial_enc_pixel_features_model_generator(
+        enc_type,
+        num_heads,
+        embs_dim,
+        color_embs_dim,
+        size,
+        embs_mid_layers,
+        dropout,
+        activation,
+        out_mid_layers,
+        attns_num,
+        concat_memory,
+        progressive,
+        backbone_args,
+        backbone_weights_path,
+        backbone_generator,
+        backbone_last_layer,
+        backbone_init_layer,
+        backbone_trainable,
+        name='PxFeaturesRadEnc'
+):
+    
+    colors_only = embs_dim==color_embs_dim
+
+    if colors_only:
+        memory=None
+        img_inputs = tf.keras.layers.Input((size, size, 3))
+        normed_img = tf.keras.layers.BatchNormalization(name='Batch-Normalization')(img_inputs)
+    else:
+        backbone_model = backbone_generator(**backbone_args)
+        if backbone_weights_path is not None:
+            backbone_model.load_weights(f'./{backbone_weights_path}.weights.h5')
+
+        backbone_model.trainable = backbone_trainable
+
+        img_inputs = backbone_model.input
+        memory = backbone_model.get_layer(backbone_last_layer).output
+        normed_img = backbone_model.get_layer(backbone_init_layer).output
+
+    
+    #########
+    enc_func = FrequencyRadialEncoding if enc_type!='separate' else SeparateRadialEncoding
+    enc_label = 'Freq' if enc_type!='separate' else 'Sep'
+
+    coords = YXcoordsLayer(size=(size,size), squeeze_output=True, name='Img-Coords')()
+
+    pos_enc = enc_func(emb_dim=embs_dim//num_heads, height=size, name=f'{enc_label}RadialEncoding')(coords)
+
+    features, pos_enc = RadialSearchFeaturesExtraction(embs_dim=embs_dim, 
+                                                        color_embs_dim=color_embs_dim, 
+                                                        mid_layers=embs_mid_layers,
+                                                        activation=activation,
+                                                        dropout=dropout,
+                                                        batch_dims=1,
+                                                        name='RSFE')(memory, normed_img, pos_enc)
+
+    print(pos_enc.shape, features.shape)
+
+    for i in range(attns_num):
+        #V = tf.keras.layers.Permute([2,1,3], name=f'PreMHA-Permute_{i+1}')(features)
+        i_heads = num_heads*2**i if progressive else num_heads
+        i_embs = embs_dim*2**i if progressive else embs_dim
+
+        x, _ = SelfRadialMHA(output_dim=i_embs, value_dim=i_embs, key_dim=i_embs, num_heads=i_heads, name=f'MHA_{i+1}')(pos_enc, features, features)
+        #print(x.shape)
+        if i>0:
+            if progressive:
+                features = FFN(mid_layers=out_mid_layers, mid_units=i_embs, output_units=i_embs, dropout=dropout, activation=activation, name=f'Progressive-SkipCon-FFN_{i+1}')(features)
+            features = AddNorm(norm_axis=-1, name=f'PostMHA-AddNorm_{i+1}')([features, x])
+            x = FFN(mid_layers=out_mid_layers, mid_units=i_embs*2, output_units=i_embs, dropout=0.0, activation=activation, name=f'Decoder-FFN_{i+1}')(features)
+            features = AddNorm(norm_axis=-1, name=f'PostFFN-AddNorm_{i+1}')([features, x])
+        else:
+            features = FFN(mid_layers=out_mid_layers, mid_units=i_embs*2, output_units=i_embs, dropout=0.0, activation=activation, name=f'Decoder-FFN_{i+1}')(x)
+    
+    if concat_memory:
+        memory = SqueezeImg(name='Squeeze-Memory')(memory)
+        features = tf.keras.layers.Concatenate(axis=-1, name='Concat-Memory')([memory, features])
+        
+    out = FFN(mid_layers=out_mid_layers, mid_units=i_embs*2, output_units=8, dropout=dropout, activation=activation, name=f'Out-FFN')(features)
+    out = tf.keras.layers.Reshape((size, size, 8))(out)
+
+    out_shape_class, out_angle, out_thickness, out_center_vec = SplitLayer([3,2,1,2], name='Splits')(out)
+
+    out_shape_class = tf.keras.layers.Activation('softmax', name='shape_class')(out_shape_class)
+    out_angle = Vec2AngleActivationLayer(name='angle')(out_angle)
+    out_center_vec = tf.keras.layers.Identity(name='center_vec')(out_center_vec)
+    out_thickness = tf.keras.layers.Identity(name='thickness')(out_thickness)
+    model = tf.keras.Model(img_inputs, {'shape_class': out_shape_class, 'angle': out_angle, 'thickness': out_thickness, 'center_vec': out_center_vec}, name=name)
+    
+    return model

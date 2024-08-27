@@ -323,7 +323,7 @@ class TrainingProcessor2:
     def _gen_custom_model(self, model_args):
         return self.model_generator(**model_args)
 
-    def _log_mlflow_params(self,):
+    def _log_mlflow_params(self):
         
         for key in self.model_args.keys():
             self.mlflow.log_param(key, self.model_args[key])
@@ -335,7 +335,7 @@ class TrainingProcessor2:
             for key, value in loss_args.items():
                 self.mlflow.log_param('loss.'+name+'_'+key, value)
 
-            #mlflow.log_param('model_type', self.model_type)
+        #mlflow.log_param('model_type', self.model_type)
 
     def compile_model(self, model_args, optimizer, loss, metrics=None, weighted_metrics=None, loss_weights=None, print_summary=True, summary_kwargs={}):
         self.model_args = model_args
@@ -372,9 +372,11 @@ class TrainingProcessor2:
     def train_model(self, epochs, log=True, callbacks=None, export_final_state=True, export_model=True, validation_freq=1):
 
         if log:
-            self.mlflow.tensorflow.autolog(log_datasets=False, log_models=True, disable=False)
-            self.mlflow.start_run()
-            print(f'MLflow run: {self.mlflow.active_run().info.run_name}')
+            #self.mlflow.tensorflow.autolog(log_datasets=False, log_models=True, disable=False, checkpoint=False, log_every_epoch=True)
+            run = self.mlflow.start_run()
+            print(f'MLflow run: {run.info.run_name}')
+            mlflow_callback = [mlflow.keras.MlflowCallback(run)]
+            callbacks = mlflow_callback if callbacks is None else callbacks+mlflow_callback
         else:
             None
             self.mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
@@ -389,24 +391,29 @@ class TrainingProcessor2:
                            steps_per_epoch=self.train_steps, 
                            callbacks=callbacks, 
                            initial_epoch=self.initial_epoch)
-        self.initial_epoch += epochs
-
-        
 
         if log:
-            self._log_mlflow_params()
-            if export_final_state:
-                #save weights
-                self._prepare_path('./final_state/temp')
-                self.model.save_weights('./final_state/temp/final_state.weights.h5')
-                self.mlflow.log_artifacts('./final_state/temp', '')
-            if export_model:
-                self.mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
+            with self.mlflow.active_run():
+                self.mlflow.log_params({
+                    'epoch': epochs,
+                    'initial_epoch': self.initial_epoch
+                })
+                self._log_mlflow_params()
+                if export_final_state:
+                    #save weights
+                    self._prepare_path('./final_state/temp')
+                    self.model.save_weights('./final_state/temp/final_state.weights.h5')
+                    self.mlflow.log_artifacts('./final_state/temp', '')
+                if export_model:
+                    self.mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
         
         try:
             self.mlflow.end_run()
         except:
             None
+
+        self.initial_epoch += epochs
+
 
     ### LOAD MODEL
 
