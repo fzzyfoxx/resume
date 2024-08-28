@@ -1324,8 +1324,8 @@ def backbone_based_pixel_similarity_dot_model(
     return tf.keras.Model(inputs, out, name=name)
 
 def prepare_components_vecs_to_plot(components_vecs, components_class):
-    vec_idxs = tf.squeeze(tf.where(components_class==1), axis=-1)
-    bbox_idxs = tf.squeeze(tf.where(components_class==0), axis=-1)
+    vec_idxs = tf.squeeze(tf.where(components_class==2), axis=-1)
+    bbox_idxs = tf.squeeze(tf.where(components_class==1), axis=-1)
 
     vecs = tf.gather(components_vecs, vec_idxs, axis=0)
     vecs = tf.transpose(vecs, [2,1,0])[::-1]
@@ -1606,10 +1606,11 @@ class AngleLengthVecDecoder(tf.keras.layers.Layer):
 class SampleRadialSearchHead(tf.keras.Model):
     def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, angle_pred=False, exp_activation=True, **kwargs):
         super().__init__(**kwargs)
-        self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=5, dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
-        self.split = SplitLayer(splits=[4,1], axis=-1, name=f'{self.name}-Vec-Class-Split')
-        self.squeeze_class = tf.keras.layers.Reshape((num_samples,), name=f'{self.name}-Class-Pred-Squeeze')
-        self.class_sigmoid = tf.keras.layers.Activation('sigmoid', name=f'{self.name}-Class-Output')
+        self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=7, dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
+        self.split = SplitLayer(splits=[4,3], axis=-1, name=f'{self.name}-Vec-Class-Split')
+        self.squeeze_class = tf.keras.layers.Reshape((num_samples,3), name=f'{self.name}-Class-Pred-Squeeze')
+        #self.class_sigmoid = tf.keras.layers.Activation('sigmoid', name=f'{self.name}-Class-Output')
+        self.class_softmax = tf.keras.layers.Softmax(axis=-1, name=f'{self.name}-Class-Output')
 
         if not angle_pred:
             self.vec_reshape = tf.keras.layers.Reshape((num_samples, 2,2), name=f'{self.name}-Out-Vec-Formatter')
@@ -1625,7 +1626,8 @@ class SampleRadialSearchHead(tf.keras.Model):
 
         x = self.ffn(sample_features, training=training)
         x, class_pred = self.split(x)
-        class_pred = self.class_sigmoid(self.squeeze_class(class_pred))
+        #class_pred = self.class_sigmoid(self.squeeze_class(class_pred))
+        class_pred = self.squeeze_class(self.class_softmax(class_pred))
 
         x = self.vec_reshape(x)
         sample_coords = self.sample_reshape(sample_coords)

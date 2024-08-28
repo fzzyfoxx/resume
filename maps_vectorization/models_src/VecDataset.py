@@ -902,12 +902,15 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
 
     components_mask = tf.cast(tf.gather(components_mask, choosen_components, axis=1, batch_dims=1), tf.float32)
 
-    components_class = tf.cast(tf.gather(tf.concat([tf.ones_like(vecs_mask), tf.zeros_like(bbox_mask)], axis=-1), choosen_components, axis=1, batch_dims=1), tf.float32)
+    components_class_mask = tf.cast(tf.gather(tf.concat([tf.ones_like(vecs_mask), tf.zeros_like(bbox_mask)], axis=-1), choosen_components, axis=1, batch_dims=1), tf.float32)
 
     components_vecs = tf.gather(tf.concat([vecs, bboxes[:,:,0::2]], axis=1), choosen_components, axis=1, batch_dims=1)
 
     components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
     components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
+
+    components_class = tf.concat([vecs_mask*2, bbox_mask*1], axis=1)
+    components_class = tf.gather(components_class, choosen_components, axis=1, batch_dims=1)
 
     B = tf.shape(choosen_components)[0]
     W = tf.shape(components_masks)[-2]
@@ -915,17 +918,19 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
     sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
 
     components_num = tf.reduce_sum(components_mask, axis=None, keepdims=True)
-    class_weights = components_mask*tf.math.divide_no_nan(tf.cast(n*B, tf.float32),components_num) #tf.math.divide_no_nan(components_mask,components_num)
+    vecs_weights = components_mask*tf.math.divide_no_nan(tf.cast(n*B, tf.float32),components_num) #tf.math.divide_no_nan(components_mask,components_num)
+    class_label = tf.cast(tf.one_hot(tf.cast(components_class, tf.int32), 3), tf.float32)
+    class_weights = tf.ones((B,n), tf.float32)
 
-    vecs_label = (components_class*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
-    bbox_label = ((1-components_class)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
+    vecs_label = (components_class_mask*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
+    bbox_label = ((1-components_class_mask)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
 
     mixed_label = tf.concat([vecs_label, bbox_label], axis=-2)
     #class_split = tf.stack([components_class, 1-components_class], axis=-1)
 
-    return ({'img': img, 'sample_points': sample_points, 'class_split': components_class}, 
-            {'vecs': mixed_label, 'class': components_class}, 
-            {'vecs': class_weights, 'class': class_weights})
+    return ({'img': img, 'sample_points': sample_points, 'class_split': components_class_mask}, 
+            {'vecs': mixed_label, 'class': class_label}, 
+            {'vecs': vecs_weights, 'class': class_weights})
 
 
 ### DATASET GENERATOR ###

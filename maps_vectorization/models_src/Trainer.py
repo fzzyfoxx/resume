@@ -395,7 +395,7 @@ class TrainingProcessor2:
         if log:
             with self.mlflow.active_run():
                 self.mlflow.log_params({
-                    'epoch': epochs,
+                    'epoch': epochs+self.initial_epoch,
                     'initial_epoch': self.initial_epoch
                 })
                 self._log_mlflow_params()
