@@ -895,8 +895,7 @@ def op_pixel_similarity(img, pattern_masks, **kwargs):
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
     return (img, tf.cast(pattern_masks, tf.float32))
 
-@tf.function
-def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, **kwargs):
+def vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n):
     components_mask = tf.cast(tf.concat([vecs_mask, bbox_mask], axis=-1), tf.float32)
     choosen_components = tf.math.top_k(components_mask-tf.random.uniform(tf.shape(components_mask), 0.0, 0.1), k=n).indices
 
@@ -926,11 +925,36 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
     bbox_label = ((1-components_class_mask)*components_mask)[...,tf.newaxis, tf.newaxis]*components_vecs
 
     mixed_label = tf.concat([vecs_label, bbox_label], axis=-2)
+
+    return choosen_components, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights
+
+@tf.function
+def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, **kwargs):
+    
+    _, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights = \
+        vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n)
     #class_split = tf.stack([components_class, 1-components_class], axis=-1)
 
     return ({'img': img, 'sample_points': sample_points, 'class_split': components_class_mask}, 
             {'vecs': mixed_label, 'class': class_label}, 
             {'vecs': vecs_weights, 'class': class_weights})
+
+@tf.function
+def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, shape_thickness, n, **kwargs):
+    
+    choosen_components, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights = \
+        vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n)
+    #class_split = tf.stack([components_class, 1-components_class], axis=-1)
+
+    thickness_label = tf.expand_dims(tf.gather(tf.concat([shape_thickness, shape_thickness], axis=1), choosen_components, axis=1, batch_dims=1), axis=-1)
+
+    return {'inputs': {'img': img, 'sample_points': sample_points, 'class_split': components_class_mask}, 
+            'labels': {'vecs': mixed_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
+            'weights': {'vecs': vecs_weights, 'class': class_weights, 'thickness': tf.expand_dims(vecs_weights, axis=-1)}}
+
+@tf.function
+def op_dict_free_pass(inputs, labels, weights):
+    return (inputs, labels, weights)
 
 
 ### DATASET GENERATOR ###
