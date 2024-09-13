@@ -1462,7 +1462,7 @@ class ExtractSampleLayer(tf.keras.layers.Layer):
         return tf.gather_nd(source, tf.cast(idxs, tf.int32), batch_dims=self.batch_dims)
 
 class DetectionMHA(MHA):
-    def __init__(self, value_pos_enc=True, key_pos_enc=False, query_pos_enc=False, pos_enc_matmul=False,**kwargs):
+    def __init__(self, value_pos_enc=True, key_pos_enc=False, query_pos_enc=False, pos_enc_matmul=False, return_weights=True, return_scores=False, **kwargs):
         super().__init__(**kwargs)
 
         self.key_pos_enc = key_pos_enc
@@ -1470,18 +1470,21 @@ class DetectionMHA(MHA):
         self.query_pos_enc = query_pos_enc
         self.pos_enc_matmul = pos_enc_matmul
 
+        self.return_weights = return_weights
+        self.return_scores = return_scores
+
         if pos_enc_matmul:
             self.pe_d = tf.keras.layers.Dense(kwargs['output_dim'])
             self.pe_output_perm = HeadsPermuter(kwargs['num_heads'], reverse=True)
 
-    def call(self, V, Q, K, pos_enc, mask=None):
+    def call(self, V, Q, K, pos_enc, mask=None, query_pos_enc=None):
         Q = self.Q_head_extractior(self.Q_d(Q))
         K = self.K_head_extractior(self.K_d(K))
 
         pos_enc = tf.expand_dims(pos_enc, axis=-3)
 
         if self.query_pos_enc:
-            Q += pos_enc
+            Q += pos_enc if query_pos_enc is None else tf.expand_dims(query_pos_enc, axis=-3)
             
         if self.key_pos_enc:
             K += pos_enc
@@ -1510,7 +1513,17 @@ class DetectionMHA(MHA):
 
         if (mask is not None) & (self.soft_mask==False):
             return V*mask
-        return V, weights
+        
+        if (not self.return_scores) & (not self.return_weights):
+            return V
+        
+        outputs = [V]
+
+        if self.return_scores:
+            outputs.append(scores)
+        if self.return_weights:
+            outputs.append(weights)
+        return outputs
     
 class ExpandDimsLayer(tf.keras.layers.Layer):
     def __init__(self, axis, **kwargs):
@@ -1584,6 +1597,12 @@ class AddNorm(tf.keras.layers.Layer):
         a, b = inputs[0], inputs[1]
         return self.norm(a+b)
     
+class SubtractNorm(AddNorm):
+
+    def call(self, inputs):
+        a, b = inputs[0], inputs[1]
+        return self.norm(a-b)
+    
 class AngleLengthVecDecoder(tf.keras.layers.Layer):
     def __init__(self, exp_activation=True, **kwargs):
         super().__init__(**kwargs)
@@ -1604,10 +1623,15 @@ class AngleLengthVecDecoder(tf.keras.layers.Layer):
         return vec
     
 class SampleRadialSearchHead(tf.keras.Model):
-    def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, angle_pred=False, exp_activation=True, **kwargs):
+    def __init__(self, num_samples, ffn_mid_layers, mid_units, activation, dropout=0.0, angle_pred=False, exp_activation=True, return_logits=False, thickness_pred=False, raw_vecs=False, **kwargs):
         super().__init__(**kwargs)
-        self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=7, dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
-        self.split = SplitLayer(splits=[4,3], axis=-1, name=f'{self.name}-Vec-Class-Split')
+
+        splits = [4,3]
+        if thickness_pred:
+            splits.append(1)
+
+        self.ffn = FFN(mid_layers=ffn_mid_layers, mid_units=mid_units, output_units=sum(splits), dropout=dropout, activation=activation, name=f'{self.name}-Vec-Pred-FFN')
+        self.split = SplitLayer(splits=splits, axis=-1, name=f'{self.name}-Vec-Class-Split')
         self.squeeze_class = tf.keras.layers.Reshape((num_samples,3), name=f'{self.name}-Class-Pred-Squeeze')
         #self.class_sigmoid = tf.keras.layers.Activation('sigmoid', name=f'{self.name}-Class-Output')
         self.class_softmax = tf.keras.layers.Softmax(axis=-1, name=f'{self.name}-Class-Output')
@@ -1622,32 +1646,54 @@ class SampleRadialSearchHead(tf.keras.Model):
 
         self.vecbbox_split = VecClassSplit(name=f'{self.name}-Vecs-Output')
 
+        self.return_logits = return_logits
+        self.thickness_pred = thickness_pred
+        self.raw_vecs = raw_vecs
+
+        if thickness_pred:
+            self.squeeze_thickness = tf.keras.layers.Reshape((num_samples,1), name=f'{self.name}-Thickness-Pred-Squeeze')
+
     def call(self, sample_features, sample_coords, split_mask, training=None):
 
         x = self.ffn(sample_features, training=training)
-        x, class_pred = self.split(x)
+        pred_elems = self.split(x)
+        x, class_pred = pred_elems[:2]
         #class_pred = self.class_sigmoid(self.squeeze_class(class_pred))
-        class_pred = self.squeeze_class(self.class_softmax(class_pred))
+        class_logits = self.squeeze_class(class_pred)
+        class_pred = self.class_softmax(class_logits)
 
         x = self.vec_reshape(x)
         sample_coords = self.sample_reshape(sample_coords)
 
         x = self.add([x, sample_coords])
-        x = self.vecbbox_split([x, split_mask])
+        splited_vecs = self.vecbbox_split([x, split_mask])
 
-        return x, class_pred
+        output_elems = [splited_vecs, class_pred]
+
+        if self.raw_vecs:
+            output_elems.append(x)
+
+        if self.thickness_pred:
+            output_elems.append(self.squeeze_thickness(pred_elems[2]))
+
+        if self.return_logits:
+            output_elems.append(class_logits)
+
+        return output_elems
     
 class SampleRadialSearchFeaturesExtraction(tf.keras.Model):
-    def __init__(self, embs_dim, color_embs_dim, mid_layers, activation, dropout=0.0, batch_dims=1, **kwargs):
+    def __init__(self, embs_dim, color_embs_dim, mid_layers, activation, dropout=0.0, batch_dims=1, memory_input=True,**kwargs):
         super().__init__(**kwargs)
 
 
         features_embs_dim = embs_dim-color_embs_dim
-        self.f_ffn = FFN(mid_layers=mid_layers, mid_units=features_embs_dim*2, output_units=features_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Memory-FFN')
+        self.memory_input = memory_input
+        if memory_input:
+            self.f_ffn = FFN(mid_layers=mid_layers, mid_units=features_embs_dim*2, output_units=features_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Memory-FFN')
+            self.f_concat = tf.keras.layers.Concatenate(name=f'{self.name}-Memory-Color-Concat')
+            self.fc_ffn = FFN(mid_layers=mid_layers, mid_units=embs_dim, output_units=embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Output-Embeddings')
+            
         self.c_ffn = FFN(mid_layers=mid_layers, mid_units=color_embs_dim*2, output_units=color_embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-ColorEmbs-FFN')
-
-        self.f_concat = tf.keras.layers.Concatenate(name=f'{self.name}-Memory-Color-Concat')
-        self.fc_ffn = FFN(mid_layers=mid_layers, mid_units=embs_dim, output_units=embs_dim, dropout=dropout, activation=activation, name=f'{self.name}-Output-Embeddings')
 
         self.extract_samples = ExtractSampleLayer(batch_dims=batch_dims, name=f'{self.name}-Extract-Sample')
         self.expand_samples = ExpandDimsLayer(axis=-2, name=f'{self.name}-Expand-Samples')
@@ -1658,10 +1704,13 @@ class SampleRadialSearchFeaturesExtraction(tf.keras.Model):
 
     def call(self, sample_inputs, memory, normed_img, pos_enc, training=None):
 
-        features = self.f_ffn(memory, training=training)
-        color_features = self.c_ffn(normed_img, training=training)
+        if self.memory_input:
+            features = self.f_ffn(memory, training=training)
+            color_features = self.c_ffn(normed_img, training=training)
+            features = self.fc_ffn(self.f_concat([features, color_features]), training=training)
+        else:
+            features = self.c_ffn(normed_img, training=training)
 
-        features = self.fc_ffn(self.f_concat([features, color_features]), training=training)
         sample_features = self.expand_samples(self.extract_samples(features, sample_inputs))
 
         features = self.expand_features(self.squeeze_features(features))
@@ -1980,3 +2029,194 @@ def radial_enc_pixel_features_model_generator(
     model = tf.keras.Model(img_inputs, {'shape_class': out_shape_class, 'angle': out_angle, 'thickness': out_thickness, 'center_vec': out_center_vec}, name=name)
     
     return model
+
+class IntegralVecRadialEncodingPreprcessing(tf.keras.layers.Layer):
+
+    def build(self, input_shape):
+        self.N = input_shape[1]
+
+    @staticmethod
+    def calc_vec_angle(x):
+        return tf.math.atan2(*tf.split(tf.squeeze(tf.math.subtract(*tf.split(x, 2, axis=-2)), axis=-2), 2, axis=-1))
+    
+    @staticmethod
+    def get_rotation_matrix(x):
+        return tf.stack([tf.stack([tf.cos(x), -tf.sin(x)], axis=-1),tf.stack([tf.sin(x), tf.cos(x)], axis=-1)], axis=-2)
+    
+    @staticmethod
+    def line_thickness_aplication(by1, by2, bx1, bx2, thickness):
+        shift = thickness/2
+        by1 -= shift
+        by2 += shift
+
+        return tf.stack([by1, bx1, by2, bx2], axis=-2)
+    
+    @staticmethod
+    def shape_thickness_aplication(rel_vecs):
+        y1x1 = tf.reduce_min(rel_vecs, axis=-3, keepdims=False)
+        y2x2 = tf.reduce_max(rel_vecs, axis=-3, keepdims=False)
+        return tf.concat([y1x1, y2x2], axis=-2)
+    
+    
+    def call(self, sample_points, vec_pred, thickness_pred, class_pred_logit, training=None):
+
+        vec_angle = self.calc_vec_angle(vec_pred)
+
+        rot_matrix = tf.expand_dims(self.get_rotation_matrix(vec_angle), axis=1)
+
+        rel_vecs = tf.expand_dims(tf.expand_dims(vec_pred, axis=1)-tf.expand_dims(tf.expand_dims(sample_points, axis=2), axis=3), axis=-1)
+
+        rot_vecs = tf.squeeze(tf.matmul(rot_matrix, rel_vecs), axis=-1)
+        r = tf.expand_dims(vec_angle+math.pi, axis=1)
+
+        by1, bx2, by2, bx1 = tf.split(tf.reshape(rot_vecs, (-1,self.N, self.N, 4)), 4, axis=-1)
+        thickness_pred = tf.expand_dims(thickness_pred, axis=1)
+
+        line_rel_coords = self.line_thickness_aplication(by1, by2, bx1, bx2, thickness_pred)
+        shape_rel_coords = self.shape_thickness_aplication(rel_vecs)
+
+        class_probs = tf.expand_dims(tf.nn.softmax(class_pred_logit[...,1:], axis=-1), axis=1)
+
+        return r, line_rel_coords, shape_rel_coords, class_probs
+    
+
+class IntegralVecRadialEncoding(tf.keras.layers.Layer):
+    def __init__(self, emb_dim, riemann_samples, size, **kwargs):
+        super().__init__(**kwargs)
+
+        self.C = emb_dim
+        self.c = emb_dim//4
+
+        self.n = riemann_samples
+        self.s = size*(2**0.5)
+
+        self.k = tf.cast(tf.reshape(tf.range(riemann_samples)+1, (1,1,1,1,riemann_samples)), tf.float32)
+        self.freq = tf.cast(tf.reshape(tf.range(self.c), (1,1,1,self.c,1)), tf.float32)
+
+    def calc_vec_arg_riemanns(self, b1, b2):
+        return self.k*(-b1+b2)/self.n + b1 - (-b1+b2)/(2*self.n)
+    
+    def calc_angle_angle_arg(self, y_vec_arg, x_vec_arg, r):
+        return self.freq*(r + tf.math.atan2(y_vec_arg, x_vec_arg)) + 2*math.pi*self.freq/self.c
+    
+    def calc_ring_angle_arg(self, y_vec_arg, x_vec_arg):
+        return self.freq*math.pi*((y_vec_arg**2 + x_vec_arg**2)**0.5)/self.s + 2*math.pi*self.freq/self.c
+    
+    def calc_prefix_arg(self, by1, by2, bx1, bx2):
+        return tf.squeeze((-by1+by2)*(-bx1+bx2)/self.n, axis=-1)
+    
+    def calc_vec_integral(self, prefix_arg, angle_arg, func):
+        return prefix_arg*tf.reduce_sum(func(angle_arg), axis=-1)
+        
+    def call(self, r, rel_coords):
+        if r is not None:
+            r = tf.expand_dims(r, axis=-1)
+        else:
+            r = math.pi
+
+        by1, bx1, by2, bx2 = tf.split(rel_coords, 4, axis=-2)
+
+        y_vec_arg = self.calc_vec_arg_riemanns(by1, by2)
+        x_vec_arg = self.calc_vec_arg_riemanns(bx1, bx2)
+        prefix_arg = self.calc_prefix_arg(by1, by2, bx1, bx2)
+
+        angle_angle_arg = self.calc_angle_angle_arg(y_vec_arg, x_vec_arg, r)
+        ring_angle_arg = self.calc_ring_angle_arg(y_vec_arg, x_vec_arg)
+
+        sin_angle = self.calc_vec_integral(prefix_arg, angle_angle_arg, tf.sin)
+        cos_angle = self.calc_vec_integral(prefix_arg, angle_angle_arg, tf.cos)
+        sin_ring = self.calc_vec_integral(prefix_arg, ring_angle_arg, tf.sin)
+        cos_ring = self.calc_vec_integral(prefix_arg, ring_angle_arg, tf.cos)
+
+        return tf.concat([sin_angle, cos_angle, sin_ring, cos_ring], axis=-1)
+    
+class IntegralVecRadialEncoding(tf.keras.layers.Layer):
+    def __init__(self, emb_dim, riemann_samples, size, **kwargs):
+        super().__init__(**kwargs)
+
+        self.C = emb_dim
+        self.c = emb_dim//4
+
+        self.n = riemann_samples
+        self.s = size*(2**0.5)
+
+        self.k = tf.cast(tf.reshape(tf.range(riemann_samples)+1, (1,1,1,1,riemann_samples)), tf.float32)
+        self.freq = tf.cast(tf.reshape(tf.range(self.c), (1,1,1,self.c,1)), tf.float32)
+
+    def calc_vec_arg_riemanns(self, b1, b2):
+        return self.k*(-b1+b2)/self.n + b1 - (-b1+b2)/(2*self.n)
+    
+    def calc_angle_angle_arg(self, y_vec_arg, x_vec_arg, r):
+        return self.freq*(r + tf.math.atan2(y_vec_arg, x_vec_arg)) + 2*math.pi*self.freq/self.c
+    
+    def calc_ring_angle_arg(self, y_vec_arg, x_vec_arg):
+        return self.freq*math.pi*((y_vec_arg**2 + x_vec_arg**2)**0.5)/self.s + 2*math.pi*self.freq/self.c
+    
+    def calc_prefix_arg(self, by1, by2, bx1, bx2):
+        return tf.squeeze((-by1+by2)*(-bx1+bx2)/self.n, axis=-1)
+    
+    def calc_vec_integral(self, prefix_arg, angle_arg, func):
+        return prefix_arg*tf.reduce_sum(func(angle_arg), axis=-1)
+    
+    @staticmethod
+    def calc_field(coords):
+        y1, x1, y2, x2 = tf.split(tf.squeeze(coords, axis=-1), 4, axis=-1)
+        return (x2-x1)*(y2-y1)
+        
+    def call(self, r, rel_coords):
+        if r is not None:
+            r = tf.expand_dims(r, axis=-1)
+        else:
+            r = math.pi
+
+        by1, bx1, by2, bx2 = tf.split(rel_coords, 4, axis=-2)
+
+        y_vec_arg = self.calc_vec_arg_riemanns(by1, by2)
+        x_vec_arg = self.calc_vec_arg_riemanns(bx1, bx2)
+        prefix_arg = self.calc_prefix_arg(by1, by2, bx1, bx2)
+
+        angle_angle_arg = self.calc_angle_angle_arg(y_vec_arg, x_vec_arg, r)
+        ring_angle_arg = self.calc_ring_angle_arg(y_vec_arg, x_vec_arg)
+
+        sin_angle = self.calc_vec_integral(prefix_arg, angle_angle_arg, tf.sin)
+        cos_angle = self.calc_vec_integral(prefix_arg, angle_angle_arg, tf.cos)
+        sin_ring = self.calc_vec_integral(prefix_arg, ring_angle_arg, tf.sin)
+        cos_ring = self.calc_vec_integral(prefix_arg, ring_angle_arg, tf.cos)
+
+        field = self.calc_field(rel_coords)+1e-6
+
+        return tf.concat([sin_angle, cos_angle, sin_ring, cos_ring], axis=-1)/field
+    
+class LineShapeEncodingConcatenation(tf.keras.layers.Layer):
+
+    def call(self, class_probs, line_encoding, shape_encoding):
+
+        return tf.squeeze(tf.matmul(tf.stack([shape_encoding, line_encoding], axis=-1), tf.expand_dims(class_probs, axis=-1)), axis=-1)
+    
+
+class QuerySamplesFeaturesMHAUpdate(tf.keras.layers.Layer):
+    def build(self, input_shape):
+
+        samples_input_shape, scores_input_shape = input_shape[0], input_shape[1]
+
+        num_heads = scores_input_shape[-3]
+        embs_dim = samples_input_shape[-1]
+
+        self.V_d = tf.keras.layers.Dense(embs_dim)
+        self.O_d = tf.keras.layers.Dense(embs_dim)
+
+        self.V_head_extractior = HeadsPermuter(num_heads, reverse=False)
+        self.output_perm = HeadsPermuter(num_heads, reverse=True)
+
+    def call(self, inputs):
+
+        sample_features, scores = inputs[0], inputs[1]
+
+        V = self.V_head_extractior(self.V_d(tf.transpose(sample_features, perm=[0,2,1,3])))
+        weights = tf.nn.softmax(tf.transpose(scores, perm=[0,3,2,4,1]),axis=-1)
+
+        V = tf.matmul(weights, V)
+
+        out = self.O_d(self.output_perm(V))
+
+        return out
