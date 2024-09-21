@@ -6,7 +6,7 @@ import math
 import cv2 as cv
 
 from models_src.fft_lib import xy_coords, decode1Dcoords
-from models_src.VecModels import flatten
+from models_src.VecModels import flatten, calc_2x2_vec_angle, two_side_angle_diff
 from src.patterns import gen_colors
 
 from google.cloud import storage
@@ -955,6 +955,59 @@ def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, 
 @tf.function
 def op_dict_free_pass(inputs, labels, weights):
     return (inputs, labels, weights)
+
+def random_vec_angles(vecs, vecs_mask, angle_samples_num):
+    vecs_mask = tf.cast(vecs_mask, tf.float32)
+    vec_angles = -calc_2x2_vec_angle(vecs)
+
+    initial_idx = tf.math.top_k(vecs_mask+tf.random.uniform(tf.shape(vecs_mask), 0.0, 0.1), k=1).indices
+    angle_input = tf.gather(vec_angles, initial_idx, axis=1, batch_dims=1)
+    expanded_angles = tf.expand_dims(vec_angles, axis=1)
+    angle_mask = tf.expand_dims(vecs_mask, axis=1)
+
+    for _ in range(angle_samples_num-1):
+        diffs = tf.reduce_min(two_side_angle_diff(tf.expand_dims(angle_input, axis=2), expanded_angles)*angle_mask, axis=1)
+        idx = tf.argmax(diffs, axis=-1)[:,tf.newaxis]
+
+        angle_input = tf.concat([angle_input, tf.gather(vec_angles, idx, axis=1, batch_dims=1)], axis=-1)
+
+    cutted_vecs_mask = vecs_mask[:,:angle_samples_num]
+    angle_input = angle_input*cutted_vecs_mask + tf.random.uniform(tf.shape(angle_input),-math.pi, math.pi)*(1-cutted_vecs_mask)
+
+    return angle_input
+
+def prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, n):
+
+    vecs = tf.concat([vecs, vecs], axis=-2)
+    bboxes = tf.concat([bboxes[...,0::2,:], bboxes[...,1::2,:]], axis=-2)
+
+    components_mask = tf.cast(tf.concat([vecs_mask, bbox_mask], axis=-1), tf.float32)
+    choosen_components = tf.math.top_k(components_mask+tf.random.uniform(tf.shape(components_mask), 0.0, 0.1), k=n).indices
+
+    components_mask = tf.cast(tf.gather(components_mask, choosen_components, axis=1, batch_dims=1), tf.float32)
+    vecs_label = tf.gather(tf.concat([vecs, bboxes], axis=1), choosen_components, axis=1, batch_dims=1)
+
+    components_class = tf.concat([vecs_mask*2, bbox_mask*1], axis=1)
+    components_class = tf.gather(components_class, choosen_components, axis=1, batch_dims=1)*tf.cast(components_mask, tf.int8)
+
+    B = tf.shape(choosen_components)[0]
+    components_num = tf.reduce_sum(components_mask, axis=None, keepdims=True)
+    vecs_weights = components_mask*tf.math.divide_no_nan(tf.cast(n*B, tf.float32),components_num)
+
+    class_label = tf.cast(tf.one_hot(components_class, 3), tf.float32)
+    class_weights = tf.ones((B,n), tf.float32)
+
+    return vecs_label, class_label, vecs_weights, class_weights, components_mask
+
+@tf.function
+def op_rotated_enc(img, vecs, bboxes, vecs_mask, bbox_mask, angle_samples_num, max_components_num):
+
+    angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num)
+
+    vecs_label, class_label, vecs_weights, class_weights, vecs_mask = prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, max_components_num)
+
+    return ({'img': img, 'angle_input': angle_input},
+            {'vecs': vecs_label, 'class': class_label, 'vecs_weights': vecs_weights, 'vecs_mask': vecs_mask})
 
 
 ### DATASET GENERATOR ###

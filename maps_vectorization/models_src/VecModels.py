@@ -1369,13 +1369,15 @@ def add_batch_dims(x, batch_dims):
 
 
 class RadialEncoding(tf.keras.layers.Layer):
-    def __init__(self, emb_dim, height, width=None, **kwargs):
+    def __init__(self, emb_dim, height, width=None, inverted_angle=False, **kwargs):
         super().__init__(**kwargs)
 
         self.H = height
         self.W = height if width is None else width
 
         self.C = emb_dim
+        self.inverted_angle = inverted_angle
+        self.inv = -1 if inverted_angle else 1
 
     def build(self, input_shape):
 
@@ -1394,7 +1396,7 @@ class RadialEncoding(tf.keras.layers.Layer):
         self.radial_reg = tf.constant(self.C//4, tf.float32)
 
     def calc_angles(self, sample_points):
-        return tf.math.atan2(*tf.split(self.yx-sample_points[...,tf.newaxis, tf.newaxis,:], 2, axis=-1))
+        return tf.math.atan2(*tf.split((self.yx-sample_points[...,tf.newaxis, tf.newaxis,:])*self.inv, 2, axis=-1))
     
     def clock_radial_enc(self, angles, period):
         return tf.nn.relu(tf.cos(angles + period*self.shifts*math.pi/self.shifts_num))**self.radial_reg
@@ -1442,7 +1444,9 @@ class FrequencyRadialEncoding(RadialEncoding):
 
     def call(self, sample_points):
         
-        angles = self.calc_angles(sample_points)+math.pi
+        angles = self.calc_angles(sample_points) 
+        if not self.inverted_angle:
+            angles += (math.pi)
         dists = self.radial_dists(sample_points)*2
 
         angle_encodings = self.frequency_encoding(angles)
@@ -1720,11 +1724,12 @@ class SampleRadialSearchFeaturesExtraction(tf.keras.Model):
     
 
 class SampleRadialEncoding(RadialEncoding):
-    def __init__(self, expand_a=True, expand_b=True, **kwargs):
+    def __init__(self, expand_a=True, expand_b=True, inverted_angle=False, **kwargs):
         super().__init__(**kwargs)
 
         self.expand_a = expand_a
         self.expand_b = expand_b
+        self.inverted_angle = inverted_angle
     
     def calc_angles(self, a, b):
 
@@ -1759,7 +1764,9 @@ class SampleFrequencyRadialEncoding(SampleRadialEncoding):
 
     def call(self, a, b):
         
-        angles = self.calc_angles(a, b)+math.pi
+        angles = self.calc_angles(a, b) 
+        if not self.inverted_angle:
+            angles += (math.pi)
         dists = self.radial_dists(a, b)*2
 
         angle_encodings = self.frequency_encoding(angles)
@@ -1958,6 +1965,7 @@ def radial_enc_pixel_features_model_generator(
         backbone_last_layer,
         backbone_init_layer,
         backbone_trainable,
+        inverted_angle,
         name='PxFeaturesRadEnc'
 ):
     
@@ -1985,7 +1993,7 @@ def radial_enc_pixel_features_model_generator(
 
     coords = YXcoordsLayer(size=(size,size), squeeze_output=True, name='Img-Coords')()
 
-    pos_enc = enc_func(emb_dim=embs_dim//num_heads, height=size, name=f'{enc_label}RadialEncoding')(coords)
+    pos_enc = enc_func(emb_dim=embs_dim//num_heads, height=size, inverted_angle=inverted_angle, name=f'{enc_label}RadialEncoding')(coords)
 
     features, pos_enc = RadialSearchFeaturesExtraction(embs_dim=embs_dim, 
                                                         color_embs_dim=color_embs_dim, 
@@ -2193,8 +2201,40 @@ class LineShapeEncodingConcatenation(tf.keras.layers.Layer):
 
         return tf.squeeze(tf.matmul(tf.stack([shape_encoding, line_encoding], axis=-1), tf.expand_dims(class_probs, axis=-1)), axis=-1)
     
+class BinarisedSoftmax(tf.keras.layers.Layer):
+    def __init__(self, axis=-1, reg=1e2, **kwargs):
+        super().__init__(**kwargs)
 
+        self.axis = axis
+        self.reg = reg
+
+    def call(self, inputs):
+        x = inputs-tf.reduce_max(inputs, axis=self.axis, keepdims=True)
+        x = tf.nn.tanh(x*1e2)
+        x = tf.tan(x*(math.pi/2-1e-4))
+        x = tf.nn.softmax(inputs+x, axis=self.axis)
+
+        return x
+    
+class SqueezeDimLayer(tf.keras.layers.Layer):
+    def __init__(self, axis, **kwargs):
+        super().__init__(**kwargs)
+
+        self.axis = axis
+
+    def call(self, inputs):
+        return tf.squeeze(inputs, axis=self.axis)
+    
 class QuerySamplesFeaturesMHAUpdate(tf.keras.layers.Layer):
+    def __init__(self, binarised=False, bin_reg=1e2, return_weights=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.binarised = binarised
+        self.return_weights = return_weights
+
+        if binarised:
+            self.binarize = BinarisedSoftmax(axis=-1, reg=bin_reg)
+
     def build(self, input_shape):
 
         samples_input_shape, scores_input_shape = input_shape[0], input_shape[1]
@@ -2208,15 +2248,61 @@ class QuerySamplesFeaturesMHAUpdate(tf.keras.layers.Layer):
         self.V_head_extractior = HeadsPermuter(num_heads, reverse=False)
         self.output_perm = HeadsPermuter(num_heads, reverse=True)
 
-    def call(self, inputs):
+    def call(self, inputs, pos_enc=None):
 
         sample_features, scores = inputs[0], inputs[1]
 
         V = self.V_head_extractior(self.V_d(tf.transpose(sample_features, perm=[0,2,1,3])))
-        weights = tf.nn.softmax(tf.transpose(scores, perm=[0,3,2,4,1]),axis=-1)
+        if pos_enc is not None:
+            V += tf.expand_dims(tf.transpose(pos_enc, perm=[0,2,1,3]), axis=-3)
+
+        scores = tf.transpose(scores, perm=[0,4,2,3,1])
+        if self.binarised:
+            weights = self.binarize(scores)
+        else:
+            weights = tf.nn.softmax(scores,axis=-1)
 
         V = tf.matmul(weights, V)
 
         out = self.O_d(self.output_perm(V))
-
+        out = tf.transpose(out, perm=[0,2,1,3])
+        if self.return_weights:
+            return out, weights
         return out
+
+def calc_2x2_vec_angle(x):
+    return tf.squeeze(tf.math.atan2(*tf.split(tf.squeeze(tf.subtract(*tf.split(x, 2, axis=-2)), axis=-2), 2, axis=-1)), axis=-1)
+
+
+class AngleHeadedSineEncoding(tf.keras.layers.Layer):
+    def __init__(self, emb_size, size, temperature=1e2, **kwargs):
+        super().__init__(**kwargs)
+
+        self.size = size
+        self.emb_size = emb_size
+        self.temperature = temperature
+        num_pos_features = emb_size//2
+
+        self.yx = tf.transpose(tf.reshape(xy_coords((size, size))[...,::-1], (size**2, 2)), perm=[1,0])[tf.newaxis, tf.newaxis]
+
+        dim_t = tf.math.cumsum(tf.ones((num_pos_features,)))-1
+        self.dim_t = temperature ** (2 * (dim_t // 2) / num_pos_features)
+
+    def build(self, input_shape):
+
+        self.angles_num = input_shape[-1]
+
+    def call(self, inputs):
+        B = tf.shape(inputs)[0]
+        rot_matrix = tf.reshape(tf.stack([tf.cos(inputs), tf.sin(inputs),-tf.sin(inputs), tf.cos(inputs)], axis=-1), (B, self.angles_num, 2, 2))
+
+        yx_rot = tf.transpose(tf.matmul(rot_matrix, self.yx), [0,1,3,2])
+        
+        pos_yx = yx_rot[...,tf.newaxis]/self.dim_t
+
+        pos_emb = tf.reshape(tf.concat([
+                tf.sin(pos_yx[...,0::2]),
+                tf.cos(pos_yx[...,1::2])
+            ], axis=-1), (B,self.angles_num, self.size**2, self.emb_size))
+        
+        return pos_emb
