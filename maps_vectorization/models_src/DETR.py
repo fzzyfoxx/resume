@@ -166,6 +166,7 @@ class MHA(tf.keras.layers.Layer):
                  transpose_weights=False,
                  softmax_axis=-1,
                  soft_mask=False,
+                 return_weights=False,
                  **kwargs):
         super(MHA, self).__init__(**kwargs)
 
@@ -186,6 +187,7 @@ class MHA(tf.keras.layers.Layer):
         self.softmax_axis = softmax_axis
 
         self.soft_mask = soft_mask
+        self.return_weights = return_weights
 
     def call(self, V, Q, K, mask=None):
         Q = self.Q_head_extractior(self.Q_d(Q))
@@ -210,6 +212,9 @@ class MHA(tf.keras.layers.Layer):
 
         if (mask is not None) & (self.soft_mask==False):
             return V*mask
+        
+        if self.return_weights:
+            return V, weights
         return V
 
 

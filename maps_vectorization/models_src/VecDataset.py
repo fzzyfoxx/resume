@@ -958,7 +958,7 @@ def op_dict_free_pass(inputs, labels, weights):
 
 def random_vec_angles(vecs, vecs_mask, angle_samples_num):
     vecs_mask = tf.cast(vecs_mask, tf.float32)
-    vec_angles = -calc_2x2_vec_angle(vecs)
+    vec_angles = tf.atan(tf.tan(-calc_2x2_vec_angle(vecs)))
 
     initial_idx = tf.math.top_k(vecs_mask+tf.random.uniform(tf.shape(vecs_mask), 0.0, 0.1), k=1).indices
     angle_input = tf.gather(vec_angles, initial_idx, axis=1, batch_dims=1)

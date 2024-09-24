@@ -1597,9 +1597,12 @@ class AddNorm(tf.keras.layers.Layer):
 
         self.norm = tf.keras.layers.LayerNormalization(axis=norm_axis)
 
-    def call(self, inputs):
+    def call(self, inputs, training=None):
         a, b = inputs[0], inputs[1]
-        return self.norm(a+b)
+        return self.norm(a+b, training=training)
+    
+    def compute_output_shape(self, input_shape):
+        return [None if any([x is None for x in [a,b]]) else max(a,b) for a,b in zip(*input_shape)]
     
 class SubtractNorm(AddNorm):
 
@@ -2210,7 +2213,7 @@ class BinarisedSoftmax(tf.keras.layers.Layer):
 
     def call(self, inputs):
         x = inputs-tf.reduce_max(inputs, axis=self.axis, keepdims=True)
-        x = tf.nn.tanh(x*1e2)
+        x = tf.nn.tanh(x*self.reg)
         x = tf.tan(x*(math.pi/2-1e-4))
         x = tf.nn.softmax(inputs+x, axis=self.axis)
 
