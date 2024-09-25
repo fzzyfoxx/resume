@@ -895,6 +895,16 @@ def op_pixel_similarity(img, pattern_masks, **kwargs):
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
     return (img, tf.cast(pattern_masks, tf.float32))
 
+def components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n):
+    components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
+    components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
+    B = tf.shape(choosen_components)[0]
+    W = tf.shape(components_masks)[-2]
+    flat_components_mask = tf.reshape(components_masks, (B, n, -1))
+    sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
+
+    return sample_points, components_masks
+
 def vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n):
     components_mask = tf.cast(tf.concat([vecs_mask, bbox_mask], axis=-1), tf.float32)
     choosen_components = tf.math.top_k(components_mask-tf.random.uniform(tf.shape(components_mask), 0.0, 0.1), k=n).indices
@@ -905,17 +915,11 @@ def vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, ve
 
     components_vecs = tf.gather(tf.concat([vecs, bboxes[:,:,0::2]], axis=1), choosen_components, axis=1, batch_dims=1)
 
-    components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
-    components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
-
     components_class = tf.concat([vecs_mask*2, bbox_mask*1], axis=1)
     components_class = tf.gather(components_class, choosen_components, axis=1, batch_dims=1)
 
-    B = tf.shape(choosen_components)[0]
-    W = tf.shape(components_masks)[-2]
-    flat_components_mask = tf.reshape(components_masks, (B, n, -1))
-    sample_points = decode1Dcoords(tf.math.top_k(tf.cast(flat_components_mask, tf.float32)-tf.random.uniform(tf.shape(flat_components_mask), 0.0, 0.1), k=1).indices[...,0], W)[...,::-1]
-
+    sample_points, _ = components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n)
+    B = tf.shape(sample_points)[0]
     components_num = tf.reduce_sum(components_mask, axis=None, keepdims=True)
     vecs_weights = components_mask*tf.math.divide_no_nan(tf.cast(n*B, tf.float32),components_num) #tf.math.divide_no_nan(components_mask,components_num)
     class_label = tf.cast(tf.one_hot(tf.cast(components_class, tf.int32), 3), tf.float32)
@@ -939,6 +943,9 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
             {'vecs': mixed_label, 'class': class_label}, 
             {'vecs': vecs_weights, 'class': class_weights})
 
+def get_indexed_vec_thickness_label(thickness, idxs):
+    return tf.expand_dims(tf.gather(tf.concat([thickness, thickness], axis=1), idxs, axis=1, batch_dims=1), axis=-1)
+
 @tf.function
 def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, shape_thickness, n, **kwargs):
     
@@ -946,7 +953,7 @@ def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, 
         vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n)
     #class_split = tf.stack([components_class, 1-components_class], axis=-1)
 
-    thickness_label = tf.expand_dims(tf.gather(tf.concat([shape_thickness, shape_thickness], axis=1), choosen_components, axis=1, batch_dims=1), axis=-1)
+    thickness_label = get_indexed_vec_thickness_label(shape_thickness, choosen_components)
 
     return {'inputs': {'img': img, 'sample_points': sample_points, 'class_split': components_class_mask}, 
             'labels': {'vecs': mixed_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
@@ -997,17 +1004,30 @@ def prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, n):
     class_label = tf.cast(tf.one_hot(components_class, 3), tf.float32)
     class_weights = tf.ones((B,n), tf.float32)
 
-    return vecs_label, class_label, vecs_weights, class_weights, components_mask
+    return vecs_label, class_label, vecs_weights, class_weights, components_mask, choosen_components
 
 @tf.function
 def op_rotated_enc(img, vecs, bboxes, vecs_mask, bbox_mask, angle_samples_num, max_components_num):
 
     angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num)
 
-    vecs_label, class_label, vecs_weights, class_weights, vecs_mask = prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, max_components_num)
+    vecs_label, class_label, vecs_weights, class_weights, vecs_mask, _ = prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, max_components_num)
 
     return ({'img': img, 'angle_input': angle_input},
             {'vecs': vecs_label, 'class': class_label, 'vecs_weights': vecs_weights, 'vecs_mask': vecs_mask})
+
+@tf.function
+def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, shape_thickness, max_components_num, **kwargs):
+    
+    vecs_label, class_label, vecs_weights, class_weights, vecs_mask, choosen_components = prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, max_components_num)
+
+    thickness_label = get_indexed_vec_thickness_label(shape_thickness, choosen_components)
+
+    sample_points, _ = components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, max_components_num)
+
+    return ({'img': img, 'sample_points': sample_points}, 
+            {'vecs': vecs_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
+            {'vecs': vecs_weights, 'class': class_weights, 'thickness': tf.expand_dims(vecs_weights, axis=-1)})
 
 
 ### DATASET GENERATOR ###

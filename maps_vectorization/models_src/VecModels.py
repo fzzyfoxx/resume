@@ -733,6 +733,16 @@ class MixedBBoxVecLoss(tf.keras.losses.Loss):
         scores = vec_scores + bbox_scores
         return scores
     
+class NoSplitMixedBboxVecLoss(MixedBBoxVecLoss):
+
+    def call(self, y_true, y_pred):
+
+        y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
+        y_pred = tf.expand_dims(y_pred, axis=-3)
+
+        scores = tf.reduce_min(self._vec_loss(y_true, y_pred), axis=-1)
+        return scores
+
 
 class EndpointsDecoder(tf.keras.layers.Layer):
     def __init__(self, sample_points_num, perp_points_num, sample_space=1.0, symmetric=False, normalize=True, batch_dims=1, **kwargs):
@@ -1323,6 +1333,16 @@ def backbone_based_pixel_similarity_dot_model(
 
     return tf.keras.Model(inputs, out, name=name)
 
+def bbox_from_vec(vec):
+    p0, p2 = tf.split(vec, 2, axis=-2)
+    p4 = p0
+    p1 = tf.stack([p2[...,0], p0[...,1]], axis=-1)
+    p3 = tf.stack([p0[...,0], p2[...,1]], axis=-1)
+
+    bboxes = tf.concat([p0,p1,p2,p3,p4], axis=-2)
+
+    return bboxes
+
 def prepare_components_vecs_to_plot(components_vecs, components_class):
     vec_idxs = tf.squeeze(tf.where(components_class==2), axis=-1)
     bbox_idxs = tf.squeeze(tf.where(components_class==1), axis=-1)
@@ -1331,12 +1351,7 @@ def prepare_components_vecs_to_plot(components_vecs, components_class):
     vecs = tf.transpose(vecs, [2,1,0])[::-1]
 
     bboxes = tf.gather(components_vecs, bbox_idxs, axis=0)
-    p0, p2 = tf.split(bboxes, 2, axis=-2)
-    p4 = p0
-    p1 = tf.stack([p2[...,0], p0[...,1]], axis=-1)
-    p3 = tf.stack([p0[...,0], p2[...,1]], axis=-1)
-
-    bboxes = tf.concat([p0,p1,p2,p3,p4], axis=-2)
+    bboxes = bbox_from_vec(bboxes)
     bboxes = tf.transpose(bboxes, [2,1,0])[::-1]
 
     return vecs, bboxes
@@ -1660,7 +1675,7 @@ class SampleRadialSearchHead(tf.keras.Model):
         if thickness_pred:
             self.squeeze_thickness = tf.keras.layers.Reshape((num_samples,1), name=f'{self.name}-Thickness-Pred-Squeeze')
 
-    def call(self, sample_features, sample_coords, split_mask, training=None):
+    def call(self, sample_features, sample_coords, split_mask=None, training=None):
 
         x = self.ffn(sample_features, training=training)
         pred_elems = self.split(x)
@@ -1673,7 +1688,11 @@ class SampleRadialSearchHead(tf.keras.Model):
         sample_coords = self.sample_reshape(sample_coords)
 
         x = self.add([x, sample_coords])
-        splited_vecs = self.vecbbox_split([x, split_mask])
+
+        if split_mask is None:
+            splited_vecs = x
+        else:
+            splited_vecs = self.vecbbox_split([x, split_mask])
 
         output_elems = [splited_vecs, class_pred]
 
