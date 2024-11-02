@@ -1357,6 +1357,24 @@ def prepare_components_vecs_to_plot(components_vecs, components_class):
     return vecs, bboxes
 
 
+def prepare_vec_label2plot(vec, class_idx, pred=False):
+
+    if class_idx==1:
+        #bbox
+        if pred:
+            vec = bbox_from_vec(vec)
+        else:
+            vec = tf.stack([vec[i] for i in [0,2,1,3,0]], axis=0)
+    elif class_idx==2:
+        #line
+        vec = vec[:2]
+    else:
+        return None
+
+    vec = tf.transpose(vec, [1,0])[::-1]
+    return vec
+
+
 def clock_radial_enc(angles, shifts_num, period=2):
     shifts = tf.reshape(tf.range(shifts_num, dtype=tf.float32), (1,1,1,shifts_num))
 

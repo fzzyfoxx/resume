@@ -609,7 +609,9 @@ class MultishapeMapGenerator:
             'bboxes': {'dtype': tf.float32, 'shape': (None, 2, 2), 'name': 'Lbboxes', 'padded_shape': [self.max_components_num, 4,2]},
             'vecs_mask': {'dtype': self.tf_mask_dtype, 'shape': (None,), 'name': 'Mvecs_mask', 'padded_shape': [self.max_components_num]},
             'bbox_mask': {'dtype': self.tf_mask_dtype, 'shape': (None,), 'name': 'Nbbox_mask', 'padded_shape': [self.max_components_num]},
-            'shape_thickness': {'dtype': tf.int32, 'shape': (None,), 'name': 'Oshape_thickness', 'padded_shape': [self.max_components_num]}
+            'shape_thickness': {'dtype': tf.int32, 'shape': (None,), 'name': 'Oshape_thickness', 'padded_shape': [self.max_components_num]},
+            'vecs_pattern_idxs': {'dtype': tf.int32, 'shape': (None,), 'name': 'Pvecs_pattern_idxs', 'padded_shape': [self.max_components_num]},
+            'bbox_pattern_idxs': {'dtype': tf.int32, 'shape': (None,), 'name': 'Rbbox_pattern_idxs', 'padded_shape': [self.max_components_num]}
         }
 
         self.outputs = outputs
@@ -737,6 +739,10 @@ class MultishapeMapGenerator:
         centers = np.mean(bbox, axis=-2, keepdims=True)
         center_vec = centers-self.yx_flat[np.newaxis]
         return np.ma.average(np.reshape(center_vec, (-1,self.size, self.size,2))*bbox_mask, weights=np.repeat(bbox_mask, 2, -1), axis=0).data
+    
+    @staticmethod
+    def get_pattern_idxs_array(vecs, idx):
+        return np.array([idx]*len(vecs), dtype=np.int32)
 
     def __call__(self, *args):
 
@@ -756,6 +762,8 @@ class MultishapeMapGenerator:
         pattern_masks = []
         center_vec_col = []
         thickness_col = []
+        vecs_pattern_idxs_col = []
+        bbox_pattern_idxs_col = []
 
         pattern_types = np.random.choice(self.patterns_name, size=patterns_num, replace=True, p=self.patterns_prob)
         colors = self.gen_colors(patterns_num)
@@ -766,6 +774,7 @@ class MultishapeMapGenerator:
 
         i=1
         r=0
+        pattern_idx = 1
         for pattern_type, color in zip(pattern_types, colors):
             #print(pattern_type)
             generator, angle_similarity_prevention, multi_pattern_color_diversity, color_repetition_filter, single_vec, general_type = self.generator_map[pattern_type].values()
@@ -795,10 +804,12 @@ class MultishapeMapGenerator:
                         if (vis_vecs is not None) & draw_angle:
                             vecs_masks_col.append(full_shape_masks if not single_vec else pattern_mask[np.newaxis])
                             vecs_col.append(vis_vecs.astype(np.float32))
+                            vecs_pattern_idxs_col.append(self.get_pattern_idxs_array(vis_vecs, pattern_idx))
 
                         if vis_bbox is not None:
                             bbox_masks_col.append(full_shape_masks)
                             bbox_col.append(vis_bbox.astype(np.float32))
+                            bbox_pattern_idxs_col.append(self.get_pattern_idxs_array(vis_bbox, pattern_idx))
 
                         if general_type=='line':
                             center_vec = self.vec_center_vec(vis_vecs, full_shape_masks)
@@ -826,6 +837,8 @@ class MultishapeMapGenerator:
                 if (i>self.max_patterns_num) | (components_left<1):
                     break
             
+            if j>0:
+                pattern_idx += 1
             previous_pattern = pattern_type
             r = abs(r-1)
             if (i>self.max_patterns_num) | (components_left<1):
@@ -835,6 +848,7 @@ class MultishapeMapGenerator:
 
         pattern_masks, shape_masks, vecs_masks, bbox_masks = [self.concat_col(col, (0,self.size, self.size,1), self.mask_dtype) for col in [pattern_masks, shape_masks_col, vecs_masks_col, bbox_masks_col]]
         vecs, bboxes, center_vec = [self.concat_col(vecs_col, (0,2,2), np.float32), self.concat_col(bbox_col, (0,4,2), np.float32), self.concat_col(center_vec_col, (0,self.size, self.size,2), np.float32)]
+        vecs_pattern_idxs, bbox_pattern_idxs = [self.concat_col(col, (0,), np.int32) for col in [vecs_pattern_idxs_col, bbox_pattern_idxs_col]]
 
         shape_thickness = self.concat_col(thickness_col, (0,), np.int32).astype(np.int32)
         thickness_label = np.max(shape_thickness[:, np.newaxis, np.newaxis, np.newaxis]*shape_masks, axis=0).astype(np.int32) if len(shape_thickness)>0 else np.zeros((self.size, self.size, 1), np.int32)
@@ -845,7 +859,7 @@ class MultishapeMapGenerator:
 
         vecs_mask = np.ones((len(vecs,)), dtype=self.mask_dtype)
         bbox_mask = np.ones((len(bboxes,)), dtype=self.mask_dtype)
-        outputs_mapping =  dict(zip(self.all_outputs_info.keys(), [img, angle_label, center_vec, line_label, shape_label, thickness_label, pattern_masks, shape_masks, vecs_masks, bbox_masks, vecs, bboxes, vecs_mask, bbox_mask, shape_thickness]))
+        outputs_mapping =  dict(zip(self.all_outputs_info.keys(), [img, angle_label, center_vec, line_label, shape_label, thickness_label, pattern_masks, shape_masks, vecs_masks, bbox_masks, vecs, bboxes, vecs_mask, bbox_mask, shape_thickness, vecs_pattern_idxs, bbox_pattern_idxs]))
 
         return [outputs_mapping[k] for k in self.outputs]
 
@@ -1028,6 +1042,7 @@ def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_mas
     return ({'img': img, 'sample_points': sample_points}, 
             {'vecs': vecs_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
             {'vecs': vecs_weights, 'class': class_weights, 'thickness': tf.expand_dims(vecs_weights, axis=-1)})
+
 
 
 ### DATASET GENERATOR ###
