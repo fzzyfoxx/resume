@@ -2323,7 +2323,7 @@ class AngleHeadedSineEncoding(tf.keras.layers.Layer):
         self.temperature = temperature
         num_pos_features = emb_size//2
 
-        self.yx = tf.transpose(tf.reshape(xy_coords((size, size))[...,::-1], (size**2, 2)), perm=[1,0])[tf.newaxis, tf.newaxis]
+        self.yx = tf.transpose(tf.reshape(xy_coords((size, size))[...,::-1], (size**2, 2)), perm=[1,0])[tf.newaxis, tf.newaxis]-(size-1)/2
 
         dim_t = tf.math.cumsum(tf.ones((num_pos_features,)))-1
         self.dim_t = temperature ** (2 * (dim_t // 2) / num_pos_features)
