@@ -254,10 +254,11 @@ class Pad2shape2D(tf.keras.layers.Layer):
     
 
 class FFT2D(tf.keras.layers.Layer):
-    def __init__(self, inverse=False, **kwargs):
+    def __init__(self, inverse=False, return_floats=False, **kwargs):
         super().__init__(**kwargs)
     
         self.func = self.fft if not inverse else self.ifft
+        self.return_floats = return_floats
 
     @staticmethod
     def fft(x):
@@ -277,7 +278,9 @@ class FFT2D(tf.keras.layers.Layer):
         x = tf.transpose(inputs, perm=self.in_perm)
         x = self.func(x)
         x = tf.transpose(x, perm=self.out_perm)
-    
+
+        if self.return_floats:
+            return tf.math.real(x), tf.math.imag(x)
         return x
     
 class FTcorr2DLayer(tf.keras.layers.Layer):
