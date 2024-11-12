@@ -24,6 +24,26 @@ def xy_coords(shape):
 
     return xy
 
+def yx_coords(shape):
+    H, W = shape
+    x = tf.repeat(tf.range(0,W)[tf.newaxis], H, axis=0)
+    y = tf.repeat(tf.range(0,H)[:,tf.newaxis], W, axis=1)
+    xy = tf.cast(tf.stack([y,x], axis=-1), tf.float32)
+
+    return xy
+
+def zero_freq_mask(size):
+    return tf.pad(tf.constant([[0.]], tf.float32), tf.constant([[0,s-1] for s in size], tf.int32), constant_values=1.)
+
+def channeled_fft(x, inv=False):
+    func = tf.signal.fft2d if not inv else tf.signal.ifft2d
+    return tf.transpose(func(tf.transpose(x, [0,3,1,2])), [0,2,3,1])
+
+def fft_angles(size):
+    yx = yx_coords((size, size))
+    yx = tf.where(yx>size/2, yx-size, yx)
+    return tf.atan(tf.tan(tf.math.atan2(*tf.split(yx, 2, axis=-1))))
+
 def argmax_2d(tensor):
 
   # input format: BxHxWxD
