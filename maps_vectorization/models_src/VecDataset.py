@@ -5,7 +5,7 @@ import tensorflow as tf
 import math
 import cv2 as cv
 
-from models_src.fft_lib import xy_coords, decode1Dcoords
+from models_src.fft_lib import xy_coords, decode1Dcoords, fft_angles
 from models_src.VecModels import flatten, calc_2x2_vec_angle, two_side_angle_diff
 from src.patterns import gen_colors
 
@@ -1043,7 +1043,15 @@ def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_mas
             {'vecs': vecs_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
             {'vecs': vecs_weights, 'class': class_weights, 'thickness': tf.expand_dims(vecs_weights, axis=-1)})
 
+@tf.function
+def op_freq_space_angle_mask(img, vecs, vecs_mask, size, threshold, binarise, **kwargs):
+    vecs_angles = calc_2x2_vec_angle(vecs)
+    angles_map = fft_angles(size)
 
+    angle_scores = tf.reduce_max((1-two_side_angle_diff(angles_map[tf.newaxis], vecs_angles[:,tf.newaxis, tf.newaxis]))*tf.cast(vecs_mask, tf.float32)[:,tf.newaxis, tf.newaxis], axis=-1, keepdims=True)
+    angle_scores = tf.where(angle_scores>threshold, 1. if binarise else angle_scores, 0.)
+
+    return ({'img': img}, {'angle_mask': angle_scores})
 
 ### DATASET GENERATOR ###
 
