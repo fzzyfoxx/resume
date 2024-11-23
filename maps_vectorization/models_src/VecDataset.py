@@ -993,7 +993,7 @@ def op_k_shape_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, ve
     choosen_components, sample_points, vecs_label, class_label, vecs_weights, class_weights = \
         vec_sample_point_extraction_no_split(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, k=k)
     
-    inputs = {'img': img, 'sample_points': sample_points}
+    inputs = {'img': img, 'sample_points': tf.cast(sample_points, tf.float32)}
     if vec_label:
         labels = {'vecs': vecs_label, 'class': class_label}
         weights = {'vecs': vecs_weights, 'class': class_weights}

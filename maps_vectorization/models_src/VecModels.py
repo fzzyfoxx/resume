@@ -1414,15 +1414,15 @@ class RadialEncoding(tf.keras.layers.Layer):
 
     def build(self, input_shape):
 
-        batch_dims = len(input_shape)-1
+        self.batch_dims = len(input_shape)-1
 
-        self.yx = add_batch_dims(xy_coords((self.H, self.W))[...,::-1], batch_dims)
+        self.yx = add_batch_dims(xy_coords((self.H, self.W))[...,::-1], self.batch_dims)
 
         self.shifts_num = tf.constant(self.C//2, tf.float32)
         self.radial_period = tf.constant(2, tf.float32)
         self.ring_period = tf.constant(-1, tf.float32)
 
-        self.shifts = add_batch_dims(tf.range(self.C//2, dtype=tf.float32), batch_dims+2)
+        self.shifts = add_batch_dims(tf.range(self.C//2, dtype=tf.float32), self.batch_dims+2)
 
         self.diag = tf.constant((self.H**2 + self.W**2)**0.5, tf.float32)
 
@@ -1452,6 +1452,9 @@ class RadialEncoding(tf.keras.layers.Layer):
                             tf.math.cos(pos_r[...,1::2])], axis=-1)
         
         return encodings
+    
+    def compute_output_shape(self, input_shape):
+        return input_shape[:self.batch_dims]+(self.H, self.W, self.C)
     
 
 class SeparateRadialEncoding(RadialEncoding):
