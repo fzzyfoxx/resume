@@ -1,0 +1,16 @@
+{
+    "train_batch_size": 32,
+    "val_batch_size": 64,
+    "test_batch_size": 8,
+    "sample_shapes": 20,
+    "shape_samples": 1,
+    "ds_path": "../Fourier/datasets/pixel_similarity",
+    "experiment_name": "adventurer_vec_detection",
+    "msmg_config_path": "../exp_lib/msmg/pixel_similarity.json",
+    "dg_preprocessing_funcs": "../exp_lib/dg_preprocessing/adventurers_base_vec_only",
+    "val_idxs": [0],
+    "shuffle_buffer_size": 128,
+    "vec_label": true,
+    "add_thickness": true,
+    "add_probe_label": false
+}
