@@ -8,6 +8,7 @@ import warnings
 import tensorflow as tf
 import numpy as np
 import shutil
+import json
 from google.cloud import storage
 
 
@@ -300,6 +301,7 @@ class TrainingProcessor:
 class TrainingProcessor2:
     def __init__(self, cfg, mlflow_instance=None):
         self.cfg = cfg
+        self.cfg.trainer_version = '2'
         self.cfg_attrs = self._get_cfg_attrs()
 
         self.mlflow = mlflow_instance if mlflow_instance is not None else mlflow
@@ -369,11 +371,17 @@ class TrainingProcessor2:
                 custom_objects[c.__class__.__name__] = c
         return custom_objects
 
-    def train_model(self, epochs, log=True, callbacks=None, export_final_state=True, export_model=True, validation_freq=1):
+    def train_model(self, epochs, log=True, callbacks=None, export_final_state=True, export_model=False, export_model_def=True, validation_freq=1):
 
         if log:
             #self.mlflow.tensorflow.autolog(log_datasets=False, log_models=True, disable=False, checkpoint=False, log_every_epoch=True)
-            run = self.mlflow.start_run()
+            try:
+                run = self.mlflow.start_run()
+            except:
+                print(f'Ending previous mlflow run {run.info.run_name}')
+                run = self.mlflow.start_run()
+
+            self.run_id = run.info.run_id
             print(f'MLflow run: {run.info.run_name}')
             mlflow_callback = [mlflow.keras.MlflowCallback(run)]
             callbacks = mlflow_callback if callbacks is None else callbacks+mlflow_callback
@@ -401,9 +409,9 @@ class TrainingProcessor2:
                 self._log_mlflow_params()
                 if export_final_state:
                     #save weights
-                    self._prepare_path('./final_state/temp')
-                    self.model.save_weights('./final_state/temp/final_state.weights.h5')
-                    self.mlflow.log_artifacts('./final_state/temp', '')
+                    self.upload_weights_to_mlflow()
+                if export_model_def:
+                    self.upload_model_def_to_mlflow()
                 if export_model:
                     self.mlflow.tensorflow.log_model(self.model, 'model',  custom_objects=self._get_custom_measures(self.model.loss, self.model.metrics))
         
@@ -413,6 +421,33 @@ class TrainingProcessor2:
             None
 
         self.initial_epoch += epochs
+
+    def upload_weights_to_mlflow(self, run_id=None):
+        run_id = run_id if run_id is not None else self.run_id
+
+        self._prepare_path('./final_state_temp')
+        self.model.save_weights('./final_state_temp/final_state.weights.h5')
+        self.mlflow.log_artifacts('./final_state_temp', '', run_id=run_id)
+
+        shutil.rmtree('./final_state_temp')
+
+    def upload_model_def_to_mlflow(self):
+
+        self._prepare_path('./model_def_temp')
+        model_def = {
+            'model_args': self.model_args,
+            'generator_module': self.cfg.generator_module,
+            'generator_func_name': self.cfg.generator_func_name,
+            'compiler_func': self.cfg.compiler_func,
+            'compiler_func_args': self.cfg.compiler_func_args
+        }
+
+        with open('./model_def_temp/model_def.json', 'w') as f:
+            json.dump(model_def, f)
+
+        self.mlflow.log_artifacts('./model_def_temp', '', run_id=self.run_id)
+
+        shutil.rmtree('./model_def_temp')
 
 
     ### LOAD MODEL

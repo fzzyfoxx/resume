@@ -54,7 +54,7 @@ def update_dict_from_widgets(d, widgets_dict):
     for key, widget in widgets_dict.items():
         d[key] = widget.value
 
-def display_dict(d, trainer=None, compile_args=None, css=dark_mode_css):
+def display_dict(d, trainer=None, compile_args_func=None, compile_args={}, css=dark_mode_css):
 
     display(HTML(css))
 
@@ -81,7 +81,7 @@ def display_dict(d, trainer=None, compile_args=None, css=dark_mode_css):
                     model_args = d, 
                     print_summary = True,
                     summary_kwargs = {'expand_nested': False, 'line_length': 100},
-                    **compile_args
+                    **compile_args_func(**compile_args)
                 )
         print('Model compiled. Use trainer.train_model for training.\nAccept parameters again to re-compile.')
     

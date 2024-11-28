@@ -7,7 +7,6 @@
     "ds_path": "../Fourier/datasets/pixel_similarity",
     "experiment_name": "adventurer_vec_detection",
     "msmg_config_path": "../exp_lib/msmg/pixel_similarity.json",
-    "dg_preprocessing_funcs": "../exp_lib/dg_preprocessing/adventurers_base_vec_only",
     "val_idxs": [0],
     "shuffle_buffer_size": 128,
     "vec_label": true,
