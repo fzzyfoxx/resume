@@ -35,7 +35,7 @@ def download_mlflow_model_components(run_name, load_weights=True, dst_path='./ml
 
     return model_def
 
-def delete_temp_path(dst_path, files_limit=3):
+def delete_temp_path(dst_path='./mlflow_model_temp', files_limit=3):
     files_num = 0
     for _,_,filelist in os.walk(dst_path):
         files_num += len(filelist)
