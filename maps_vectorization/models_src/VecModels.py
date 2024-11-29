@@ -1453,8 +1453,8 @@ class RadialEncoding(tf.keras.layers.Layer):
         
         return encodings
     
-    def compute_output_shape(self, input_shape):
-        return input_shape[:self.batch_dims]+(self.H, self.W, self.C)
+    '''def compute_output_shape(self, input_shape):
+        return input_shape[:self.batch_dims]+(self.H, self.W, self.C)'''
     
 
 class SeparateRadialEncoding(RadialEncoding):
@@ -1783,6 +1783,7 @@ class SampleRadialEncoding(RadialEncoding):
     
     def radial_dists(self, a, b):
         return (tf.reduce_sum(((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a))**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
+    
     
 class SampleSeparateRadialEncoding(SampleRadialEncoding):
 

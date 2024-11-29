@@ -1,7 +1,7 @@
 {
     "model_args": {
         "enc_type": "frequency",
-        "num_heads": 2,
+        "num_heads": 1,
         "embs_dim": 64,
         "color_embs_dim": 64,
         "size": 32,
@@ -16,7 +16,8 @@
         "backbone_def": null,
         "backbone_trainable": null,
         "backbone_last_layer": null,
-        "backbone_init_layer": null
+        "backbone_init_layer": null,
+        "name": "PxFeaturesRadEnc"
     },
     "generator_module": "Fourier.model_generators.radial_enc_pixel_features",
     "generator_func_name": "radial_enc_pixel_features_model_generator",

@@ -16,7 +16,8 @@
         "backbone_def": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
         "backbone_trainable": false,
         "backbone_last_layer": "Up-Conv_2",
-        "backbone_init_layer": "Batch-Normalization"
+        "backbone_init_layer": "Batch-Normalization",
+        "name": "PxFeaturesRadEnc"
     },
     "generator_module": "Fourier.model_generators.radial_enc_pixel_features",
     "generator_func_name": "radial_enc_pixel_features_model_generator",

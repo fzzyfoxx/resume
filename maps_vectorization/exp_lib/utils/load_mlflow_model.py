@@ -60,7 +60,7 @@ def backbone_loader(
     ):
     """
     load_mode: 
-        -'mlflow' to load model from mlflow run spec uses (run_name, load_mlflow_weights, mlflow)
+        -'mlflow' to load model from mlflow run spec uses (run_name, load_mlflow_weights)
         -'local' to load model using generator func and locally saved weights, uses (backbone_args, backbone_modelu, generator_func_name, weights_path)
     """
 

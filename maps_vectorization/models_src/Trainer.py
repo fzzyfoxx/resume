@@ -378,7 +378,9 @@ class TrainingProcessor2:
             try:
                 run = self.mlflow.start_run()
             except:
+                run = mlflow.active_run()
                 print(f'Ending previous mlflow run {run.info.run_name}')
+                mlflow.end_run()
                 run = self.mlflow.start_run()
 
             self.run_id = run.info.run_id

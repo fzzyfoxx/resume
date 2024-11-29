@@ -1,7 +1,14 @@
 import tensorflow as tf
 from models_src.Metrics import LossBasedMetric
 from models_src.VecModels import NoSplitMixedBboxVecLoss
+import argparse
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--upload", default=0, type=int, help="Upload metrics to Mlflow run")
+parser.add_argument("--run_id", default=None, type=str, help="Mlflow run_id")
+
+kwargs = vars(parser.parse_args())
 
 vec_mixed_metric = LossBasedMetric(NoSplitMixedBboxVecLoss(name='VecMixLoss', gamma=1, reduction='none'))
 vec_metric = LossBasedMetric(NoSplitMixedBboxVecLoss(name='VecLoss', gamma=1, reduction='none'))
@@ -10,7 +17,7 @@ class_metric = LossBasedMetric(tf.keras.losses.BinaryCrossentropy(name='ClassLos
 thickness_metric = LossBasedMetric(tf.keras.losses.MeanAbsoluteError(name='ThickLoss', reduction='none'))
 
 @tf.function(input_signature=[tf.TensorSpec(shape=(cfg.test_batch_size,32,32,3), dtype=tf.float32),  # type: ignore
-                              tf.TensorSpec(shape=(cfg.test_batch_size,cfg.sample_points,2), dtype=tf.float32), # type: ignore
+                              tf.TensorSpec(shape=(cfg.test_batch_size,cfg.sample_points,2), dtype=tf.int32), # type: ignore
                               tf.TensorSpec(shape=(cfg.test_batch_size,cfg.sample_points,4,2), dtype=tf.float32), # type: ignore
                               tf.TensorSpec(shape=(cfg.test_batch_size,cfg.sample_points,3), dtype=tf.float32), # type: ignore
                               tf.TensorSpec(shape=(cfg.test_batch_size,cfg.sample_points,1), dtype=tf.float32), # type: ignore
@@ -57,3 +64,14 @@ with tf.device('/GPU:0'):
                                ('BBoxLoss', bbox_metric.result().numpy()),
                                ('ClassLoss', class_metric.result().numpy()),
                                ('ThickLoss', thickness_metric.result().numpy())])
+        
+if kwargs['upload']:
+    if kwargs['run_id'] is None:
+        run_id = trainer.run_id # type: ignore
+    else:
+        run_id = kwargs['run_id']
+
+    with mlflow.start_run(run_id=run_id): # type: ignore
+        for metric_name, metric_value in zip(['VecMixedLoss', 'VecLoss', 'BBoxLoss', 'ClassLoss', 'ThickLoss'], \
+                                             [m.result().numpy() for m in [vec_mixed_metric, vec_metric, bbox_metric, class_metric, thickness_metric]]):
+            mlflow.log_metric(metric_name, metric_value) # type: ignore

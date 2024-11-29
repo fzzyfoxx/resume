@@ -1105,7 +1105,7 @@ def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_mas
 
     thickness_label = get_indexed_vec_thickness_label(shape_thickness, choosen_components)
 
-    sample_points, _ = components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, max_components_num)
+    sample_points, _, _ = components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, max_components_num)
 
     return ({'img': img, 'sample_points': sample_points}, 
             {'vecs': vecs_label, 'class': class_label, 'thickness': tf.cast(thickness_label, tf.float32)}, 
