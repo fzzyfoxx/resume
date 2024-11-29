@@ -19,8 +19,7 @@ def download_model_def(run_id, dst_path):
 def download_model_weights(run_id, dst_path):
     mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path='final_state.weights.h5', dst_path=dst_path)
 
-
-def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./mlflow_model_temp'):
+def download_mlflow_model_components(run_name, load_weights=True, dst_path='./mlflow_model_temp'):
 
     run_id = get_mlflow_run_id_by_name(run_name)
 
@@ -31,12 +30,30 @@ def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./ml
     with open(os.path.join(dst_path, 'model_def.json')) as json_model_def:
         model_def = json.load(json_model_def)
 
+    if load_weights:
+        download_model_weights(run_id=run_id, dst_path=dst_path)
+
+    return model_def
+
+def delete_temp_path(dst_path, files_limit=3):
+    files_num = 0
+    for _,_,filelist in os.walk(dst_path):
+        files_num += len(filelist)
+    
+    if files_num<=files_limit:
+        shutil.rmtree(dst_path)
+    else:
+        print(f'Number of files in provided directory exceeds limit.\nFiles number: {files_num}\nFiles limit: {files_limit}')
+
+def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./mlflow_model_temp'):
+
+    model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=dst_path)
+
     model_generator = getattr(import_module(model_def['generator_module']), model_def['generator_func_name'])
 
     model = model_generator(**model_def['model_args'])
 
     if load_weights:
-        download_model_weights(run_id=run_id, dst_path=dst_path)
         model.load_weights(os.path.join(dst_path, 'final_state.weights.h5'))
 
     if compile:
@@ -44,7 +61,7 @@ def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./ml
         compile_args = compile_args_gen(**model_def['compiler_func_args'])
         model.compile(**compile_args)
 
-    shutil.rmtree(dst_path)
+    delete_temp_path(dst_path)
 
     return model
 
