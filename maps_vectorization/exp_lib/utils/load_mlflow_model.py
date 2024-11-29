@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 from importlib import import_module
+import mlflow
 
 def prepare_path(path):
     try:
@@ -9,23 +10,23 @@ def prepare_path(path):
     except:
         None
 
-def get_mlflow_run_id_by_name(run_name, mlflow):
+def get_mlflow_run_id_by_name(run_name):
     return mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'",search_all_experiments=True).iloc[0].run_id
 
-def download_model_def(run_id, dst_path, mlflow):
+def download_model_def(run_id, dst_path):
     mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path='model_def.json', dst_path=dst_path)
 
-def download_model_weights(run_id, dst_path, mlflow):
+def download_model_weights(run_id, dst_path):
     mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path='final_state.weights.h5', dst_path=dst_path)
 
 
-def load_mlflow_model(run_name, mlflow, load_weights=True, compile=False, dst_path='./mlflow_model_temp'):
+def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./mlflow_model_temp'):
 
-    run_id = get_mlflow_run_id_by_name(run_name, mlflow)
+    run_id = get_mlflow_run_id_by_name(run_name)
 
     prepare_path(dst_path)
 
-    download_model_def(run_id=run_id, dst_path=dst_path, mlflow=mlflow)
+    download_model_def(run_id=run_id, dst_path=dst_path)
 
     with open(os.path.join(dst_path, 'model_def.json')) as json_model_def:
         model_def = json.load(json_model_def)
@@ -35,7 +36,7 @@ def load_mlflow_model(run_name, mlflow, load_weights=True, compile=False, dst_pa
     model = model_generator(**model_def['model_args'])
 
     if load_weights:
-        download_model_weights(run_id=run_id, dst_path=dst_path, mlflow=mlflow)
+        download_model_weights(run_id=run_id, dst_path=dst_path)
         model.load_weights(os.path.join(dst_path, 'final_state.weights.h5'))
 
     if compile:
@@ -46,5 +47,33 @@ def load_mlflow_model(run_name, mlflow, load_weights=True, compile=False, dst_pa
     shutil.rmtree(dst_path)
 
     return model
+
+def backbone_loader(
+        run_name=None,
+        load_mlflow_weights=None,
+        backbone_args=None,
+        backbone_generator=None,
+        generator_func_name=None,
+        weights_path=None,
+        load_mode='mlflow',
+        **kwargs
+    ):
+    """
+    load_mode: 
+        -'mlflow' to load model from mlflow run spec uses (run_name, load_mlflow_weights, mlflow)
+        -'local' to load model using generator func and locally saved weights, uses (backbone_args, backbone_modelu, generator_func_name, weights_path)
+    """
+
+    if load_mode=='mlflow':
+        backbone = load_mlflow_model(run_name=run_name, load_weights=load_mlflow_weights, compile=False, dst_path='./mlflow_backbone_temp')
+    elif load_mode=='local':
+        generator = getattr(import_module(backbone_generator), generator_func_name)
+        backbone = generator(**backbone_args)
+        if weights_path is not None:
+            backbone.load_weights(weights_path)
+    else:
+        raise ValueError(f'Wrong "load_mode" provided: {load_mode}. Choose either "mlflow" or "local"')
+    
+    return backbone
 
 

@@ -1,5 +1,6 @@
 import sys
 import json
+import time
 from IPython.display import clear_output
 
 from models_src.VecDataset import MultishapeMapGenerator, DatasetGenerator, blur_img, op_line_features
@@ -32,4 +33,5 @@ ds_iter = iter(ds)
 val_iter = iter(val_ds)
 test_iter = iter(test_ds)
 
+time.sleep(0.5)
 clear_output(wait=True)

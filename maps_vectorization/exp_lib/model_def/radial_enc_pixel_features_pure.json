@@ -1,0 +1,34 @@
+{
+    "model_args": {
+        "enc_type": "frequency",
+        "num_heads": 2,
+        "embs_dim": 64,
+        "color_embs_dim": 64,
+        "size": 32,
+        "embs_mid_layers": 2,
+        "dropout": 0.0,
+        "activation": "relu",
+        "out_mid_layers": 2,
+        "attns_num": 3,
+        "concat_memory": false,
+        "progressive": true,
+        "inverted_angle": false,
+        "backbone_def": null,
+        "backbone_trainable": null,
+        "backbone_last_layer": null,
+        "backbone_init_layer": null
+    },
+    "generator_module": "Fourier.model_generators.radial_enc_pixel_features",
+    "generator_func_name": "radial_enc_pixel_features_model_generator",
+    "compiler_func": "exp_lib.compilers.unet_pixel_features",
+    "compiler_func_args": {
+            "gamma": 1.0, 
+            "angle_gamma": 1.0, 
+            "length_gamma": 1.0, 
+            "dist_gamma": 2.0, 
+            "angle_weight": 0.3, 
+            "length_weights": 0.7, 
+            "dist_weight": 1.0, 
+            "loss_weights": { "shape_class": 0.25, "angle": 0.25, "thickness": 0.25, "center_vec": 0.25 } 
+    }
+}
