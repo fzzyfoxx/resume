@@ -12,7 +12,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--run_name", default='', type=str, help="If provided, model definition is loaded from mlflow run")
 parser.add_argument("--load_weights", default=0, type=int, help="If >0 then mlflow model weights are downloaded and load to model")
 
-kwargs = vars(parser.parse_args())
+kwargs, args = parser.parse_known_args()#vars(parser.parse_args())
+kwargs = vars(kwargs)
 run_name = kwargs['run_name']
 load_weights = bool(kwargs['load_weights'])
 temp_path = './mlflow_model_temp'
@@ -21,7 +22,7 @@ if run_name!='':
     model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=temp_path)
 else:
 
-    model_def_path = sys.argv[1] 
+    model_def_path = args[0]
 
     with open(model_def_path) as json_model_def:
         model_def = json.load(json_model_def)
