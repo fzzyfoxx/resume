@@ -1,6 +1,53 @@
 import tensorflow as tf
 from scipy.optimize import linear_sum_assignment
+from models_src.VecModels import flatten
 
+def norm(x, reg=1.):
+    return (x-tf.reduce_mean(x))/(tf.math.reduce_std(x)*reg+1e-4)
+
+def norm_weights(w, batch_dims=0):
+    return w/tf.cast(tf.reduce_prod(tf.shape(w)[batch_dims:]), w.dtype)
+
+def weighted_sum(x, weights, axis=None, keepdims=False):
+    return tf.reduce_sum(x*weights, axis=axis, keepdims=keepdims)
+
+def weighted_std(x, weights, x_mean, axis=None, keepdims=None):
+    return tf.reduce_sum((x-x_mean)**2*weights, axis=axis, keepdims=keepdims)**0.5
+
+def adaptive_loss_weights(weights, loss_values, reg=1.):
+
+    flat_weights = flatten(weights)
+    #s = tf.reduce_sum(flat_weights)
+    flat_loss_values = flatten(loss_values)
+    norm_w = flat_weights/(tf.reduce_sum(flat_weights, axis=-1, keepdims=True)+1e-6) #norm_weights(flat_weights, batch_dims=1)
+    x_mean = weighted_sum(flat_loss_values, norm_w, axis=-1, keepdims=True)
+    x_std = weighted_std(flat_loss_values, norm_w, x_mean, axis=-1, keepdims=True)
+    
+    loss_norm = (flat_loss_values*flat_weights-x_mean)/(x_std*reg+1e-6)
+    
+    sm_nom = tf.math.exp(loss_norm)
+    sm_denom = tf.reduce_sum(sm_nom*norm_w, axis=-1, keepdims=True)
+    
+    adapted_weights = tf.reshape(sm_nom/(sm_denom+1e-6)*flat_weights, tf.shape(weights))
+
+    return adapted_weights
+
+class AdaptiveWeightsLoss(tf.keras.Loss):
+    def __init__(self, loss_func, reg=20., reduction='sum_over_batch_size', **kwargs):
+        super().__init__(reduction=reduction,**kwargs)
+
+        self.loss_func = loss_func
+        self.reg = reg
+
+    def call(self, y_true, y_pred):
+        return self.loss_func.call(y_true, y_pred)
+    
+    def __call__(self, y_true, y_pred, sample_weight=None):
+
+        if sample_weight is not None:
+            losses = self.call(y_true, y_pred)
+            sample_weight = adaptive_loss_weights(sample_weight, losses, reg=self.reg)
+        return super().__call__(y_true, y_pred, sample_weight)
 
 class LossBasedMetric(tf.keras.metrics.Mean):
     def __init__(self, loss_func, **kwargs):
