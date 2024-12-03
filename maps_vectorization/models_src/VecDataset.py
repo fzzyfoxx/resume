@@ -878,6 +878,7 @@ def op_line_features(img, line_label, shape_label, angle_label, center_vec_label
     all_shapes_mask = tf.cast(all_shapes_mask, tf.float32)
 
     line_label = tf.math.divide_no_nan(line_label, tf.reduce_mean(flatten(line_label), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
+    line_label *= tf.math.divide_no_nan(tf.cast(tf.reduce_prod(tf.shape(line_label)), line_label.dtype), tf.reduce_sum(line_label))
     thickness_label = tf.cast(thickness_label, tf.float32)
     all_shapes_mask = tf.math.divide_no_nan(all_shapes_mask, tf.reduce_mean(flatten(all_shapes_mask), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
 
