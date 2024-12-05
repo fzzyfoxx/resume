@@ -12,7 +12,7 @@ def weighted_sum(x, weights, axis=None, keepdims=False):
     return tf.reduce_sum(x*weights, axis=axis, keepdims=keepdims)
 
 def weighted_std(x, weights, x_mean, axis=None, keepdims=None):
-    return tf.reduce_sum((x-x_mean)**2*weights, axis=axis, keepdims=keepdims)**0.5
+    return tf.reduce_sum(input_tensor=(x-x_mean)**2*weights, axis=axis, keepdims=keepdims)**0.5
 
 def adaptive_loss_weights(weights, loss_values, reg=1.):
 
@@ -20,33 +20,62 @@ def adaptive_loss_weights(weights, loss_values, reg=1.):
     #s = tf.reduce_sum(flat_weights)
     flat_loss_values = flatten(loss_values)
     norm_w = flat_weights/(tf.reduce_sum(flat_weights, axis=-1, keepdims=True)+1e-6) #norm_weights(flat_weights, batch_dims=1)
+    weights_sum = tf.reduce_sum(norm_w, axis=-1, keepdims=True)
     x_mean = weighted_sum(flat_loss_values, norm_w, axis=-1, keepdims=True)
     x_std = weighted_std(flat_loss_values, norm_w, x_mean, axis=-1, keepdims=True)
-    
-    loss_norm = (flat_loss_values*flat_weights-x_mean)/(x_std*reg+1e-6)
-    
-    sm_nom = tf.math.exp(loss_norm)
+
+    loss_norm = (flat_loss_values*weights_sum-x_mean)/(x_std*reg+1e-6)
+
+    sm_nom = tf.math.exp(loss_norm)*weights_sum
+
     sm_denom = tf.reduce_sum(sm_nom*norm_w, axis=-1, keepdims=True)
-    
+
     adapted_weights = tf.reshape(sm_nom/(sm_denom+1e-6)*flat_weights, tf.shape(weights))
 
     return adapted_weights
 
 class AdaptiveWeightsLoss(tf.keras.Loss):
-    def __init__(self, loss_func, reg=20., reduction='sum_over_batch_size', **kwargs):
+    def __init__(self, loss_func, reg=20., adapt_ratio=0.5, norm_clip=2., reduction='sum_over_batch_size', **kwargs):
         super().__init__(reduction=reduction,**kwargs)
 
         self.loss_func = loss_func
         self.reg = reg
+        self.adapt_ratio = adapt_ratio
+        self.norm_clip = norm_clip
 
     def call(self, y_true, y_pred):
         return self.loss_func.call(y_true, y_pred)
     
+    def adaptive_loss_weights(self, weights, loss_values):
+
+        flat_weights = flatten(weights)
+        #s = tf.reduce_sum(flat_weights)
+        flat_loss_values = flatten(loss_values)
+        norm_w = flat_weights/(tf.reduce_sum(flat_weights, axis=-1, keepdims=True)+1e-6) #norm_weights(flat_weights, batch_dims=1)
+        weights_sum = tf.reduce_sum(norm_w, axis=-1, keepdims=True)
+        x_mean = weighted_sum(flat_loss_values, norm_w, axis=-1, keepdims=True)
+        x_std = weighted_std(flat_loss_values, norm_w, x_mean, axis=-1, keepdims=True)
+
+        loss_norm = tf.clip_by_value((flat_loss_values*weights_sum-x_mean)/(x_std*self.reg+1e-6), -self.norm_clip, self.norm_clip)
+
+        sm_nom = tf.math.exp(loss_norm)*weights_sum
+
+        sm_denom = tf.reduce_sum(sm_nom*norm_w, axis=-1, keepdims=True)
+
+        adapted_weights = tf.reshape(sm_nom/(sm_denom+1e-6)*flat_weights, tf.shape(weights))
+
+        return adapted_weights
+        
+    def adapt_weights(self, y_true, y_pred, sample_weight):
+        losses = self.loss_func.call(y_true, y_pred)
+        adapted_weight = self.adaptive_loss_weights(sample_weight, losses)
+
+        return (1-self.adapt_ratio)*sample_weight + self.adapt_ratio*adapted_weight
+    
     def __call__(self, y_true, y_pred, sample_weight=None):
 
         if sample_weight is not None:
-            losses = self.call(y_true, y_pred)
-            sample_weight = adaptive_loss_weights(sample_weight, losses, reg=self.reg)
+            sample_weight = tf.stop_gradient(self.adapt_weights(y_true, y_pred, sample_weight))
         return super().__call__(y_true, y_pred, sample_weight)
 
 class LossBasedMetric(tf.keras.metrics.Mean):
