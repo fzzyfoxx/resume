@@ -2338,7 +2338,7 @@ class AngleHeadedSineEncoding(tf.keras.layers.Layer):
 
     def call(self, inputs):
         B = tf.shape(inputs)[0]
-        rot_matrix = tf.reshape(tf.stack([tf.cos(inputs), tf.sin(inputs),-tf.sin(inputs), tf.cos(inputs)], axis=-1), (B, self.angles_num, 2, 2))
+        rot_matrix = tf.reshape(tf.stack([tf.cos(inputs), -tf.sin(inputs), tf.sin(inputs), tf.cos(inputs)], axis=-1), (B, self.angles_num, 2, 2))
 
         yx_rot = tf.transpose(tf.matmul(rot_matrix, self.yx), [0,1,3,2])
         
