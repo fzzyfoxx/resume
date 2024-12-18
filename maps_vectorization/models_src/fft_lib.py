@@ -9,6 +9,7 @@ import numpy as np
 import cv2 as cv
 
 from src.patterns import gen_colors
+from models_src.DETR import HeadsPermuter, MHA
 
 def amp_and_phase(F):
     Re, Im = tf.math.real(F), tf.math.imag(F)
@@ -42,7 +43,8 @@ def channeled_fft(x, inv=False):
 def fft_angles(size):
     yx = yx_coords((size, size))
     yx = tf.where(yx>size/2, yx-size, yx)
-    return tf.atan(tf.tan(tf.math.atan2(*tf.split(yx, 2, axis=-1))))
+    angles = tf.math.atan2(*tf.split(yx, 2, axis=-1))
+    return tf.where(angles<0, angles+math.pi, angles)
 
 def argmax_2d(tensor):
 
@@ -122,6 +124,7 @@ def FTcorr2D(a,b, abs_value=True):
     if abs_value:
        return tf.abs(L)
     return L
+
 
 def fft_symmetry(Fx, shape=None):
     if shape is None:
@@ -258,15 +261,15 @@ class FFT2D(tf.keras.layers.Layer):
         super().__init__(**kwargs)
     
         self.func = self.fft if not inverse else self.ifft
-        self.return_floats = return_floats
+        self.return_floats = return_floats if not inverse else False
 
     @staticmethod
     def fft(x):
-        return tf.signal.fft2d(tf.cast(x, tf.complex64))
+        return tf.signal.fft2d(x)
 
     @staticmethod
     def ifft(x):
-        return tf.math.real(tf.signal.ifft2d((x)))
+        return tf.math.real(tf.signal.ifft2d(x))
 
     def build(self, input_shape):
         batch_dims_num = len(input_shape)-3
@@ -274,8 +277,13 @@ class FFT2D(tf.keras.layers.Layer):
         self.in_perm = batch_dims + [d+batch_dims_num for d in [2,0,1]]#[0,3,1,2]#batch_dims + [-1,-3,-2]
         self.out_perm = batch_dims + [d+batch_dims_num for d in [1,2,0]]#[0,2,3,1]#batch_dims + [-2,-1,-3]
 
-    def call(self, inputs):
-        x = tf.transpose(inputs, perm=self.in_perm)
+    def call(self, Re, Im=None):
+        if Im is None:
+            x = tf.transpose(Re, perm=self.in_perm)
+            x = tf.cast(x, tf.complex64)
+        else:
+            x = tf.complex(Re, Im)
+            x = tf.transpose(x, perm=self.in_perm)
         x = self.func(x)
         x = tf.transpose(x, perm=self.out_perm)
 
@@ -321,13 +329,18 @@ class SqueezeChannels(tf.keras.layers.Layer):
         return tf.reshape(inputs, self.d)
     
 class AmpPhaseLayer(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, stack=False, **kwargs):
         super().__init__(**kwargs)
 
-    def call(self, inputs):
-        amp, ph = amp_and_phase(inputs)
+        self.stack = stack
 
-        return tf.stack([amp,ph], axis=-1)
+    def call(self, Re, Im):
+        amp = (Re**2+Im**2)**0.5
+        ph = tf.math.atan2(Im,Re+1e-6)
+
+        if self.stack:
+            return tf.stack([amp,ph], axis=-1)
+        return amp, ph
 
 def F_from_freq(Ffreq, axis=-1):
     amp, ph = tf.gather(Ffreq, 0, axis=axis), tf.gather(Ffreq, 1, axis=axis)
@@ -362,3 +375,140 @@ class FreqActivation(tf.keras.layers.Layer):
             F = tf.signal.fft2d(tf.cast(I*mask, tf.complex64))
 
         return F
+    
+class FreqSpaceAnglePosEncoding(tf.keras.layers.Layer):
+    def __init__(self, embs_dim, size, batch_dims=1, flatten=True,**kwargs):
+        super().__init__(**kwargs)
+
+        self.embs_dim = embs_dim
+        self.size = size
+        self.batch_dims = batch_dims
+        self.flatten = flatten
+
+    def build(self, input_shape):
+
+        s = self.embs_dim//2
+        ph = math.pi * tf.linspace(1., 3.-2/s, s)[tf.newaxis, tf.newaxis]
+        t = tf.range(1, s+1, dtype=tf.float32)[tf.newaxis, tf.newaxis]
+        angles_map = fft_angles(self.size)
+        
+        pos_sin = tf.sin(angles_map*t+ph)
+        pos_cos = tf.cos(angles_map*t+ph)
+        pos_enc = tf.concat([pos_sin, pos_cos], axis=-1)
+        
+        if self.flatten:
+            pos_enc = tf.reshape(pos_enc, (self.size**2, self.embs_dim))
+        
+        for _ in range(self.batch_dims):
+            pos_enc = pos_enc[tf.newaxis]
+
+        self.pos_enc = pos_enc
+
+    def call(self, inputs=None):
+        return self.pos_enc
+
+def complex_conj_matmul(aRe, aIm, bRe, bIm, transpose_a=False, transpose_b=False, real_output=True):
+    output = tf.matmul(tf.complex(aRe, aIm), tf.complex(bRe, -bIm), transpose_a=transpose_a, transpose_b=transpose_b)
+    if real_output:
+        return tf.math.real(output)
+    return output
+
+def polar2complex(amp, ph):
+    return amp*tf.cos(ph), amp*tf.sin(ph)
+
+class Polar2ComplexLayer(tf.keras.layers.Layer):
+
+    def call(self, amp, ph):
+        return polar2complex(amp, ph)
+
+class complexSelfMHA(tf.keras.layers.Layer):
+    def __init__(self,
+                 emb_dim,
+                 num_heads,
+                 value_pos_enc=True,
+                 single_head_pos_enc=True,
+                 return_weights=False,
+                 **kwargs):
+        super().__init__(**kwargs)
+
+        self.emb_dim = emb_dim
+        self.num_heads = num_heads
+        self.return_weights = return_weights
+        self.value_pos_enc = value_pos_enc
+        self.single_head_pos_enc = single_head_pos_enc
+        self.value_preprocess = True
+
+    def build(self):
+
+        self.Q_d = tf.keras.layers.Dense(self.emb_dim)
+        self.K_d = tf.keras.layers.Dense(self.emb_dim)
+        if self.value_preprocess:
+            self.V_d = tf.keras.layers.Dense(self.emb_dim)
+        self.O_d = tf.keras.layers.Dense(self.emb_dim)
+
+        self.denominator = tf.math.sqrt(tf.cast(self.emb_dim, tf.float32))
+
+        self.Q_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.Im_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.K_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        if self.value_preprocess:
+            self.V_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.output_perm = HeadsPermuter(self.num_heads, reverse=True)
+        if not self.single_head_pos_enc:
+            self.pe_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+
+    def call(self, Re, Im, pos_enc):
+        Q = self.Q_head_extractior(self.Q_d(Re))
+        K = self.K_head_extractior(self.K_d(Re))
+        Im = self.Im_head_extractior(Im)
+
+        if self.single_head_pos_enc:
+            pos_enc = tf.expand_dims(pos_enc, axis=-3)
+        else:
+            pos_enc = self.pe_head_extractior(pos_enc)
+
+        Q += pos_enc
+        K += pos_enc
+
+        scores = complex_conj_matmul(aRe=Q, aIm=Im, bRe=K, bIm=Im, transpose_b=True, real_output=True)/self.denominator
+        weights = tf.nn.softmax(scores, axis=-1)
+
+        V = self.V_head_extractior(self.V_d(Re))
+        if self.value_pos_enc:
+            V += pos_enc
+        V = tf.matmul(weights, V)
+
+        V = self.O_d(self.output_perm(V))
+        
+        if self.return_weights:
+            return V, weights
+        return V
+    
+
+class complexSelfPosEncMHA(complexSelfMHA):
+
+    def build(self):
+        self.value_preprocess = False
+        self.value_pos_enc = False
+        super().build()
+
+    def call(self, Re, Im, pos_enc):
+        Q = self.Q_head_extractior(self.Q_d(Re))
+        K = self.K_head_extractior(self.K_d(Re))
+        Im = self.Im_head_extractior(Im)
+
+        scores = complex_conj_matmul(aRe=Q, aIm=Im, bRe=K, bIm=Im, transpose_b=True, real_output=True)/self.denominator
+        weights = tf.nn.softmax(scores, axis=-1)
+        
+        if self.single_head_pos_enc:
+            V = tf.expand_dims(pos_enc, axis=-3)
+        else:
+            V = self.pe_head_extractior(pos_enc)
+
+        V = tf.matmul(weights, V)
+
+        V = self.O_d(self.output_perm(V))
+
+        if self.return_weights:
+            return V, weights
+        return V

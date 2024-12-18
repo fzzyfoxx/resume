@@ -1,0 +1,31 @@
+{
+    "model_args": {
+        "size": 32,
+        "embs_dim": 32,
+        "num_heads": 4,
+        "attns_num": 3,
+        "single_head_pos_enc": true,
+        "value_pos_enc": true,
+        "ffn_mid_layers": 2,
+        "ffn_mid_layers_mult": 2,
+        "out_mid_layers": 2,
+        "out_mid_layers_mult": 1,
+        "pos_enc_as_values": true,
+        "activation": "relu",
+        "dropout": 0.0,
+        "name": "FreqSpacePxFeatures"
+    },
+    "generator_module": "Freq_Space.model_generators.fft_pixel_features",
+    "generator_func_name": "freq_space_pixel_features_model_generator",
+    "compiler_func": "exp_lib.compilers.unet_pixel_features",
+    "compiler_func_args": {
+            "gamma": 1.0, 
+            "angle_gamma": 1.0, 
+            "length_gamma": 1.0, 
+            "dist_gamma": 2.0, 
+            "angle_weight": 0.3, 
+            "length_weights": 0.7, 
+            "dist_weight": 1.0, 
+            "loss_weights": { "shape_class": 0.25, "angle": 0.25, "thickness": 0.25, "center_vec": 0.25 } 
+    }
+}
