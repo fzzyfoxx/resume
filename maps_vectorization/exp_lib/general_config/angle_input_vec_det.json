@@ -3,9 +3,12 @@
     "val_batch_size": 64,
     "test_batch_size": 8,
     "ds_path": "../Fourier/datasets/pixel_similarity",
-    "experiment_name": "vec_detection",
+    "experiment_name": "angle_input_vec_detection",
     "msmg_config_path": "../exp_lib/msmg/pixel_similarity.json",
     "val_idxs": [0],
     "shuffle_buffer_size": 128,
-    "angle_samples_num": 8
+    "angle_samples_num": 8,
+    "random_angle_weight": 0.3,
+    "rotated_bbox_label": true,
+    "angle_input_rand_range": 10
 }

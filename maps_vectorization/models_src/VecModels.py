@@ -2377,3 +2377,122 @@ class AngleHeadedSineEncoding(tf.keras.layers.Layer):
             ], axis=-1), (B,self.angles_num, self.size**2, self.emb_size))
         
         return pos_emb
+    
+class SelfMHAPosEncAddition(tf.keras.layers.Layer):
+    def __init__(self, query_enc=True, key_enc=True, value_enc=False, enc_as_value=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.query_enc = query_enc
+        self.key_enc = key_enc
+        self.value_enc = value_enc
+        self.enc_as_value = enc_as_value
+
+        self.any_enc = any([query_enc, key_enc, value_enc])
+
+    def call(self, x, pos_enc):
+        
+        if self.any_enc:
+            encoded_x = x + pos_enc
+            Q = encoded_x if self.query_enc else x
+            K = encoded_x if self.key_enc else x
+            V = pos_enc if self.enc_as_value else (encoded_x if self.value_enc else x)
+        else:
+            Q = K = x
+            V = pos_enc if self.enc_as_value else x
+
+        return V, Q, K
+
+class MultiAngleVecRotationLayer(tf.keras.layers.Layer):
+    def __init__(self, size=None, center_shift=True, flatten_vec_output=True, **kwargs):
+        super().__init__(**kwargs)
+
+        self.size = size
+        self.center_shift = center_shift
+        self.flatten_vec_output = flatten_vec_output
+
+        self.shift_size = tf.constant((self.size-1)/2)
+
+    def build(self, vec_shape, angles_shape):
+
+        extra_dims = len(vec_shape)-3
+        angle_samples = angles_shape[-1]
+
+        self.rot_matrix_shape = (-1,) + (1,)*extra_dims + (angle_samples,) + (2,2)
+
+        self.flatten_shape = (-1,) + vec_shape[1:-1] + (4,)
+
+        self.vec_in_reshape = (-1,) + vec_shape[1:-1] + (2,2)
+
+    def call(self, vec, angles):
+
+        rot_matrix = tf.reshape(tf.stack([tf.cos(angles), -tf.sin(angles), tf.sin(angles), tf.cos(angles)], axis=-1), self.rot_matrix_shape)
+
+        vec = tf.reshape(vec, self.vec_in_reshape)
+        rot_vecs = tf.matmul(vec, rot_matrix)
+
+        if self.center_shift:
+            rot_vecs += self.shift_size
+
+        if self.flatten_vec_output:
+            rot_vec = tf.reshape(rot_vecs, self.flatten_shape)
+
+        return rot_vec
+    
+class NoSplitMixedBboxVecMultiPropLoss(MixedBBoxVecLoss):
+    def __init__(self, conf_threshold, size=None, gamma=1, vec_loss_weight=0.5, norm=True, reduction='none', **kwargs):
+        super().__init__(gamma=gamma, reduction=reduction, **kwargs)
+
+        self.conf_threshold = conf_threshold
+        self.size = size
+        self.vec_loss_weight = vec_loss_weight
+        self.norm = norm
+
+        if self.norm:
+            self.conf_th = self.conf_threshold/self.size
+        self.conf_th  = ((self.conf_th/2)**gamma)*2
+
+        self.bce = tf.keras.losses.binary_crossentropy
+
+    def call(self, y_true, y_pred):
+
+        y_pred_a, y_pred_b, conf_pred = tf.split(y_pred, [2,2,1], axis=-1)
+        y_pred = tf.stack([y_pred_a, y_pred_b], axis=-2)
+
+        if self.norm:
+            y_pred /= self.size
+            y_true /= self.size
+
+        y_pred = tf.expand_dims(y_pred, axis=-3)
+        y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
+        if len(y_pred.shape)>len(y_true.shape):
+            y_true = tf.expand_dims(y_true, axis=-4)
+
+        proposals_vec_loss = tf.reduce_min(self._vec_loss(y_true, y_pred), axis=-1)
+
+        best_prop_sign = tf.one_hot(tf.argmin(proposals_vec_loss, axis=-1), depth=tf.shape(proposals_vec_loss)[-1])
+        fine_prop_sign = tf.where(proposals_vec_loss<self.conf_th, 1., 0.)
+
+        conf_label = tf.reduce_max(tf.stack([best_prop_sign, fine_prop_sign], axis=-1), axis=-1)
+
+        conf_loss = self.bce(conf_label, tf.squeeze(conf_pred, axis=-1))[...,tf.newaxis]
+
+        vec_loss = tf.reduce_min(proposals_vec_loss, axis=-1, keepdims=True)
+
+        loss_values = self.vec_loss_weight*vec_loss + (1-self.vec_loss_weight)*conf_loss
+
+        return loss_values
+    
+class MultiSampleMAELoss(tf.keras.losses.Loss):
+    def __init__(self, sample_reduction_method='mean', reduction='sum_over_batch_size', name='MultiSampleMAELoss'):
+        super().__init__(reduction=reduction, name=name)
+
+        self.sample_reduction_method = sample_reduction_method
+
+        red_map = {'mean':tf.reduce_mean, 'min':tf.reduce_min}
+
+        self.sample_reduction = red_map[sample_reduction_method]
+
+    def call(self, y_true, y_pred):
+        if len(y_pred.shape)>len(y_true.shape):
+            y_true = tf.expand_dims(y_true, axis=-2)
+        return self.sample_reduction(tf.reduce_mean(tf.abs(y_true - y_pred), axis=-1), axis=-1)

@@ -1193,7 +1193,7 @@ def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_mask
     vec_weights = get_mask_weights(all_shapes_mask, batch_reg=False)
 
     thickness_label = tf.cast(thickness_label, tf.float32)*tf.cast(line_label, tf.float32)
-    thickness_weights = get_mask_weights(tf.cast(line_label, tf.float32), batch_reg=True)
+    thickness_weights = tf.squeeze(get_mask_weights(tf.cast(line_label, tf.float32), batch_reg=True), axis=-1)
 
     return ({'img': img, 'angle_input': angle_input},
             {'vecs': vec_label, 'class': shape_class, 'thickness': thickness_label},
