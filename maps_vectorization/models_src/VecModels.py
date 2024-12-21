@@ -1,6 +1,7 @@
 import tensorflow as tf
 import math
 import numpy as np
+from cv2 import warpAffine, getRotationMatrix2D
 from models_src.Hough import VecDrawer
 from models_src.fft_lib import xy_coords
 from models_src.Attn_variations import UnSqueezeImg, SqueezeImg
@@ -734,7 +735,24 @@ class MixedBBoxVecLoss(tf.keras.losses.Loss):
         return scores
     
 class NoSplitMixedBboxVecLoss(MixedBBoxVecLoss):
-
+    """
+    This subclass inherits from MixedBBoxVecLoss and overrides the call method.
+    
+    The parent class MixedBBoxVecLoss is a custom loss function class that extends tf.keras.losses.Loss.
+    It calculates a combined loss based on vector and bounding box predictions.
+    
+    The parent class has the following methods:
+    - __init__: Initializes the loss with a gamma parameter and reduction method.
+    - _dist: Computes the distance between true and predicted values using the gamma parameter.
+    - _bbox_loss: Computes the bounding box loss by considering different permutations of the bounding box coordinates.
+    - _vec_loss: Computes the vector loss by considering the original and reversed true values.
+    - call: Splits the true and predicted values into vector and bounding box components, computes their respective losses, and returns the combined score.
+    
+    The NoSplitMixedBboxVecLoss class overrides the call method to perform a different computation:
+    - call: This method takes the true and predicted values, splits the true values into two parts along the second-to-last axis, and stacks them along a new third-to-last axis. 
+    It then expands the predicted values along the same axis. The vector loss is computed using the _vec_loss method from the parent class, 
+    and the minimum score is returned.
+    """
     def call(self, y_true, y_pred):
 
         y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
@@ -2316,6 +2334,15 @@ class QuerySamplesFeaturesMHAUpdate(tf.keras.layers.Layer):
 
 def calc_2x2_vec_angle(x):
     return tf.squeeze(tf.math.atan2(*tf.split(tf.squeeze(tf.subtract(*tf.split(x, 2, axis=-2)), axis=-2), 2, axis=-1)), axis=-1)
+
+def gen_rot_matrix_yx(angle):
+    return tf.stack([tf.stack([tf.cos(angle), -tf.sin(angle)], axis=-1), tf.stack([tf.sin(angle), tf.cos(angle)], axis=-1)], axis=-2)
+
+def rotate_image_around_center(img, angle):
+    (h, w) = img.shape[:2]
+    center = (w // 2, h // 2)
+    M = getRotationMatrix2D(center, np.degrees(-angle), 1.0)
+    return warpAffine(img, M, (w, h))
 
 
 class AngleHeadedSineEncoding(tf.keras.layers.Layer):

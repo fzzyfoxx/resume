@@ -6,7 +6,7 @@ import math
 import cv2 as cv
 
 from models_src.fft_lib import xy_coords, decode1Dcoords, fft_angles
-from models_src.VecModels import flatten, calc_2x2_vec_angle, two_side_angle_diff
+from models_src.VecModels import flatten, calc_2x2_vec_angle, two_side_angle_diff, gen_rot_matrix_yx
 from src.patterns import gen_colors
 
 from google.cloud import storage
@@ -1156,15 +1156,40 @@ def vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks):
 
     return vec_label
 
+
+def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input):
+    vecs, bboxes = vec_label_prep(vecs, bboxes) # [B, N, 4, 2]
+
+    angle_samples_num = tf.shape(angle_input)[-1] # [B, A]
+    # bbox rotation
+    rot_matrix = gen_rot_matrix_yx(-angle_input) # [B, A, 2, 2]
+    bbox_center = tf.reduce_mean(bboxes, axis=-2, keepdims=True) # [B, N, 1, 2]
+    bboxes = tf.matmul(tf.expand_dims(bboxes-bbox_center, axis=-3), tf.expand_dims(rot_matrix, axis=-4)) + tf.expand_dims(bbox_center, axis=-3) # [B, N, A, 4, 2]
+    # vec repeat
+    vecs = tf.repeat(tf.expand_dims(vecs, axis=-3), angle_samples_num, axis=-3) # [B, N, A, 4, 2]
+
+    vec_components = tf.concat([vecs, bboxes], axis=1) # [B, 2N, A, 4, 2]
+    components_masks = tf.cast(tf.concat([vecs_masks, bbox_masks], axis=1), tf.float32) # [B, 2N, H, W, 1]
+    vec_label = tf.reduce_sum(vec_components[...,tf.newaxis, tf.newaxis,:,:,:]*components_masks[...,tf.newaxis, tf.newaxis], axis=1) # [B, H, W, A, 4, 2]
+
+    return vec_label
+
 @tf.function
-def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight):
+def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight, rotated_bbox_label, angle_input_rand_range):
 
     angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num, random_angle_weight=random_angle_weight)
+
+    if angle_input_rand_range>0.: 
+        radian_range = angle_input_rand_range/180*math.pi
+        angle_input += tf.random.uniform(tf.shape(angle_input), -radian_range, radian_range)
 
     shape_class, all_shapes_mask = get_shape_class_label(line_label, shape_label, return_all_shapes_mask=True, reversed_label=True)
     class_weights = tf.ones(tf.shape(shape_class)[:-1], dtype=tf.float32)
 
-    vec_label = vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks)
+    if rotated_bbox_label:
+        vec_label = vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input)
+    else:
+        vec_label = vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks)
     vec_weights = get_mask_weights(all_shapes_mask, batch_reg=False)
 
     thickness_label = tf.cast(thickness_label, tf.float32)*tf.cast(line_label, tf.float32)
