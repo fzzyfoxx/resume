@@ -2496,3 +2496,54 @@ class MultiSampleMAELoss(tf.keras.losses.Loss):
         if len(y_pred.shape)>len(y_true.shape):
             y_true = tf.expand_dims(y_true, axis=-2)
         return self.sample_reduction(tf.reduce_mean(tf.abs(y_true - y_pred), axis=-1), axis=-1)
+
+class MultiSampleBinaryCrossEntropy(MultiSampleMAELoss):
+    def __init__(self, sample_reduction_method='mean', reduction='sum_over_batch_size', name='MultiSampleMAELoss'):
+        super().__init__(sample_reduction_method=sample_reduction_method, reduction=reduction, name=name)
+
+        self.bce = tf.keras.losses.binary_crossentropy
+
+    def call(self, y_true, y_pred):
+        if len(y_pred.shape)>len(y_true.shape):
+            y_true = tf.expand_dims(y_true, axis=-2)
+
+            A = tf.shape(y_pred)[-2]
+            y_true = tf.repeat(y_true, A, axis=-2)
+            
+        return self.sample_reduction(self.bce(y_true, y_pred, axis=-1), axis=-1)
+    
+class NoSplitMixedBboxVecMultiPropMetric(tf.keras.metrics.Mean):
+    def __init__(self, size=None, gamma=1, norm=True, **kwargs):
+        super().__init__(**kwargs)
+
+        self.size = size
+        self.norm = norm
+        self.gamma = gamma
+
+    def _dist(self, y_true, y_pred):
+        return tf.reduce_mean(tf.reduce_sum(tf.abs(y_true-y_pred)**self.gamma, axis=-1), axis=-1)
+    
+    def _vec_loss(self, y_true, y_pred):
+        a = self._dist(y_true, y_pred)
+        b = self._dist(y_true[...,::-1,:], y_pred)
+
+        scores = tf.reduce_min(tf.stack([a,b], axis=-1), axis=-1)
+
+        return scores
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_pred_a, y_pred_b, _ = tf.split(y_pred, [2,2,1], axis=-1)
+        y_pred = tf.stack([y_pred_a, y_pred_b], axis=-2)
+
+        if self.norm:
+            y_pred /= self.size
+            y_true /= self.size
+
+        y_pred = tf.expand_dims(y_pred, axis=-3)
+        y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
+        if len(y_pred.shape)>len(y_true.shape):
+            y_true = tf.expand_dims(y_true, axis=-4)
+
+        proposals_vec_loss = tf.reduce_min(self._vec_loss(y_true, y_pred), axis=[-1,-2])[...,tf.newaxis]
+
+        return super().update_state(proposals_vec_loss, sample_weight)
