@@ -1147,6 +1147,9 @@ def op_rotated_enc(img, vecs, bboxes, vecs_mask, bbox_mask, angle_samples_num, m
     return ({'img': img, 'angle_input': angle_input},
             {'vecs': vecs_label, 'class': class_label, 'vecs_weights': vecs_weights, 'vecs_mask': vecs_mask})
 
+'''
+Deprecated due to vec label multiplication on polyline corners
+
 def vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks):
     vecs, bboxes = vec_label_prep(vecs, bboxes)
 
@@ -1172,7 +1175,42 @@ def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input):
     components_masks = tf.cast(tf.concat([vecs_masks, bbox_masks], axis=1), tf.float32) # [B, 2N, H, W, 1]
     vec_label = tf.reduce_sum(vec_components[...,tf.newaxis, tf.newaxis,:,:,:]*components_masks[...,tf.newaxis, tf.newaxis], axis=1) # [B, H, W, A, 4, 2]
 
-    return vec_label
+    return vec_label'''
+
+def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, shape_label, angle_input, vec_rotation=True):
+
+    vecs_masks_sums = tf.reduce_sum(vecs_masks, axis=1)
+    vecs_masks_t = tf.transpose(vecs_masks[...,0], [0,2,3,1])
+    top_vecs_idxs = tf.math.top_k(vecs_masks_t, k=2).indices
+    top_vecs_idx = top_vecs_idxs[...,:1]
+
+    corner_mask = tf.expand_dims(tf.cast(tf.where(vecs_masks_sums > 1, 1, 0), tf.float32), axis=-1)
+
+    single_vecs = tf.squeeze(tf.gather(vecs, top_vecs_idx, batch_dims=1), axis=-3)
+    corner_vecs = tf.gather(vecs, top_vecs_idxs, batch_dims=1)
+
+    single_vecs = tf.concat([single_vecs, single_vecs], axis=-2)
+    corner_vecs = tf.squeeze(tf.concat(tf.split(corner_vecs, 2, axis=-3), axis=-2), axis=-3)
+
+    vec_joint_label = ((1-corner_mask)*single_vecs + corner_mask*corner_vecs)*tf.cast(line_label[...,tf.newaxis], tf.float32)
+
+    bboxes_label = tf.concat([bboxes[...,0::2,:], bboxes[...,1::2,:]], axis=-2)
+    bbox_masks_t = tf.transpose(bbox_masks[...,0], [0,2,3,1])
+    bbox_idx = tf.argmax(bbox_masks_t, axis=-1)[...,tf.newaxis]
+    single_bbox = tf.squeeze(tf.gather(bboxes_label, bbox_idx, batch_dims=1), axis=-3)*tf.cast(shape_label[...,tf.newaxis], tf.float32)
+
+    if vec_rotation:
+        angle_samples_num = tf.shape(angle_input)[-1]
+        rot_matrix = gen_rot_matrix_yx(-angle_input)
+
+        vec_joint_label = tf.repeat(tf.expand_dims(vec_joint_label, axis=-3), angle_samples_num, axis=-3)
+
+        bbox_center = tf.reduce_mean(single_bbox, axis=-2, keepdims=True)  
+        single_bbox = tf.matmul(tf.expand_dims(single_bbox-bbox_center, axis=-3), rot_matrix[:,tf.newaxis, tf.newaxis]) + tf.expand_dims(bbox_center, axis=-3)
+
+    full_vec_label = vec_joint_label + single_bbox
+
+    return full_vec_label
 
 @tf.function
 def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight, rotated_bbox_label, angle_input_rand_range):
@@ -1186,10 +1224,13 @@ def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_mask
     shape_class, all_shapes_mask = get_shape_class_label(line_label, shape_label, return_all_shapes_mask=True, reversed_label=True)
     class_weights = tf.ones(tf.shape(shape_class)[:-1], dtype=tf.float32)
 
-    if rotated_bbox_label:
+    '''if rotated_bbox_label:
         vec_label = vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input)
     else:
-        vec_label = vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks)
+        vec_label = vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks)'''
+    
+    vec_label = vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, shape_label, angle_input)
+    
     vec_weights = get_mask_weights(all_shapes_mask, batch_reg=False)
 
     thickness_label = tf.cast(thickness_label, tf.float32)*tf.cast(line_label, tf.float32)
