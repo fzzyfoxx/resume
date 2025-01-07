@@ -2340,7 +2340,7 @@ def gen_rot_matrix_yx(angle):
 
 def rotate_image_around_center(img, angle):
     (h, w) = img.shape[:2]
-    center = (w // 2, h // 2)
+    center = ((w-1)/2, (h-1)/2)
     M = getRotationMatrix2D(center, np.degrees(-angle), 1.0)
     return warpAffine(img, M, (w, h))
 
@@ -2424,8 +2424,8 @@ class MultiAngleVecRotationLayer(tf.keras.layers.Layer):
         self.vec_in_reshape = (-1,) + vec_shape[1:-1] + (2,2)
 
     def call(self, vec, angles):
-
-        rot_matrix = tf.reshape(tf.stack([tf.cos(angles), -tf.sin(angles), tf.sin(angles), tf.cos(angles)], axis=-1), self.rot_matrix_shape)
+        inv_angles = -angles
+        rot_matrix = tf.reshape(tf.stack([tf.cos(inv_angles), -tf.sin(inv_angles), tf.sin(inv_angles), tf.cos(inv_angles)], axis=-1), self.rot_matrix_shape)
 
         vec = tf.reshape(vec, self.vec_in_reshape)
         rot_vecs = tf.matmul(vec, rot_matrix)
@@ -2530,8 +2530,8 @@ class NoSplitMixedBboxVecMultiPropMetric(tf.keras.metrics.Mean):
         scores = tf.reduce_min(tf.stack([a,b], axis=-1), axis=-1)
 
         return scores
-
-    def update_state(self, y_true, y_pred, sample_weight=None):
+    
+    def format_inputs(self, y_true, y_pred):
         y_pred_a, y_pred_b, _ = tf.split(y_pred, [2,2,1], axis=-1)
         y_pred = tf.stack([y_pred_a, y_pred_b], axis=-2)
 
@@ -2543,6 +2543,11 @@ class NoSplitMixedBboxVecMultiPropMetric(tf.keras.metrics.Mean):
         y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
         if len(y_pred.shape)>len(y_true.shape):
             y_true = tf.expand_dims(y_true, axis=-4)
+
+        return y_true, y_pred
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true, y_pred = self.format_inputs(y_true, y_pred)
 
         proposals_vec_loss = tf.reduce_min(self._vec_loss(y_true, y_pred), axis=[-1,-2])[...,tf.newaxis]
 
