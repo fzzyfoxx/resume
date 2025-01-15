@@ -1456,7 +1456,7 @@ class DatasetGenerator:
             for func, func_kwargs, if_validation in self.preprocess_funcs:
                 if (not validation) | (validation & if_validation):
                     ds = ds.map(lambda x: func(**x, **func_kwargs), num_parallel_calls=self.parallel_calls)
-
+            ds = ds.prefetch(2)
         if repeat:
             ds = ds.repeat()
 

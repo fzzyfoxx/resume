@@ -2424,8 +2424,7 @@ class MultiAngleVecRotationLayer(tf.keras.layers.Layer):
         self.vec_in_reshape = (-1,) + vec_shape[1:-1] + (2,2)
 
     def call(self, vec, angles):
-        inv_angles = -angles
-        rot_matrix = tf.reshape(tf.stack([tf.cos(inv_angles), -tf.sin(inv_angles), tf.sin(inv_angles), tf.cos(inv_angles)], axis=-1), self.rot_matrix_shape)
+        rot_matrix = tf.reshape(tf.stack([tf.cos(angles), -tf.sin(angles), tf.sin(angles), tf.cos(angles)], axis=-1), self.rot_matrix_shape)
 
         vec = tf.reshape(vec, self.vec_in_reshape)
         rot_vecs = tf.matmul(vec, rot_matrix)
