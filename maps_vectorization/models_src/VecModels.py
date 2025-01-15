@@ -695,10 +695,12 @@ class BBoxVecLoss(tf.keras.losses.Loss):
         return scores
     
 class MixedBBoxVecLoss(tf.keras.losses.Loss):
-    def __init__(self, gamma=1, reduction=tf.keras.losses.Reduction.AUTO, **kwargs):
+    def __init__(self, gamma=1, norm=False, size=None, reduction='sum_over_batch_size', **kwargs):
         super().__init__(reduction=reduction,**kwargs)
 
         self.gamma = gamma
+        self.norm = norm
+        self.size = size
 
     def _dist(self, y_true, y_pred):
         return tf.reduce_mean(tf.reduce_sum(tf.abs(y_true-y_pred)**self.gamma, axis=-1), axis=-1)
@@ -724,6 +726,10 @@ class MixedBBoxVecLoss(tf.keras.losses.Loss):
         return scores
     
     def call(self, y_true, y_pred):
+
+        if self.norm:
+            y_pred /= self.size
+            y_true /= self.size
 
         vec_true, bbox_true = tf.split(y_true, 2, axis=-2)
         vec_pred, bbox_pred = tf.split(y_pred, 2, axis=-2)
@@ -754,6 +760,9 @@ class NoSplitMixedBboxVecLoss(MixedBBoxVecLoss):
     and the minimum score is returned.
     """
     def call(self, y_true, y_pred):
+        if self.norm:
+            y_pred /= self.size
+            y_true /= self.size
 
         y_true = tf.stack(tf.split(y_true, 2, axis=-2), axis=-3)
         y_pred = tf.expand_dims(y_pred, axis=-3)
@@ -2439,12 +2448,10 @@ class MultiAngleVecRotationLayer(tf.keras.layers.Layer):
     
 class NoSplitMixedBboxVecMultiPropLoss(MixedBBoxVecLoss):
     def __init__(self, conf_threshold, size=None, gamma=1, vec_loss_weight=0.5, norm=True, reduction='none', **kwargs):
-        super().__init__(gamma=gamma, reduction=reduction, **kwargs)
+        super().__init__(gamma=gamma, size=size, norm=norm, reduction=reduction, **kwargs)
 
         self.conf_threshold = conf_threshold
-        self.size = size
         self.vec_loss_weight = vec_loss_weight
-        self.norm = norm
 
         if self.norm:
             self.conf_th = self.conf_threshold/self.size

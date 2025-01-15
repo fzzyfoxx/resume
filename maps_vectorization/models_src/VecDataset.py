@@ -1201,7 +1201,7 @@ def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, sha
 
     if vec_rotation:
         angle_samples_num = tf.shape(angle_input)[-1]
-        rot_matrix = gen_rot_matrix_yx(-angle_input)
+        rot_matrix = gen_rot_matrix_yx(angle_input)
 
         vec_joint_label = tf.repeat(tf.expand_dims(vec_joint_label, axis=-3), angle_samples_num, axis=-3)
 
@@ -1212,17 +1212,29 @@ def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, sha
 
     return full_vec_label
 
+def vec_angle_filter(vecs, angle_input, vecs_mask, vecs_masks, line_label, radian_range):
+    vec_angles = calc_2x2_vec_angle(vecs)
+    angle_diff = tf.abs(vec_angles[...,tf.newaxis] - angle_input[...,tf.newaxis, :])
+    filtered_vecs_mask = tf.cast(tf.reduce_min(angle_diff, axis=-1)<=radian_range, vecs_masks.dtype)*vecs_mask
+    filtered_vecs_masks = filtered_vecs_mask[...,tf.newaxis, tf.newaxis, tf.newaxis]*vecs_masks
+    filtered_line_label = tf.reduce_max(filtered_vecs_masks, axis=1, keepdims=False)
+    filtered_line_anti_mask = (1-filtered_line_label)*line_label
+    return filtered_vecs_mask, filtered_vecs_masks, filtered_line_label, filtered_line_anti_mask
+
 @tf.function
-def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight, rotated_bbox_label, angle_input_rand_range):
+def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight, rotated_bbox_label, angle_input_rand_range, splitted_conf=False):
 
     angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num, random_angle_weight=random_angle_weight)
 
+    radian_range = angle_input_rand_range/180*math.pi
     if angle_input_rand_range>0.: 
-        radian_range = angle_input_rand_range/180*math.pi
         angle_input += tf.random.uniform(tf.shape(angle_input), -radian_range, radian_range)
 
     shape_class, all_shapes_mask = get_shape_class_label(line_label, shape_label, return_all_shapes_mask=True, reversed_label=True)
-    class_weights = tf.ones(tf.shape(shape_class)[:-1], dtype=tf.float32)
+
+    #filter vecs that are too far from the angle_input
+    vecs_mask, vecs_masks, line_label, filtered_line_anti_mask = vec_angle_filter(vecs, angle_input, vecs_mask, vecs_masks, line_label, radian_range)
+    class_weights = tf.squeeze(get_mask_weights(tf.cast(1-filtered_line_anti_mask, tf.float32)), axis=-1)
 
     '''if rotated_bbox_label:
         vec_label = vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input)
@@ -1230,15 +1242,24 @@ def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_mask
         vec_label = vecs_full_label(vecs, bboxes, vecs_masks, bbox_masks)'''
     
     vec_label = vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, shape_label, angle_input)
+    if splitted_conf:
+        vec_label = tf.squeeze(vec_label, axis=-3)
     
-    vec_weights = get_mask_weights(all_shapes_mask, batch_reg=False)
+    filtered_all_shapes_mask = all_shapes_mask - tf.cast(filtered_line_anti_mask, tf.float32)
+    vec_weights = get_mask_weights(filtered_all_shapes_mask, batch_reg=False)
 
     thickness_label = tf.cast(thickness_label, tf.float32)*tf.cast(line_label, tf.float32)
     thickness_weights = tf.squeeze(get_mask_weights(tf.cast(line_label, tf.float32), batch_reg=True), axis=-1)
 
-    return ({'img': img, 'angle_input': angle_input},
-            {'vecs': vec_label, 'class': shape_class, 'thickness': thickness_label},
-            {'vecs': vec_weights, 'class': class_weights, 'thickness': thickness_weights})
+    inputs = {'img': img, 'angle_input': angle_input}
+    labels = {'vecs': vec_label, 'class': shape_class, 'thickness': thickness_label}
+    weights = {'vecs': vec_weights, 'class': class_weights, 'thickness': thickness_weights}
+
+    if splitted_conf:
+        labels['conf'] = filtered_all_shapes_mask
+        weights['conf'] = tf.squeeze(get_mask_weights(all_shapes_mask, batch_reg=False), axis=-1)
+
+    return (inputs, labels, weights)
 
 
 @tf.function
