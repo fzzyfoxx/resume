@@ -1,6 +1,6 @@
 {
     "train_batch_size": 64,
-    "val_batch_size": 128,
+    "val_batch_size": 64,
     "test_batch_size": 8,
     "ds_path": "../Fourier/datasets/pixel_similarity",
     "experiment_name": "angle_input_vec_detection",

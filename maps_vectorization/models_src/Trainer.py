@@ -353,7 +353,8 @@ class TrainingProcessor2:
                 loss = loss,
                 metrics = metrics,
                 loss_weights = loss_weights,
-                weighted_metrics = weighted_metrics
+                weighted_metrics = weighted_metrics,
+                jit_compile='auto'
                 )
 
         if print_summary:

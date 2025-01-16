@@ -867,6 +867,11 @@ class MultishapeMapGenerator:
 
 ### dataset preprocessing funcs ###
 
+@tf.function
+def colors_random_shift(img, **kwargs):
+    img = (img + tf.random.uniform((3,), 0., 1.)) % 1
+    return {'img': img, **kwargs}
+
 def get_mask_weights(x, batch_reg=False):
     w = tf.math.divide_no_nan(x, tf.reduce_mean(flatten(x), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
     if batch_reg:
@@ -1436,7 +1441,7 @@ class DatasetGenerator:
     def _load_dataset(self, val_idxs, validation):
         feature_description = self._gen_feature_description()
         ds_files = [os.path.join(self.ds_path, filename) for i, filename in enumerate(os.listdir(self.ds_path)) if (i in val_idxs if validation else i not in val_idxs)]
-        ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.parallel_calls)
+        ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.parallel_calls, buffer_size=int(50*1e6))
 
         ds = ds.map(lambda x: self._parse_function(x, self.fmg.output_dtypes, feature_description), num_parallel_calls=self.parallel_calls)
 
