@@ -10,8 +10,8 @@ import random
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--s", default=5, type=int, help="Number of columns/images input")
-parser.add_argument("--r", default=8, type=int, help="Number of rows/sample points")
+parser.add_argument("--s", default=5, type=int, help="Number of columns/sample points")
+parser.add_argument("--r", default=8, type=int, help="Number of rows/image inputs")
 parser.add_argument("--next", default=1, type=int, help="Prepare plots for another batch")
 
 kwargs = vars(parser.parse_args())
