@@ -3,7 +3,7 @@ import sys
 import os
 from models_src.Trainer import TrainingProcessor2
 from exp_lib.utils.dict_widget import display_dict
-from exp_lib.utils.load_mlflow_model import download_mlflow_model_components, delete_temp_path
+from exp_lib.utils.load_mlflow_model import download_mlflow_model_components, delete_temp_path, get_mlflow_run_id_by_name
 from importlib import import_module
 import argparse
 
@@ -11,15 +11,17 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--run_name", default='', type=str, help="If provided, model definition is loaded from mlflow run")
 parser.add_argument("--load_weights", default=0, type=int, help="If >0 then mlflow model weights are downloaded and load to model")
+parser.add_argument("--summary", default=1, type=int, help="If 1 then print compiled model summary")
 
 kwargs, args = parser.parse_known_args()#vars(parser.parse_args())
 kwargs = vars(kwargs)
 run_name = kwargs['run_name']
 load_weights = bool(kwargs['load_weights'])
-temp_path = './mlflow_model_temp'
+print_summary = bool(kwargs['summary'])
+cache_path = '../model_cache'
 
 if run_name!='':
-    model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=temp_path)
+    model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=cache_path)
 else:
 
     model_def_path = args[0]
@@ -54,12 +56,15 @@ if __name__=="__main__":
     if load_weights:
         trainer.compile_model(
                     model_args = model_args, 
-                    print_summary = True,
+                    print_summary = print_summary,
                     summary_kwargs = {'expand_nested': False, 'line_length': 100},
                     **compile_args_gen(**cfg.compiler_func_args)
                 )
-        trainer.model.load_weights(os.path.join(temp_path, 'final_state.weights.h5'))
-        delete_temp_path(temp_path)
+        trainer.model.load_weights(os.path.join(cache_path, run_name, 'final_state.weights.h5'))
+        #delete_temp_path(temp_path)
+    
+    if run_name!='':
+        trainer.run_id = get_mlflow_run_id_by_name(run_name)
         
     else:
         display_dict(model_args, trainer=trainer, compile_args_func=compile_args_gen, compile_args=cfg.compiler_func_args) # type: ignore

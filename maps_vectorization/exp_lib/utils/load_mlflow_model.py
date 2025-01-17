@@ -19,19 +19,38 @@ def download_model_def(run_id, dst_path):
 def download_model_weights(run_id, dst_path):
     mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path='final_state.weights.h5', dst_path=dst_path)
 
-def download_mlflow_model_components(run_name, load_weights=True, dst_path='./mlflow_model_temp'):
+def check_for_subdirectory(name, path):
+    return len([f.name for f in os.scandir(path) if f.is_dir() & (f.name==name)])>0
 
-    run_id = get_mlflow_run_id_by_name(run_name)
+def check_for_file(name, path):
+    return os.path.isfile(os.path.join(path, name))
 
+def download_mlflow_model_components(run_name, load_weights=True, dst_path='../model_cache'):
     prepare_path(dst_path)
+    model_cached = check_for_subdirectory(run_name, dst_path)
+    dst_path = os.path.join(dst_path, run_name)
 
-    download_model_def(run_id=run_id, dst_path=dst_path)
+    if not model_cached:
+        run_id = get_mlflow_run_id_by_name(run_name)
 
+        prepare_path(dst_path)
+
+        download_model_def(run_id=run_id, dst_path=dst_path)
+
+    else:
+        print(f'{run_name} model def already cached')
+    
     with open(os.path.join(dst_path, 'model_def.json')) as json_model_def:
         model_def = json.load(json_model_def)
 
     if load_weights:
-        download_model_weights(run_id=run_id, dst_path=dst_path)
+        weights_cached = check_for_file('final_state.weights.h5', dst_path)
+        if not weights_cached:
+            if model_cached:
+                run_id = get_mlflow_run_id_by_name(run_name)
+            download_model_weights(run_id=run_id, dst_path=dst_path)
+        else:
+            print(f'{run_name} weights already cached')
 
     return model_def
 
@@ -45,7 +64,7 @@ def delete_temp_path(dst_path='./mlflow_model_temp', files_limit=3):
     else:
         print(f'Number of files in provided directory exceeds limit.\nFiles number: {files_num}\nFiles limit: {files_limit}')
 
-def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./mlflow_model_temp'):
+def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='../model_cache'):
 
     model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=dst_path)
 
@@ -54,14 +73,14 @@ def load_mlflow_model(run_name, load_weights=True, compile=False, dst_path='./ml
     model = model_generator(**model_def['model_args'])
 
     if load_weights:
-        model.load_weights(os.path.join(dst_path, 'final_state.weights.h5'))
+        model.load_weights(os.path.join(dst_path, run_name, 'final_state.weights.h5'))
 
     if compile:
         compile_args_gen = getattr(import_module(model_def['compiler_func']), 'get_compile_args')
         compile_args = compile_args_gen(**model_def['compiler_func_args'])
         model.compile(**compile_args)
 
-    delete_temp_path(dst_path)
+    #delete_temp_path(dst_path)
 
     return model
 
@@ -82,7 +101,7 @@ def backbone_loader(
     """
 
     if load_mode=='mlflow':
-        backbone = load_mlflow_model(run_name=run_name, load_weights=load_mlflow_weights, compile=False, dst_path='./mlflow_backbone_temp')
+        backbone = load_mlflow_model(run_name=run_name, load_weights=load_mlflow_weights, compile=False, dst_path='../model_cache')
     elif load_mode=='local':
         generator = getattr(import_module(backbone_generator), generator_func_name)
         backbone = generator(**backbone_args)
