@@ -11,7 +11,6 @@ import shutil
 import json
 from google.cloud import storage
 
-
 storage_client = storage.Client()
 
 from models_src.UNet_model import UNet
@@ -21,6 +20,7 @@ from models_src.Deeplab import DeepLabModel
 
 from models_src.Support import SmoothOutput, DatasetGenerator
 from models_src.Trainer_support import BuildHyperModel
+from exp_lib.utils.load_mlflow_model import download_mlflow_model_weights
 
 mlflow.tensorflow.autolog(log_datasets=False, log_models=False, disable=True)
 
@@ -514,11 +514,15 @@ class TrainingProcessor2:
 
         self._download_and_load_mlflow_weights(weights_path, run_args, skip_mismatch)
 
-    def _download_and_load_mlflow_weights(self, weights_path, run_args, skip_mismatch=True):
+    '''def _download_and_load_mlflow_weights(self, weights_path, run_args, skip_mismatch=True):
         self._prepare_path(weights_path)
         self.mlflow.artifacts.download_artifacts(run_id=run_args.run_id,artifact_path='final_state.weights.h5',
                                     dst_path=weights_path)
-        self.model.load_weights(os.path.join(weights_path,'final_state.weights.h5'), skip_mismatch=skip_mismatch)
+        self.model.load_weights(os.path.join(weights_path,'final_state.weights.h5'), skip_mismatch=skip_mismatch)'''
+    
+    def _download_and_load_mlflow_weights(self, run_name, skip_mismatch=True):
+        weights_path = download_mlflow_model_weights(run_name)
+        self.model.load_weights(weights_path, skip_mismatch=skip_mismatch)
 
     def load_model(self, run_name, weights_path='./final_state/temp', load_final_state=True):
         run_args = self.mlflow.search_runs(filter_string=f"tags.mlflow.runName like '{run_name}%'").iloc[0]

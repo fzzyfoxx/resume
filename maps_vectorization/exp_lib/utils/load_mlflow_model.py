@@ -1,5 +1,6 @@
 import json
 import os
+from pyexpat import model
 import shutil
 from importlib import import_module
 import mlflow
@@ -25,13 +26,29 @@ def check_for_subdirectory(name, path):
 def check_for_file(name, path):
     return os.path.isfile(os.path.join(path, name))
 
-def download_mlflow_model_components(run_name, load_weights=True, dst_path='../model_cache'):
-    prepare_path(dst_path)
+def get_model_cache_info(run_name, dst_path='../model_cache'):
     model_cached = check_for_subdirectory(run_name, dst_path)
     dst_path = os.path.join(dst_path, run_name)
 
-    if not model_cached:
+    if model_cached:
+        model_def_cached = check_for_file('model_def.json', dst_path)
+        weights_cached = check_for_file('final_state.weights.h5', dst_path)
+    else:
+        model_def_cached = weights_cached = False
+
+    if (not model_cached) or (not model_def_cached):
         run_id = get_mlflow_run_id_by_name(run_name)
+    else:
+        run_id = None
+
+    return dst_path, model_def_cached, weights_cached, run_id
+
+def download_mlflow_model_components(run_name, load_weights=True, dst_path='../model_cache'):
+    prepare_path(dst_path)
+    
+    dst_path, model_def_cached, weights_cached, run_id = get_model_cache_info(run_name, dst_path)
+
+    if not model_def_cached:
 
         prepare_path(dst_path)
 
@@ -43,16 +60,25 @@ def download_mlflow_model_components(run_name, load_weights=True, dst_path='../m
     with open(os.path.join(dst_path, 'model_def.json')) as json_model_def:
         model_def = json.load(json_model_def)
 
-    if load_weights:
-        weights_cached = check_for_file('final_state.weights.h5', dst_path)
+    if load_weights:       
         if not weights_cached:
-            if model_cached:
-                run_id = get_mlflow_run_id_by_name(run_name)
             download_model_weights(run_id=run_id, dst_path=dst_path)
         else:
             print(f'{run_name} weights already cached')
 
     return model_def
+
+def download_mlflow_model_weights(run_name, dst_path='../model_cache'):
+    prepare_path(dst_path)
+
+    dst_path, _, weights_cached, run_id = get_model_cache_info(run_name, dst_path)
+
+    if not weights_cached:
+        download_model_weights(run_id=run_id, dst_path=dst_path)
+    else:
+        print(f'{run_name} weights already cached')
+
+    return os.path.join(dst_path, 'final_state.weights.h5')
 
 def delete_temp_path(dst_path='./mlflow_model_temp', files_limit=3):
     files_num = 0
