@@ -2558,3 +2558,48 @@ class NoSplitMixedBboxVecMultiPropMetric(tf.keras.metrics.Mean):
         proposals_vec_loss = tf.reduce_min(self._vec_loss(y_true, y_pred), axis=[-1,-2])[...,tf.newaxis]
 
         return super().update_state(proposals_vec_loss, sample_weight)
+    
+class MHLA(tf.keras.layers.Layer):
+    def __init__(self, num_heads, d_model, norm=True, eps=1e-6, **kwargs):
+        super(MHLA, self).__init__(**kwargs)
+        self.num_heads = num_heads
+        self.d_model = d_model
+        self.norm = norm
+        self.eps = tf.cast(eps, tf.float32)
+
+    def build(self, Q_shape):
+        self.Q_d = tf.keras.layers.Dense(self.d_model)
+        self.K_d = tf.keras.layers.Dense(self.d_model)
+        self.V_d = tf.keras.layers.Dense(self.d_model)
+        self.O_d = tf.keras.layers.Dense(self.d_model)
+
+        self.Q_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.K_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.V_head_extractior = HeadsPermuter(self.num_heads, reverse=False)
+        self.output_perm = HeadsPermuter(self.num_heads, reverse=True)
+
+        self.N = tf.cast(Q_shape[-2], tf.float32)
+
+    @staticmethod
+    def l2_norm(x):
+        return tf.einsum('...nc,...n->...nc', x, 1/tf.norm(x, ord='euclidean', axis=-1))
+
+    def call(self, V, Q, K):
+        Q = self.Q_head_extractior(self.Q_d(Q))
+        K = self.K_head_extractior(self.K_d(K))
+        V = self.V_head_extractior(self.V_d(V))
+
+        if self.norm:
+            Q = self.l2_norm(Q)
+            K = self.l2_norm(K)
+
+        T = 1/(self.N + tf.einsum('...nc,...c->...n', Q, tf.reduce_sum(K, axis=-2))+self.eps)
+
+        Ev = tf.expand_dims(tf.einsum('...nc->...c', V), axis=-2)
+
+        M = tf.matmul(K, V, transpose_a=True)
+        Mqv = Ev + tf.matmul(Q, M)
+
+        O = tf.einsum('...nc,...n->...nc', Mqv, T)
+        O = self.O_d(self.output_perm(O))
+        return O
