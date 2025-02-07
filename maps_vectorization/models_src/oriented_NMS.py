@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from models_src.VecModels import gen_rot_matrix_yx
 from models_src.fft_lib import yx_coords
+from models_src.Attn_variations import SqueezeImg
 
 def line_intersection(p1, p2, p3, p4):
     """Find the intersection point of two lines (p1, p2) and (p3, p4)."""
@@ -397,3 +398,112 @@ class GaussianVecIou(tf.keras.layers.Layer):
         prob_iou = gaussian_iou(u1, sigma1, u2, sigma2)
 
         return prob_iou
+    
+
+class GatherBestExamples(tf.keras.layers.Layer):
+    def __init__(self, axis, return_idxs=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.axis = axis
+        self.return_idxs = return_idxs
+
+    def build(self, scores_shape, attributes_shape):
+
+        self.abs_axis = self.axis if self.axis >= 0 else len(scores_shape) + self.axis
+        
+        self.squeeze_layers = [SqueezeImg(name=f'{self.name}-SqImg_i') for i in range(len(attributes_shape))]
+
+    def call(self, scores, attributes):
+
+        max_idx = tf.argmax(scores, axis=self.abs_axis)
+
+        outputs =  [sq_l(tf.squeeze(tf.gather(a, max_idx, axis=self.abs_axis, batch_dims=self.abs_axis), axis=self.abs_axis)) for sq_l, a in zip(self.squeeze_layers, attributes)]
+
+        if self.return_idxs:
+            outputs.append(max_idx)
+
+        return outputs
+    
+class UnflattenVec(tf.keras.layers.Layer):
+    def build(self, input_shape):
+        batch_dims = input_shape[:-1]
+        points_num = input_shape[-1]//2
+
+        self.target_shape = batch_dims + (points_num, 2)
+
+    def call(self, x):
+        return tf.reshape(x, self.target_shape)
+    
+class BinaryClassMasks(tf.keras.layers.Layer):
+
+    def build(self, input_shape):
+        self.num_classes = input_shape[-1]
+        self.splits = tf.ones((self.num_classes,), dtype=tf.int32)
+
+    def call(self, x):
+        return tf.split(tf.one_hot(tf.argmax(x, axis=-1), self.num_classes), self.splits, axis=-1)
+    
+class MaskApply(tf.keras.layers.Layer):
+    def __init__(self, inv=False, **kwargs):
+        super().__init__(**kwargs)
+        self.inv = inv  
+
+    def call(self, x, mask):
+        mask = tf.cast(mask, x.dtype)
+        if self.inv:
+            mask = 1. - mask
+        return x * mask
+    
+class OverlapsNMS(tf.keras.layers.Layer):
+    def __init__(self, max_output_size, overlap_threshold, score_threshold, return_indices, parallel_iterations=8, **kwargs):
+        super().__init__(**kwargs)
+
+        self.max_output_size = max_output_size
+        self.overlap_threshold = overlap_threshold
+        self.score_threshold = score_threshold
+        self.return_indices = return_indices
+        self.parallel_iterations = parallel_iterations
+
+    def build(self, overlaps_shape, scores_shape, attributes_shape):
+        self.attributes_num = len(attributes_shape)
+
+        self.map_output_sign = [tf.float32]*(self.attributes_num+1)
+
+        self.paddings_list = [tf.zeros((len(s)-2, 2), dtype=tf.int32) for s in attributes_shape] + [tf.zeros((0,2), dtype=tf.int32)]
+        self.front_pad = tf.constant([[0, 1]], dtype=tf.int32)
+
+        if self.return_indices:
+            self.map_output_sign += [tf.int32]
+            self.paddings_list += [tf.zeros((0,2), dtype=tf.int32)]
+
+
+    def _get_paddings(self, pad_size):
+        front_pad = self.front_pad*pad_size
+
+        return [tf.concat([front_pad, pl], axis=0) for pl in self.paddings_list]
+    
+    def _gather_selected(self, tensor, indices):
+        return tf.gather(tensor, indices, axis=0, batch_dims=0)
+
+    def _non_max_suppresion(self, overlaps, scores, attributes):
+
+        nms_indices = tf.image.non_max_suppression_overlaps(overlaps, scores, self.max_output_size, self.overlap_threshold, self.score_threshold)
+
+        pad_size = self.max_output_size - tf.shape(nms_indices)[0]
+        paddings = self._get_paddings(pad_size)
+
+        mask = tf.ones_like(nms_indices, dtype=tf.float32)
+
+        selected_attributes = [self._gather_selected(attr, nms_indices) for attr in attributes]
+        selected_attributes.append(mask)
+
+        if self.return_indices:
+            selected_attributes.append(nms_indices)
+
+        selected_attributes = [tf.pad(sa, p) for sa, p in zip(selected_attributes, paddings)]
+
+        return selected_attributes
+
+    def call(self, overlaps, scores, attributes):
+
+        return tf.map_fn(lambda x: self._non_max_suppresion(*x), (overlaps, scores, attributes), dtype=self.map_output_sign, parallel_iterations=self.parallel_iterations)
