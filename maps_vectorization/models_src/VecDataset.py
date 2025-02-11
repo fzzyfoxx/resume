@@ -1290,6 +1290,17 @@ def op_freq_space_angle_mask(img, vecs, vecs_mask, size, threshold, binarise, **
 
     return ({'img': img}, {'angle_mask': angle_scores})
 
+@tf.function
+def op_image_autoencoder(img, size, center_shift_range):
+    B = tf.shape(img)[0]
+    random_channel = tf.random.uniform((B,1), 0, 3, dtype=tf.int32)
+    single_channel_img = tf.transpose(tf.gather(tf.transpose(img, [0,3,1,2]), random_channel, axis=1, batch_dims=1), [0,2,3,1])
+    center_point = (size-1)/2
+
+    center_points = center_point + tf.random.uniform((B,2), -center_shift_range, center_shift_range)
+
+    return ({'img': single_channel_img, 'center_points': center_points}, {'target_img': single_channel_img})
+
 ### DATASET GENERATOR ###
 
 
