@@ -1429,11 +1429,12 @@ def add_batch_dims(x, batch_dims):
 
 
 class RadialEncoding(tf.keras.layers.Layer):
-    def __init__(self, emb_dim, height, width=None, inverted_angle=False, **kwargs):
+    def __init__(self, emb_dim, height, width=None, inverted_angle=False, radial_reg_denom=4, **kwargs):
         super().__init__(**kwargs)
 
         self.H = height
         self.W = height if width is None else width
+        self.radial_reg_denom = radial_reg_denom
 
         self.C = emb_dim
         self.inverted_angle = inverted_angle
@@ -1453,7 +1454,7 @@ class RadialEncoding(tf.keras.layers.Layer):
 
         self.diag = tf.constant((self.H**2 + self.W**2)**0.5, tf.float32)
 
-        self.radial_reg = tf.constant(self.C//4, tf.float32)
+        self.radial_reg = tf.constant(self.C/self.radial_reg_denom, tf.float32)
 
     def calc_angles(self, sample_points):
         return tf.math.atan2(*tf.split((self.yx-sample_points[...,tf.newaxis, tf.newaxis,:])*self.inv, 2, axis=-1))
