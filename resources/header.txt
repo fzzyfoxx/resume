@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{
+            font-family: {font}, sans-serif;
+            font-size: {font_size}pt;
+            margin: 0in;
+        }}
+        h1, h2, h3, h4, h5, h6 {{
+            font-family: {font}, sans-serif;
+        }}
+        h1 {{
+            font-size: 36pt;
+            margin-top: 25px;
+            margin-bottom: 5px;
+        }}
+        h2 {{
+            margin-top: 25px;
+            margin-bottom: 80px;
+        }}
+        h3 {{
+            margin-top: 30px;
+        }}
+    </style>
+</head>
+<body>
