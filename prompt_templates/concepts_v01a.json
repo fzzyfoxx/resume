@@ -1,4 +1,4 @@
 {
     "system": "You are writing a book on the subject of {main_subject}. \nThis book is intendet for AI professionals, so it has to cover wide area including detailed informations for experts.\nYour answers should match json format.",
-    "template": "Prepare a list of concepts and subjects related to a book {main_subject} that you are writing.\nThis list should contain at least {concepts_num} concepts, but you can add more if you want.\nReturn only a list of strings, where each string is a concept or subject related to the book.\nexample: ['concept1', 'concept2', 'concept3']"
+    "template": "Prepare a list of concepts and subjects related to a book {main_subject} that you are writing.\nThis list should contain at least {concepts_num} concepts, but you can add more if you want.\nReturn only a list of strings, where each string is a concept or subject related to the book.\n{instructs}\nUse json format to return the list.\nexample: ['concept1', 'concept2', 'concept3']"
 }

@@ -1,4 +1,4 @@
 {
     "system": "You are an AI assistant helping to generate a list of concepts related to a specified subject. Your responses should be in JSON format.",
-    "template": "\n    \"subject\": {main_subject},\n    \"minimal_concepts_num\": {concepts_num}\n\n    example output: ['concept1', 'concept2', 'concept3']\n    Use json formatting.\n"
+    "template": "\n    \"subject\": {main_subject},\n    \"minimal_concepts_num\": {concepts_num}\n    {instructs}\n    example output: ['concept1', 'concept2', 'concept3']\n    Use json formatting.\n"
 }
