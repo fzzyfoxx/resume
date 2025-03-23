@@ -1,0 +1,25 @@
+{
+    "model_args": {
+        "color_embs_num": 16,
+        "color_embs_mid_layers": 3,
+        "conv_num": 0,
+        "conv_dim": 64,
+        "attn_dim": 64,
+        "heads_num": 5,
+        "pre_attn_ffn_mid_layers": 3,
+        "dropout": 0.2,
+        "use_heads": false,
+        "backbone_def": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
+        "backbone_trainable": false,
+        "backbone_last_layer": "Up-Conv_2",
+        "backbone_init_layer": "Batch-Normalization",
+        "name": "PxSimDot"
+    },
+    "generator_module": "Fourier.model_generators.pixel_similarity_dot",
+    "generator_func_name": "backbone_based_pixel_similarity_dot_model",
+    "compiler_func": "exp_lib.compilers.pixel_similarity_dot",
+    "compiler_func_args": {
+        "learning_rate": 0.001,
+        "label_smoothing": 0.1
+    }
+}

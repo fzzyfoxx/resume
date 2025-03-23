@@ -932,7 +932,7 @@ def random_flip(**kwargs):
 def op_pixel_similarity(img, pattern_masks, **kwargs):
     background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
-    return (img, tf.cast(pattern_masks, tf.float32))
+    return (img, {'Dot_Similarity': tf.cast(pattern_masks, tf.float32)})
 
 def components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n, k=1):
     components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
