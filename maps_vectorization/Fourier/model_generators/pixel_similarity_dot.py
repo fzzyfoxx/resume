@@ -1,9 +1,14 @@
 import tensorflow as tf
 from models_src.Attn_variations import SqueezeImg, UnSqueezeImg
 from models_src.DETR import FFN, HeadsPermuter
-from models_src.VecModels import DotSimilarityLayer, FrequencyRadialEncoding, SeparateRadialEncoding, YXcoordsLayer, RadialSearchFeaturesExtraction, SelfRadialMHA, SplitLayer, Vec2AngleActivationLayer, AddNorm
+from models_src.VecModels import DotSimilarityLayer, FrequencyRadialEncoding, SeparateRadialEncoding, YXcoordsLayer, RadialSearchFeaturesExtraction, SelfRadialMHA, SplitLayer, Vec2AngleActivationLayer, AddNorm, AngleHeadedSineEncoding
 from exp_lib.utils.load_mlflow_model import backbone_loader
 
+
+class StopGradLayer(tf.keras.layers.Layer):
+    def call(self, x):
+        return tf.stop_gradient(x)
+    
 def backbone_based_pixel_similarity_dot_model(
         color_embs_num,
         color_embs_mid_layers,
@@ -104,14 +109,29 @@ def radial_enc_pixel_similarity_dot(
         memory = backbone_model.get_layer(backbone_last_layer).output
         normed_img = backbone_model.get_layer(backbone_init_layer).output
 
+        if enc_type=='linear':
+            angles = backbone_model.get_layer('angle').output
+            angles = tf.keras.layers.Reshape([size**2], name='Reshape-Angles')(angles)
+            print(angles.shape)
+
+    enc_map = {
+        'frequency': (FrequencyRadialEncoding, 'Freq'),
+        'separate': (SeparateRadialEncoding, 'Sep'),
+        'linear': (AngleHeadedSineEncoding, 'Lin')
+    }
+
     
     #########
-    enc_func = FrequencyRadialEncoding if enc_type!='separate' else SeparateRadialEncoding
-    enc_label = 'Freq' if enc_type!='separate' else 'Sep'
+    enc_func, enc_label = enc_map[enc_type]
 
-    coords = YXcoordsLayer(size=(size,size), squeeze_output=True, name='Img-Coords')()
+    if enc_type!='linear':
+        coords = YXcoordsLayer(size=(size,size), squeeze_output=True, name='Img-Coords')()
 
-    pos_enc = enc_func(emb_dim=embs_dim//num_heads, height=size, inverted_angle=inverted_angle, name=f'{enc_label}RadialEncoding')(coords)
+        pos_enc = enc_func(emb_dim=embs_dim//num_heads, height=size, inverted_angle=inverted_angle, name=f'{enc_label}RadialEncoding')(coords)
+    else:
+        pos_enc = enc_func(emb_size=embs_dim//num_heads, size=size, name='LinearEncoding')(angles)
+        pos_enc = UnSqueezeImg(name='UnSqueeze-PosEnc')(pos_enc)
+        pos_enc = StopGradLayer(name='PosEnc-Stop-Grad')(pos_enc)
 
     color_embs_map = FFN(mid_layers=color_embs_mid_layers, mid_units=color_embs_num*2, output_units=color_embs_num, dropout=dropout, activation='relu', name='Colors_FFN')(normed_img)
 
