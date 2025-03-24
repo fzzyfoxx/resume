@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--run_name", default='', type=str, help="If provided, model definition is loaded from mlflow run")
 parser.add_argument("--load_weights", default=0, type=int, help="If >0 then mlflow model weights are downloaded and load to model")
 parser.add_argument("--summary", default=1, type=int, help="If 1 then print compiled model summary")
+parser.add_argument("--trainer_name", default='trainer', type=str, help="Name of the trainer class")
 
 kwargs, args = parser.parse_known_args()#vars(parser.parse_args())
 kwargs = vars(kwargs)
@@ -19,6 +20,7 @@ run_name = kwargs['run_name']
 load_weights = bool(kwargs['load_weights'])
 print_summary = bool(kwargs['summary'])
 cache_path = '../model_cache'
+trainer_name = kwargs['trainer_name']
 
 if run_name!='':
     model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=cache_path)
@@ -49,22 +51,22 @@ model_args = model_def['model_args']
 
 if __name__=="__main__":
 
-    trainer = TrainingProcessor2(cfg, mlflow_instance=mlflow) # type: ignore
-    trainer.load_dataset(ds, train_steps, val_ds, val_steps) # type: ignore
-    trainer.load_model_generator(model_generator)
+    globals()[trainer_name] = TrainingProcessor2(cfg, mlflow_instance=mlflow) # type: ignore
+    globals()[trainer_name].load_dataset(ds, train_steps, val_ds, val_steps) # type: ignore
+    globals()[trainer_name].load_model_generator(model_generator)
 
     if load_weights:
-        trainer.compile_model(
+        globals()[trainer_name].compile_model(
                     model_args = model_args, 
                     print_summary = print_summary,
                     summary_kwargs = {'expand_nested': False, 'line_length': 100},
                     **compile_args_gen(**cfg.compiler_func_args)
                 )
-        trainer.model.load_weights(os.path.join(cache_path, run_name, 'final_state.weights.h5'))
+        globals()[trainer_name].model.load_weights(os.path.join(cache_path, run_name, 'final_state.weights.h5'))
         #delete_temp_path(temp_path)
     
     if run_name!='':
-        trainer.run_id = get_mlflow_run_id_by_name(run_name)
+        globals()[trainer_name].run_id = get_mlflow_run_id_by_name(run_name)
         
     else:
-        display_dict(model_args, trainer=trainer, compile_args_func=compile_args_gen, compile_args=cfg.compiler_func_args) # type: ignore
+        display_dict(model_args, trainer=globals()[trainer_name], compile_args_func=compile_args_gen, compile_args=cfg.compiler_func_args) # type: ignore

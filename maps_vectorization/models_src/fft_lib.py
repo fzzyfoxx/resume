@@ -75,6 +75,12 @@ def decode1Dcoords(coords, width):
 
    return tf.stack([x,y], axis=-1)
 
+def decode1Dcoords_yx(coords, width):
+   y = coords // width
+   x = coords % width
+
+   return tf.stack([y,x], axis=-1)
+
 def encode1Dcoords(coords, width):
     return tf.expand_dims(coords[...,1]*width+coords[...,0], axis=-1)
 
