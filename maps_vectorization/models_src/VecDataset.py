@@ -934,6 +934,13 @@ def op_pixel_similarity(img, pattern_masks, **kwargs):
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
     return (img, {'Dot_Similarity': tf.cast(pattern_masks, tf.float32)})
 
+@tf.function
+def op_pixel_similarity_shapes(img, pattern_masks, shape_masks, **kwargs):
+    background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
+    label_masks = tf.concat([background_mask, shape_masks], axis=-4)
+    label_masks /= tf.reduce_sum(label_masks, axis=-4, keepdims=True)
+    return (img, {'Dot_Similarity': tf.cast(label_masks, tf.float32)})
+
 def components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n, k=1):
     components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
     components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
