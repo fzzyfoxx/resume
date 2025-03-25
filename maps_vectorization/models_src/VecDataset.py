@@ -183,7 +183,7 @@ class LineFilledGenerator(LinesGenerator):
         vecs = self.gen_vecs_to_draw(**shape_args)
 
         shape_masks = self.draw_vecs(vecs[...,::-1], thickness=shape_args['thickness']) if len(vecs)>0 else None
-        thickness = (shape_args['thickness']-1)*2+1
+        thickness = np.array((shape_args['thickness']-1)*2+1)
         return [(shape_masks, None, vecs, None, tan_angle(np.array([shape_args['angle']])), thickness.astype(np.int32))]
     
 
@@ -205,7 +205,7 @@ class DoubleLineFilledGenerator(LineFilledGenerator):
 
         shape_masks = self.draw_vecs(vecs[...,::-1], thickness=shape_args['thickness']) if len(vecs)>0 else None
         angle = tan_angle(np.array([shape_args['angle']]))
-        thickness = shape_args['thickness']//2*2+1
+        thickness = np.array(shape_args['thickness']//2*2+1)
         outputs = [(shape_masks, None, vecs, None, angle, thickness)]
 
         max_components -= len(vecs)
@@ -291,7 +291,7 @@ class PolylineGenerator(LinesGenerator):
         vecs = np.round(np.stack(vecs, axis=0)+0.5,0)
         angle = np.stack(angles, axis=0)
         shape_mask = self.draw_vecs(vecs[...,::-1].astype(np.int32), thickness=thickness) if len(vecs)>0 else None
-        thickness = (thickness-1)*2+1
+        thickness = np.array((thickness-1)*2+1)
         return [(shape_mask, None, vecs, None, angle, thickness.astype(np.int32))]
     
 
@@ -829,16 +829,19 @@ class MultishapeMapGenerator:
                         if angle_similarity_prevention:
                             previous_angles = np.concatenate([previous_angles, angle], axis=0)
                         img += self.get_pattern_drawing(pattern_mask, vis_shape_masks, vis_borderline_masks, shape_color, borderline_color)
+                        
+                        pattern_idx += 1
                     else:
                         #print(pattern_type, 'COVERED')
                         None
                     j+=1
                     i+=1
+
                 if (i>self.max_patterns_num) | (components_left<1):
                     break
             
-            if j>0:
-                pattern_idx += 1
+                #if j>0:
+                #    pattern_idx += 1
             previous_pattern = pattern_type
             r = abs(r-1)
             if (i>self.max_patterns_num) | (components_left<1):
