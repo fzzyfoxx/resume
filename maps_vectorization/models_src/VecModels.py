@@ -1429,12 +1429,13 @@ def add_batch_dims(x, batch_dims):
 
 
 class RadialEncoding(tf.keras.layers.Layer):
-    def __init__(self, emb_dim, height, width=None, inverted_angle=False, radial_reg_denom=4, **kwargs):
+    def __init__(self, emb_dim, height, width=None, inverted_angle=False, radial_reg_denom=4, reg=1.0, **kwargs):
         super().__init__(**kwargs)
 
         self.H = height
         self.W = height if width is None else width
         self.radial_reg_denom = radial_reg_denom
+        self.reg = reg
 
         self.C = emb_dim
         self.inverted_angle = inverted_angle
@@ -1461,6 +1462,7 @@ class RadialEncoding(tf.keras.layers.Layer):
     
     def clock_radial_enc(self, angles, period):
         return tf.nn.relu(tf.cos(angles + period*self.shifts*math.pi/self.shifts_num))**self.radial_reg
+
     
     def radial_dists(self, sample_points):
         return (tf.reduce_sum((self.yx-sample_points[...,tf.newaxis, tf.newaxis, :])**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
@@ -1474,7 +1476,7 @@ class RadialEncoding(tf.keras.layers.Layer):
     
     def frequency_encoding(self, r_embed):
 
-        pos_r = r_embed * self.dim_freq + self.dim_ph
+        pos_r = r_embed/self.reg * self.dim_freq + self.dim_ph*self.reg
 
         encodings = tf.concat([tf.math.sin(pos_r[...,0::2]),
                             tf.math.cos(pos_r[...,1::2])], axis=-1)

@@ -178,9 +178,9 @@ class MHA(tf.keras.layers.Layer):
         self.softmax = tf.keras.activations.softmax
         self.denominator = tf.math.sqrt(tf.cast(key_dim, tf.float32))
 
-        self.Q_head_extractior = HeadsPermuter(num_heads, reverse=False)
-        self.K_head_extractior = HeadsPermuter(num_heads, reverse=False)
-        self.V_head_extractior = HeadsPermuter(num_heads, reverse=False)
+        self.Q_head_extractor = HeadsPermuter(num_heads, reverse=False)
+        self.K_head_extractor = HeadsPermuter(num_heads, reverse=False)
+        self.V_head_extractor = HeadsPermuter(num_heads, reverse=False)
         self.output_perm = HeadsPermuter(num_heads, reverse=True)
 
         self.T = transpose_weights
@@ -190,8 +190,8 @@ class MHA(tf.keras.layers.Layer):
         self.return_weights = return_weights
 
     def call(self, V, Q, K, mask=None):
-        Q = self.Q_head_extractior(self.Q_d(Q))
-        K = self.K_head_extractior(self.K_d(K))
+        Q = self.Q_head_extractor(self.Q_d(Q))
+        K = self.K_head_extractor(self.K_d(K))
 
         scores = tf.matmul(Q, K, transpose_b=True)/self.denominator
         if mask is not None:
@@ -202,7 +202,7 @@ class MHA(tf.keras.layers.Layer):
                 scores = scores+((cross_mask-1)*math.inf)
         weights = self.softmax(scores, axis=self.softmax_axis)
 
-        V = self.V_head_extractior(self.V_d(V))
+        V = self.V_head_extractor(self.V_d(V))
         if not self.T:
             V = tf.matmul(weights, V)
         else:
