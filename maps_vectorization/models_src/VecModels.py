@@ -1814,7 +1814,39 @@ class SampleRadialEncoding(RadialEncoding):
     def radial_dists(self, a, b):
         return (tf.reduce_sum(((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a))**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
     
+class SampleRadialEncoding2(RadialEncoding):
+    def __init__(self, expand_a=True, expand_b=True, inverted_angle=False, **kwargs):
+        super().__init__(**kwargs)
+
+        self.expand_a = expand_a
+        self.expand_b = expand_b
+        self.inverted_angle = inverted_angle
+
+    def build(self, input_shape):
+
+        batch_dims = len(input_shape)-2
+
+        self.shifts_num = tf.constant(self.C//2, tf.float32)
+        self.radial_period = tf.constant(2, tf.float32)
+        self.ring_period = tf.constant(-1, tf.float32)
+
+        self.shifts = add_batch_dims(tf.range(self.C//2, dtype=tf.float32), batch_dims+2)
+
+        self.diag = tf.constant((self.H**2 + self.W**2)**0.5, tf.float32)
+
+        self.radial_reg = tf.constant(self.C/self.radial_reg_denom, tf.float32)
     
+    def calc_angles(self, a, b):
+
+        return tf.math.atan2(*tf.split((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a), 2, axis=-1))
+    
+    def clock_radial_enc(self, angles, period):
+        return tf.nn.relu(tf.cos(angles + period*self.shifts*math.pi/self.shifts_num))**self.radial_reg
+    
+    def radial_dists(self, a, b):
+        return (tf.reduce_sum(((tf.expand_dims(b, axis=-3) if self.expand_b else b)-(tf.expand_dims(a, axis=-2) if self.expand_a else a))**2, axis=-1, keepdims=True)**0.5)/self.diag*math.pi
+    
+
 class SampleSeparateRadialEncoding(SampleRadialEncoding):
 
     def call(self, a, b):
