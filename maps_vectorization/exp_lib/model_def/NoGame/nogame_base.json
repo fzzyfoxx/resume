@@ -10,7 +10,7 @@
                 "initial_nodes_num": 1,
                 "nodes_per_turn": 8,
                 "max_nodes_per_node": 1,
-                "turns": 4,
+                "turns": 2,
                 "new_only": false
             }
         },
