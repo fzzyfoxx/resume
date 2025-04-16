@@ -170,10 +170,10 @@ class MHA(tf.keras.layers.Layer):
                  **kwargs):
         super(MHA, self).__init__(**kwargs)
 
-        self.Q_d = tf.keras.layers.Dense(key_dim)
-        self.K_d = tf.keras.layers.Dense(key_dim)
-        self.V_d = tf.keras.layers.Dense(value_dim)
-        self.O_d = tf.keras.layers.Dense(output_dim)
+        self.Q_d = tf.keras.layers.Dense(key_dim, name='Q_Dense')
+        self.K_d = tf.keras.layers.Dense(key_dim, name='K_Dense')
+        self.V_d = tf.keras.layers.Dense(value_dim, name='V_Dense')
+        self.O_d = tf.keras.layers.Dense(output_dim, name='Out_Dense')
 
         self.softmax = tf.keras.activations.softmax
         self.denominator = tf.math.sqrt(tf.cast(key_dim, tf.float32))

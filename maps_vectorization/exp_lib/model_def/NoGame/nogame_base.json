@@ -10,7 +10,7 @@
                 "initial_nodes_num": 1,
                 "nodes_per_turn": 8,
                 "max_nodes_per_node": 1,
-                "turns": 2,
+                "turns": 5,
                 "new_only": false
             }
         },
@@ -62,7 +62,7 @@
         },
         "pattern_info_args": {
             "separate_downscale": true,
-            "update_mode": "unet_add_old",
+            "update_mode": "direct",
             "down_conv_args": {
                 "output_units": 128,
                 "filters": 32,
@@ -144,6 +144,7 @@
                 "pooling_type": "max"
             }
         },
+        "backbone_args": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
         "lf_model_name": "NodesLF",
         "name": "NoGame"
     },
