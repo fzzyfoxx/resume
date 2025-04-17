@@ -13,6 +13,7 @@ parser.add_argument("--run_name", default='', type=str, help="If provided, model
 parser.add_argument("--load_weights", default=0, type=int, help="If >0 then mlflow model weights are downloaded and load to model")
 parser.add_argument("--summary", default=1, type=int, help="If 1 then print compiled model summary")
 parser.add_argument("--trainer_name", default='trainer', type=str, help="Name of the trainer class")
+parser.add_argument("--auto_accept", default=1, type=int, help="Automatically accept parameters and compile model")
 
 kwargs, args = parser.parse_known_args()#vars(parser.parse_args())
 kwargs = vars(kwargs)
@@ -21,6 +22,7 @@ load_weights = bool(kwargs['load_weights'])
 print_summary = bool(kwargs['summary'])
 cache_path = '../model_cache'
 trainer_name = kwargs['trainer_name']
+auto_accept = bool(kwargs['auto_accept'])
 
 if run_name!='':
     model_def = download_mlflow_model_components(run_name=run_name, load_weights=load_weights, dst_path=cache_path)
@@ -69,4 +71,4 @@ if __name__=="__main__":
         globals()[trainer_name].run_id = get_mlflow_run_id_by_name(run_name)
         
     else:
-        display_dict(model_args, trainer=globals()[trainer_name], compile_args_func=compile_args_gen, compile_args=cfg.compiler_func_args) # type: ignore
+        display_dict(model_args, trainer=globals()[trainer_name], compile_args_func=compile_args_gen, compile_args=cfg.compiler_func_args, auto_accept=auto_accept, print_summary=print_summary) # type: ignore

@@ -65,40 +65,44 @@ def update_dict_from_widgets(d, widgets_dict):
     for key, widget in widgets_dict.items():
         d[key] = widget.value
 
-def display_dict(d, trainer=None, compile_args_func=None, compile_args={}, css=dark_mode_css, nested=False, nested_title=None):
-
-    if nested:
-        css = f'<h5> {nested_title} </h5>'
-    display(HTML(css))
-
-    widgets_dict = create_widgets_for_dict(d, css=css)
-    widget_list = list(widgets_dict.values())
-    
-    # Create a GridBox to display widgets in 4 columns
-    grid = widgets.GridBox(widget_list, layout=widgets.Layout(
-        grid_template_columns="repeat(4, 1fr)",
-        grid_gap="10px 10px"
-    ))
-    
-    display(grid)
-    
-    update_button = widgets.Button(description="Accept Parameters" if not nested else "Pass Parameters")
-    display(update_button)
-    
-    def on_update_button_clicked(b):
-        update_dict_from_widgets(d, widgets_dict)
-        print("Dictionary updated:", d)
+def display_dict(d, trainer=None, compile_args_func=None, compile_args={}, css=dark_mode_css, nested=False, nested_title=None, auto_accept=False, print_summary=True):
 
     def trainer_compile(b):
         trainer.compile_model(
                     model_args = d, 
-                    print_summary = True,
+                    print_summary = print_summary,
                     summary_kwargs = {'expand_nested': False, 'line_length': 100},
                     **compile_args_func(**compile_args)
                 )
         print('Model compiled. Use trainer.train_model for training.\nAccept parameters again to re-compile.')
-    
-    update_button.on_click(on_update_button_clicked)
 
-    if trainer is not None:
-        update_button.on_click(trainer_compile)
+    if auto_accept:
+        trainer_compile(None)
+    else:
+        if nested:
+            css = f'<h5> {nested_title} </h5>'
+        display(HTML(css))
+
+        widgets_dict = create_widgets_for_dict(d, css=css)
+        widget_list = list(widgets_dict.values())
+        
+        # Create a GridBox to display widgets in 4 columns
+        grid = widgets.GridBox(widget_list, layout=widgets.Layout(
+            grid_template_columns="repeat(4, 1fr)",
+            grid_gap="10px 10px"
+        ))
+        
+        display(grid)
+        
+        update_button = widgets.Button(description="Accept Parameters" if not nested else "Pass Parameters")
+        display(update_button)
+        
+        def on_update_button_clicked(b):
+            update_dict_from_widgets(d, widgets_dict)
+            print("Dictionary updated:", d)
+
+        
+        update_button.on_click(on_update_button_clicked)
+
+        if trainer is not None:
+            update_button.on_click(trainer_compile)

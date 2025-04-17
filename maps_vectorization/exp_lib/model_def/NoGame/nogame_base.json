@@ -2,15 +2,17 @@
     "model_args": {
         "general_setting": {
             "size": 32,
-            "activation": "relu"
+            "activation": "relu",
+            "output_format": "concatenated"
         },
         "node_incr_args": {
             "mode": "static",
             "params": {
                 "initial_nodes_num": 1,
                 "nodes_per_turn": 8,
-                "max_nodes_per_node": 1,
-                "turns": 5,
+                "max_nodes_per_node": 3,
+                "turns": 10,
+                "no_new_nodes_turn": 6,
                 "new_only": false
             }
         },
@@ -62,7 +64,7 @@
         },
         "pattern_info_args": {
             "separate_downscale": true,
-            "update_mode": "direct",
+            "update_mode": "unet_add_old",
             "down_conv_args": {
                 "output_units": 128,
                 "filters": 32,
@@ -71,7 +73,7 @@
                 "dropout": 0.0,
                 "phase_conv_num": 2,
                 "phases_num": 3,
-                "pooling_type": "avg"
+                "pooling_type": "max"
             },
             "mha_args": {
                 "output_dim": 32,
@@ -105,7 +107,7 @@
                 "dropout": 0.0,
                 "phase_conv_num": 2,
                 "phases_num": 3,
-                "pooling_type": "avg"
+                "pooling_type": "max"
             },
             "out_ffn_args": {
                 "mid_layers": 2,
@@ -148,9 +150,29 @@
         "lf_model_name": "NodesLF",
         "name": "NoGame"
     },
-    "generator_module": "",
-    "generator_func_name": "",
-    "compiler_func": "",
+    "generator_module": "Adventurers.model_generators.nogame_models",
+    "generator_func_name": "NoGame_model_generator",
+    "compiler_func": "exp_lib.compilers.nogame_simplified",
     "compiler_func_args": {
+        "learning_rate": 0.001,
+        "node_incr_args": {
+                    "mode": "static",
+                    "params": {
+                        "initial_nodes_num": 1,
+                        "nodes_per_turn": 8,
+                        "max_nodes_per_node": 3,
+                        "turns": 10,
+                        "no_new_nodes_turn": 6,
+                        "new_only": false
+                    }
+                },
+        "assignment_threshold": 2.5,
+        "angles_num": 16,
+        "label_smoothing": 0.2,
+        "size": 32,
+        "norm_ord": 1,
+        "gamma": 10.0,
+        "inf_value": 1000,
+        "hungarian": false
     }
 }
