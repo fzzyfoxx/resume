@@ -11,7 +11,7 @@
                 "initial_nodes_num": 1,
                 "nodes_per_turn": 8,
                 "max_nodes_per_node": 3,
-                "turns": 10,
+                "turns": 3,
                 "no_new_nodes_turn": 6,
                 "new_only": false
             }
@@ -147,6 +147,7 @@
             }
         },
         "backbone_args": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
+        "backbone_layers": {"batch_norm": "Batch-Normalization", "features": "Up-Conv_2"},
         "lf_model_name": "NodesLF",
         "name": "NoGame"
     },
@@ -161,7 +162,7 @@
                         "initial_nodes_num": 1,
                         "nodes_per_turn": 8,
                         "max_nodes_per_node": 3,
-                        "turns": 10,
+                        "turns": 3,
                         "no_new_nodes_turn": 6,
                         "new_only": false
                     }
