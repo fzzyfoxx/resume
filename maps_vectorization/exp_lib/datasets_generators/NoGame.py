@@ -29,6 +29,7 @@ msmg = MultishapeMapGenerator(**msmg_config['msmg'])
 
 size = msmg_config['msmg']['size']
 max_shapes_num = get_max_pattern_shapes_num(msmg_config['msmg'])
+cfg.max_shapes_num = max_shapes_num
 
 dg = DatasetGenerator(map_generator=msmg,
                       ds_path=cfg.ds_path,

@@ -3,15 +3,18 @@
         "general_setting": {
             "size": 32,
             "activation": "relu",
-            "output_format": "concatenated"
+            "output_format": "concatenated",
+            "norm_ord": 2,
+            "proper_node_threshold": 2.5,
+            "masked_dist": 1000
         },
         "node_incr_args": {
             "mode": "static",
             "params": {
                 "initial_nodes_num": 1,
-                "nodes_per_turn": 8,
+                "nodes_per_turn": 4,
                 "max_nodes_per_node": 3,
-                "turns": 3,
+                "turns": 8,
                 "no_new_nodes_turn": 6,
                 "new_only": false
             }
