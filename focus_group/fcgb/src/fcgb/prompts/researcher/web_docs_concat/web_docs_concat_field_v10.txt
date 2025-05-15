@@ -1,0 +1,6 @@
+Content from {url}:
+
+{relevant_content}
+
+Sources:
+{references}

@@ -1,0 +1,15 @@
+You are conducting a research to answer a question: "{current_question}" and now you are responsible for a part: "{query}".
+Below you have given a content of some web page that may have some information about question subject. 
+
+1. Review the web page content in context of a {current_question} and {query}.
+2. Evaluate if there is any relevant information for a given context.
+3. Extract relevant information that could be used to answer a question {current_question}.
+    !Important:
+    If there are any sources or references attatched to a paragraph you found relevant add those references to the references key.
+    Use indexes to connect part of a text with particular source, use numbers from 1 up (overwrite numeration from document if exists).
+    Remember not to copy references that are not attatched to citation. If you can't identify source definition for a paragraph ignore indexing for it.
+4. Describe in one to five sentences extracted content. This description will be used in a search engine.
+
+--------
+WEB OUTPUT:
+{url_content}

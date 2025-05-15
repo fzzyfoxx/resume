@@ -1,0 +1,3 @@
+Thank you {customer_name} for helping me to understand main subject of your "{main_title}" guide which wich will be: "{main_subject}".
+Now, as an Editor, I will try to go much deeper into your requirements so I would be able to manage my coworkers to write proper content for you.
+Try to answer my questions comprehensively, our all future actions depends on how well we will define how "{main_title}" guide should look like.
