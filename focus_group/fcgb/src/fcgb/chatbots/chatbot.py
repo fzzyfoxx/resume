@@ -4,9 +4,10 @@ from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage, 
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables.graph import MermaidDrawMethod
 from IPython.display import Image, display
-from typing import List, Dict, Any, TypedDict, Generic, TypeVar
+from typing import List, Dict, Any, TypedDict
 from pydantic import BaseModel
 from fcgb.utils import load_txt
+from fcgb.prompt_manager import PromptManager
 import nest_asyncio
 
 class ButtonMessageSpec(TypedDict):
@@ -19,7 +20,8 @@ class SimpleChatBot:
                  initial_messages_spec,
                  button_messsage_spec: ButtonMessageSpec,
                  memory=None,
-                 button_message=True
+                 button_message=True,
+                 prompt_manager_spec={}
                  ):
         
         self.llm = llm
@@ -27,6 +29,8 @@ class SimpleChatBot:
         self.button_messsage_spec = button_messsage_spec
         self.memory = memory if memory else MemorySaver()
         self.button_message = button_message
+
+        self.prompts = PromptManager(**prompt_manager_spec)
 
         self._set_state_class()
         self._compile_graph()
@@ -48,11 +52,11 @@ class SimpleChatBot:
 
         self.state_class = State[summary_type]
     
-    def _apply_initial_message(self, config, template_inputs, source, template_path, hidden=False, as_node=None):
+    def _apply_initial_message(self, config, template_inputs, source, template, hidden=False, as_node=None):
         """
         Apply a message to the graph state.
         """
-        msg_content = load_txt(template_path).format(**template_inputs)
+        msg_content = self.prompts.get_prompt(template).format(**template_inputs)
         msg = self.message_types_map[source](msg_content, name="hidden" if hidden else "basic")
 
         self.graph.update_state(config=config, values={'messages': msg}, as_node=as_node)
@@ -66,7 +70,7 @@ class SimpleChatBot:
         Set the button prompt for the graph state.
         """
         if self.button_messsage_spec:
-            self.button_prompt = load_txt(self.button_messsage_spec['template_path']).format(**template_inputs)
+            self.button_prompt = self.prompts.get_prompt(self.button_messsage_spec['template']).format(**template_inputs)
             self.button_model = self.button_messsage_spec['answer_format']
     
     def init_thread(self, thread_id: str, template_inputs: Dict[str, Any] = {}):
