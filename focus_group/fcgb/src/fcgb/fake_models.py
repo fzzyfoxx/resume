@@ -1,9 +1,10 @@
-from typing import Any, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple, TypedDict
 from pydantic import BaseModel
 import random
 from langchain_core.messages import AIMessage
 from numpy.random import uniform
 import string
+from fcgb.types.tavily import TavilySearchSingleResult, TavilySearchResults, TavilyExtractSingleResult, TavilyExtractResults
 
 def random_string(length: int) -> str:
     """
@@ -218,13 +219,13 @@ class FakeEmbeddingModel:
     
     def embed_query(self, text, *args, **kwargs):
         return self._gen_embs()
-    
+
 
 class FakeTavily:
     def __init__(self):
         pass
 
-    def _set_search_result(self, i: int):
+    def _set_search_result(self, i: int) -> TavilySearchSingleResult:
         return {
             "title": f"Fake title {i} {random_string(5)}",
             "url": f"https://fake-url-{i}-{random_string(5)}.com",
@@ -233,14 +234,14 @@ class FakeTavily:
             "raw_content": None
         }
     
-    def _set_extract_result(self, url: str, i: int):
+    def _set_extract_result(self, url: str, i: int) -> TavilyExtractSingleResult:
         return {
             "url": url,
             "raw_content": f"Fake raw content {i} {random_string(5)}",
             "images": []
         }
 
-    def search(self, query: str, max_results: int, exclude_domains: List[str]=None):
+    def search(self, query: str, max_results: int, exclude_domains: List[str]=None, *args, **kwargs) -> TavilySearchResults:
         results = [self._set_search_result(i) for i in range(max_results)]
 
         return {
@@ -252,7 +253,7 @@ class FakeTavily:
             "response_time": uniform(0, 1)
         }
     
-    def extract(self, urls: List[str], *args, **kwargs):
+    def extract(self, urls: List[str], *args, **kwargs) -> TavilyExtractResults:
         results = [self._set_extract_result(url, i) for i, url in enumerate(urls)]
 
         return {

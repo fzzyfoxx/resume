@@ -1,18 +1,18 @@
 from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 
-class nnmodel(BaseModel):
+class simple_model(BaseModel):
     nn_str: str
     nn_list: List[bool]
 
-class nmodel(BaseModel):
+class model_with_nesting(BaseModel):
     n_str: str
     n_bool: bool
     n_list: List[Dict[str, bool]]
     n_dict: Dict[int, str]
-    n_models_list: List[nnmodel]
+    n_models_list: List[simple_model]
 
-class amodel(BaseModel):
+class model_with_double_nesting(BaseModel):
     str_var: str
     int_var: int
     list_var: List[str]
@@ -22,4 +22,4 @@ class amodel(BaseModel):
     bool_var: bool
     float_var: float
     none_var: None
-    list_of_models: List[nmodel]
+    list_of_models: List[model_with_nesting]
