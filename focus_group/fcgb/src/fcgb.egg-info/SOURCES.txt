@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+src/fcgb/__init__.py
+src/fcgb/chatbot.py
+src/fcgb/fake_models.py
+src/fcgb/utils.py
+src/fcgb.egg-info/PKG-INFO
+src/fcgb.egg-info/SOURCES.txt
+src/fcgb.egg-info/dependency_links.txt
+src/fcgb.egg-info/requires.txt
+src/fcgb.egg-info/top_level.txt

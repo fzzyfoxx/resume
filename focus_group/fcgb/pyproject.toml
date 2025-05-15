@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fcgb"
+version = "0.1.0"
+description = "A Python package for focus group analysis."
+authors = [
+    { name = "Dariusz Łazor", email = "fzzyfoxx@gmail.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["focus group", "analysis", "python"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "pydantic>=2.11.4",          # Used in fake_models.py for BaseModel
+    "langchain-core>=0.3.58",     # Used in chatbot.py and fake_models.py for AIMessage, etc.
+    "langgraph>=0.4.3",          # Used in chatbot.py for graph-related functionality
+    "IPython>=9.2.0",            # Used in chatbot.py for display functionality
+    "nest-asyncio>=1.6.0",       # Used in chatbot.py for async handling
+    "numpy>=2.2.5",             # Used in fake_models.py for uniform random generation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+fcgb = [
+    "fcgb/prompts/**/*.txt",
+    "fcgb/prompts/**/*.json"
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*.pyo", "*~", "*.bak"]

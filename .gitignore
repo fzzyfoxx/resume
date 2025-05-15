@@ -1,2 +1,5 @@
 locals
 lang_venv
+focus_group/studio
+get-pip.py
+.vscode
