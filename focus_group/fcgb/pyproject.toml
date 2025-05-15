@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fcgb"
-version = "0.1.0"
-description = "A Python package for focus group analysis."
+version = "0.1.1"
+description = "A Python package for guide book generation using LLM"
 authors = [
     { name = "Dariusz Łazor", email = "fzzyfoxx@gmail.com" }
 ]

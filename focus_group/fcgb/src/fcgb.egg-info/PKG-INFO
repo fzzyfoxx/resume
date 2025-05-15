@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: fcgb
-Version: 0.1.0
-Summary: A Python package for focus group analysis.
+Version: 0.1.1
+Summary: A Python package for guide book generation using LLM
 Author-email: Dariusz Łazor <fzzyfoxx@gmail.com>
 License: MIT
 Keywords: focus group,analysis,python
