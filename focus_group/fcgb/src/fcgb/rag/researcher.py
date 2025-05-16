@@ -63,7 +63,7 @@ class RAGResearcher:
                  web_search_client,
                  web_search_kwargs,
                  max_queries_num,
-                 prompt_manage_spec={}
+                 prompt_manager_spec={}
                  ):
         
         self.llm = llm
@@ -78,7 +78,7 @@ class RAGResearcher:
 
         self.max_queries_num = max_queries_num
 
-        self.pm = PromptManager(**prompt_manage_spec)
+        self.pm = PromptManager(**prompt_manager_spec)
         self._load_prompts()
 
         self.web_doc_vector_fields = self.rag_module.get_vec_fields(self.rag_kwargs['search_index_name'])

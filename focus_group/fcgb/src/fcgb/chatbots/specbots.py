@@ -1,5 +1,5 @@
 from fcgb.chatbots.chatbot import SimpleChatBot
-from fcgb.cfg.inputs_spec import MainSubjectConfig, SubjectDetailsConfig
+from fcgb.cfg.chat_inputs_spec import MainSubjectConfig, SubjectDetailsConfig
 
 
 class MainSubjectChatBot(SimpleChatBot):
