@@ -32,19 +32,31 @@ class mongodb_config(BaseConfig):
 
 class mongodb_rag_config(BaseConfig):
     prod = {
-        'collection': 'vec-web-data',
-        'search_index_name': 'web-data-index',
-        'load_web_docs': True
+        'collection': 'vec-web-data-prod',
+        'search_index_name': 'web-data-prod-index',
+        'load_web_docs': True,
+        'embdding_size': 768,
+        'similarity_func': 'cosine',
+        'vector_fields': ['relevant_content', 'description'],
+        'filter_fields': ['source', 'user_id', 'thread_id']
     }
     dev = {
-        'collection': 'dev-vec-web-data',
-        'search_index_name': 'dev-web-data-index',
-        'load_web_docs': True
+        'collection': 'vec-web-data-dev',
+        'search_index_name': 'web-data-dev-index',
+        'load_web_docs': True,
+        'embdding_size': 768,
+        'similarity_func': 'cosine',
+        'vector_fields': ['relevant_content', 'description'],
+        'filter_fields': ['source', 'user_id', 'thread_id']
     }
     test = {
-        'collection': 'test-vec-web-data',
-        'search_index_name': 'test-web-data-index',
-        'load_web_docs': True
+        'collection': 'vec-web-data-test',
+        'search_index_name': 'web-data-test-index',
+        'load_web_docs': True,
+        'embdding_size': 768,
+        'similarity_func': 'cosine',
+        'vector_fields': ['relevant_content', 'description'],
+        'filter_fields': ['source', 'user_id', 'thread_id']
     }
 
 class mongodb_saver_config(mongodb_config):
@@ -62,13 +74,16 @@ class google_embedding_config(BaseConfig):
     embedding_func = VertexAIEmbeddings
     embedding_kwargs = {'model': 'text-embedding-005'}
 
+def none_embedding_func(*args, **kwargs):
+    return None
+
 class none_embedding_config(BaseConfig):
-    embedding_func = None
+    embedding_func = none_embedding_func
     embedding_kwargs = {}
 
 class fake_embedding_config(BaseConfig):
     embedding_func = FakeEmbeddingModel
-    embedding_kwargs = {}
+    embedding_kwargs = {'embedding_size': 768}
 
 #------------------------------------------------------------
 

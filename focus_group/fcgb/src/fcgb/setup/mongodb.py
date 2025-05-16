@@ -3,6 +3,8 @@ import os
 from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
 from langchain_mongodb import MongoDBAtlasVectorSearch
+from fcgb.rag.precompiled import get_rag
+from fcgb.cfg.vars import mongodb_rag_config
 
 
 def setup_mongodb():
@@ -10,49 +12,25 @@ def setup_mongodb():
         This function creates necessary collections and indexes in MongoDB for the RAG system
     """
 
-    DB_URI = os.getenv('MONGO_URI')
+    for mode in ['prod', 'dev', 'test']:
 
-    mongo_client = MongoClient(DB_URI)
-    db = mongo_client['FocusGroup']
-
-    rag = MongodbRAG(
-            database=db,
-            collection_name='vec-web-data',
-            embedding_model=None
+        rag = get_rag(
+            mode=mode,
+            db_engine='mongodb',
+            embedding_model='none'
         )
-    
-    rag.add_index(
-        index_name='web-data-index',
-        similarity_func='cosine',
-        embedding_dimension=768,
-        vector_fields=['relevant_content', 'description'],
-        filter_fields=['source', 'user_id', 'thread_id']
-    )
 
-    rag = MongodbRAG(
-            database=db,
-            collection_name='dev-vec-web-data',
-            embedding_model=None
-        )
+        mode_kwargs = getattr(mongodb_rag_config, mode)
+        index_name = mode_kwargs.get('search_index_name')
+        embedding_size = mode_kwargs.get('embdding_size')
+        similarity_func = mode_kwargs.get('similarity_func')
+        vector_fields = mode_kwargs.get('vector_fields')
+        filter_fields = mode_kwargs.get('filter_fields')
     
-    rag.add_index(
-        index_name='dev-web-data-index',
-        similarity_func='cosine',
-        embedding_dimension=768,
-        vector_fields=['relevant_content', 'description'],
-        filter_fields=['source', 'user_id', 'thread_id']
-    )
-
-    rag = MongodbRAG(
-            database=db,
-            collection_name='test-vec-web-data',
-            embedding_model=None
+        rag.add_index(
+            index_name=index_name,
+            similarity_func=similarity_func,
+            embedding_dimension=embedding_size,
+            vector_fields=vector_fields,
+            filter_fields=filter_fields
         )
-    
-    rag.add_index(
-        index_name='test-web-data-index',
-        similarity_func='cosine',
-        embedding_dimension=768,
-        vector_fields=['relevant_content', 'description'],
-        filter_fields=['source', 'user_id', 'thread_id']
-    )

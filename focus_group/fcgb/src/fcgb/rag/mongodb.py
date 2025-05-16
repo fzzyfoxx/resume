@@ -86,7 +86,7 @@ class MongodbRAG:
             }
 
             self.index_metadata_collection.insert_one(index_metadata)
-
+            print(f"Index {index_name} created in collection {self.collection_name}.")
             return 'index_created'
 
     def drop_index(self, index_name: str):
@@ -107,6 +107,15 @@ class MongodbRAG:
 
         return index_metadata['vector_fields']
     
+    def _get_vec_fields_filter(self, index_name: str):
+        """
+        Get the vector fields filter for a given index_name that can be used to exclude vector fields in $project stage.
+        Args:
+            index_name (str): The name of the search index.
+        Returns:
+            List[Dict[str, 1]]: A list of tuples containing the source field and vector field names.
+        """
+        return {vec_field['vec_path']: 0 for vec_field in self.get_vec_fields(index_name)}
     
     def add_documents(self, 
                       documents: List[Dict[str, Any]], 
@@ -172,22 +181,26 @@ class MongodbRAG:
 
         vector_field_name = self._assign_vector_field_name(source_field)
         query_vector = self.embedding_model.embed_query(query, embeddings_task_type='RETRIEVAL_QUERY')
-
-        init_filters = [{'$match': filters}] if filters else []
+        filters = filters or {}
 
         search_stage = [{
             '$vectorSearch': {
                 'index': index_name,
                 'path': vector_field_name,
-                'query_vector': query_vector,
+                'queryVector': query_vector,
                 'exact': True,
+                'filter': filters,
                 "limit": limit
             }
         }]
 
-        threshold_filter = [{'$match': {"results.score": {"$gte": threshold}}}] if threshold else []
+        output_stage = [{
+                    '$project': {'score': {'$meta': 'vectorSearchScore'}} | self._get_vec_fields_filter(index_name)
+                }]
 
-        pipeline = init_filters + search_stage + threshold_filter
+        threshold_filter = [{'$match': {"score": {"$gt": threshold}}}] if threshold else []
+
+        pipeline = search_stage + output_stage + threshold_filter
 
         result = self.collection.aggregate(pipeline)
 

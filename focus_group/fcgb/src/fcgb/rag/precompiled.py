@@ -7,6 +7,39 @@ from fcgb.rag.mongodb import MongodbRAG
 from fcgb.rag.researcher import RAGResearcher
 from typing import Literal
 
+# Functions for base models
+
+def get_embedding_model(embedding_model: Literal['google', 'none', 'fake']):
+    """
+    Get the embedding model based on the specified type.
+    :param embedding_model: The type of embedding model to use (google, none, fake).
+    :return: An instance of the embedding model.
+    """
+    embedding_config = getattr(vars, f"{embedding_model}_embedding_config")
+    return embedding_config.embedding_func(**embedding_config.embedding_kwargs)
+
+def get_search_engine(search_engine: Literal['tavily', 'fake']):
+    """
+    Get the search engine based on the specified type.
+    :param search_engine: The type of search engine to use (tavily, fake).
+    :return: An instance of the search engine.
+    """
+    search_config = getattr(vars, f"{search_engine}_search_config")
+    return search_config.search_func(**search_config.search_kwargs)
+
+def get_llm(llm_model = Literal['google', 'fake']):
+    """
+    Get the LLM based on the specified type.
+    :param llm_model: The type of LLM to use (google, fake).
+    :return: An instance of the LLM.
+    """
+    llm_config = getattr(vars, f"{llm_model}_llm_config")
+    return llm_config.llm_func(**llm_config.llm_kwargs)
+
+#------------------------------------------------------------
+
+# Database client functions
+# name pattern: _get_{db_engine}_client
 def _get_mongodb_client(db_uri_key: str, db_name: str):
     """
     Get the MongoDB client for the specified URI key and database name.
@@ -26,6 +59,11 @@ def get_db_client(db_engine: Literal['mongodb']):
     db_client_func = globals().get(f"_get_{db_engine}_client")
     return db_client_func(**db_config.params())
 
+#------------------------------------------------------------
+
+# Get RAG system
+# name pattern: _get_{db_engine}_rag
+
 def _get_mongodb_rag(db, mode, embedding_model):
     """
     Get the MongoDB RAG instance for the specified mode and embedding model.
@@ -41,15 +79,6 @@ def _get_mongodb_rag(db, mode, embedding_model):
         embedding_model=embedding_model
     )
 
-def get_embedding_model(embedding_model: Literal['google', 'none', 'fake']):
-    """
-    Get the embedding model based on the specified type.
-    :param embedding_model: The type of embedding model to use (google, none, fake).
-    :return: An instance of the embedding model.
-    """
-    embedding_config = getattr(vars, f"{embedding_model}_embedding_config")
-    return embedding_config.embedding_func(**embedding_config.embedding_kwargs)
-
 def get_rag(
         mode: Literal['prod', 'dev', 'test'] = 'dev', 
         db_engine: Literal['mongodb'] = 'mongodb',
@@ -64,26 +93,13 @@ def get_rag(
     """
     db = get_db_client(db_engine)
     embedding_model = get_embedding_model(embedding_model)
+    rag_func = globals().get(f"_get_{db_engine}_rag")
+    return rag_func(db, mode, embedding_model)
 
-    return _get_mongodb_rag(db, mode, embedding_model)
+#------------------------------------------------------------
 
-def get_search_engine(search_engine: Literal['tavily', 'fake']):
-    """
-    Get the search engine based on the specified type.
-    :param search_engine: The type of search engine to use (tavily, fake).
-    :return: An instance of the search engine.
-    """
-    search_config = getattr(vars, f"{search_engine}_search_config")
-    return search_config.search_func(**search_config.search_kwargs)
-
-def get_llm(llm_model = Literal['google', 'fake']):
-    """
-    Get the LLM based on the specified type.
-    :param llm_model: The type of LLM to use (google, fake).
-    :return: An instance of the LLM.
-    """
-    llm_config = getattr(vars, f"{llm_model}_llm_config")
-    return llm_config.llm_func(**llm_config.llm_kwargs)
+# Get LangGraph checkpointer from config
+# name pattern: _get_{checkpointer_mode}_saver
 
 def _get_mongodb_saver(db_uri_key: str, db_name: str):
     """
@@ -111,6 +127,11 @@ def get_checkpointer(checkpointer_mode: Literal['mongodb', 'local']):
     checkpointer_config = getattr(vars, f"{checkpointer_mode}_saver_config")
     saver_func = globals().get(f"_get_{checkpointer_mode}_saver")
     return saver_func(**checkpointer_config.params())
+
+
+#------------------------------------------------------------
+
+# Get compiled RAG researcher
 
 def get_researcher(
         mode: Literal['prod', 'dev', 'test'] = 'dev',
