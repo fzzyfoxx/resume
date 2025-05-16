@@ -31,12 +31,26 @@ def setup_mongodb():
 
     rag = MongodbRAG(
             database=db,
+            collection_name='dev-vec-web-data',
+            embedding_model=None
+        )
+    
+    rag.add_index(
+        index_name='dev-web-data-index',
+        similarity_func='cosine',
+        embedding_dimension=768,
+        vector_fields=['relevant_content', 'description'],
+        filter_fields=['source', 'user_id', 'thread_id']
+    )
+
+    rag = MongodbRAG(
+            database=db,
             collection_name='test-vec-web-data',
             embedding_model=None
         )
     
     rag.add_index(
-        index_name='test_web-data-index',
+        index_name='test-web-data-index',
         similarity_func='cosine',
         embedding_dimension=768,
         vector_fields=['relevant_content', 'description'],

@@ -12,6 +12,7 @@ from typing import List, Dict, Any, TypedDict
 from pydantic import BaseModel
 from fcgb.types.rag import QueryListModel, WebOutputModel, RAGGeneralState, QueriesState, WebSearchState, WebSearchOutputHandlerState, WebResponseRoutingModel
 from fcgb.prompt_manager import PromptManager
+import nest_asyncio
 
 class RAGResearcher:
     """
@@ -83,6 +84,8 @@ class RAGResearcher:
 
         self.web_doc_vector_fields = self.rag_module.get_vec_fields(self.rag_kwargs['search_index_name'])
         self.load_web_docs = self.rag_kwargs.get('load_web_docs', False)
+
+        self._set_web_search_graph()
 
 
     def _load_prompts(self):
@@ -192,7 +195,7 @@ class RAGResearcher:
         web_output_handler = self._set_web_output_handler_func()
         web_output_aggregation = self._set_web_output_aggregation_func()
 
-        web_search_workflow = StateGraph(self.GeneralState)
+        web_search_workflow = StateGraph(RAGGeneralState)
         # Prepare set of queries
         web_search_workflow.add_node('prepare_queries', prepare_queries) 
         web_search_workflow.add_edge(START, 'prepare_queries')
@@ -210,6 +213,7 @@ class RAGResearcher:
         self.web_search_graph = web_search_workflow.compile(checkpointer=self.memory)
 
     def display_graph(self, graph):
+        nest_asyncio.apply()
         display(Image(graph.get_graph(xray=1).draw_mermaid_png(draw_method=MermaidDrawMethod.PYPPETEER), height=200, width=200))
 
     @property
