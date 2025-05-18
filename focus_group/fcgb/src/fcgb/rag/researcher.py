@@ -114,7 +114,6 @@ class RAGResearcher:
     def _set_run_web_search_func(self):
 
         def run_web_search(state: WebSearchState) -> WebResponseRoutingModel:
-            print('run_web_search', state)
             urls = [elem['url'] for elem in self.web_search_client.search(state['query'], **self.web_search_kwargs.get('search', {}))['results']]
             urls_response = self.web_search_client.extract(urls, **self.web_search_kwargs.get('extract', {}))['results']
 
@@ -128,7 +127,6 @@ class RAGResearcher:
             return {'responses': urls_response}
         
         def urls_responses_routing(state: WebResponseRoutingModel):
-            print('url_responses_routing', state)
             return [Send('web_output_handler', url_response) for url_response in state.responses]
         
         return run_web_search, urls_responses_routing
@@ -152,7 +150,6 @@ class RAGResearcher:
     def _set_web_output_handler_func(self):
 
         def web_output_handler(state: WebSearchOutputHandlerState, config: RunnableConfig):
-            print('web_output_handler', state)
             response = self.llm.with_structured_output(WebOutputModel).invoke(self.prompts['summarize_web_output'].format(current_question=state.current_question, query=state.query, url_content=state.url_content))
             response_doc = self._form_web_document(response, state.url, state.query, config['configurable']['thread_id'], config['configurable']['user_id'])
             
@@ -167,7 +164,6 @@ class RAGResearcher:
     def _set_web_output_aggregation_func(self):
 
         def web_output_aggregation(state: RAGGeneralState):
-            print(state)
             created_at = Timestamp(int(datetime.now().timestamp()), 1)
             filtered_contents = [doc.model_dump() | {'created_at': created_at} for doc in state.documents if doc.is_relevant]
 

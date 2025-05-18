@@ -49,15 +49,15 @@ def _get_mongodb_client(db_uri_key: str, db_name: str):
     """
     return MongoClient(os.getenv(db_uri_key))[db_name]
 
-def get_db_client(db_engine: Literal['mongodb']):
+def get_db_client(db_engine: Literal['mongodb'], mode: Literal['prod', 'dev', 'test'] = 'dev'):
     """
     Get the database client for the specified engine.
     :param db_engine: The database engine to use (mongodb).
     :return: An instance of the database client.
     """
-    db_config = getattr(vars, f"{db_engine}_config")
+    db_config = getattr(getattr(vars, f"{db_engine}_config"), mode)
     db_client_func = globals().get(f"_get_{db_engine}_client")
-    return db_client_func(**db_config.params())
+    return db_client_func(**db_config)
 
 #------------------------------------------------------------
 
@@ -91,7 +91,7 @@ def get_rag(
     :param embedding_model: The embedding model to use (google, none, fake).
     :return: An instance of the RAG system.
     """
-    db = get_db_client(db_engine)
+    db = get_db_client(db_engine, mode)
     embedding_model = get_embedding_model(embedding_model)
     rag_func = globals().get(f"_get_{db_engine}_rag")
     return rag_func(db, mode, embedding_model)
@@ -118,15 +118,15 @@ def _get_local_saver():
     """
     return MemorySaver()
 
-def get_checkpointer(checkpointer_mode: Literal['mongodb', 'local']):
+def get_checkpointer(checkpointer_mode: Literal['mongodb', 'local'], mode: Literal['prod', 'dev', 'test'] = 'dev'):
     """
     Get the checkpointer based on the specified mode.
     :param checkpointer_mode: The mode of operation (mongodb, local).
     :return: An instance of the checkpointer.
     """
-    checkpointer_config = getattr(vars, f"{checkpointer_mode}_saver_config")
+    checkpointer_config = getattr(getattr(vars, f"{checkpointer_mode}_saver_config"), mode)
     saver_func = globals().get(f"_get_{checkpointer_mode}_saver")
-    return saver_func(**checkpointer_config.params())
+    return saver_func(**checkpointer_config)
 
 
 #------------------------------------------------------------
@@ -145,7 +145,7 @@ def get_researcher(
     llm = get_llm(llm_model)
     rag = get_rag(mode, db_engine, embedding_model)
     rag_kwargs = getattr(getattr(vars, f"{db_engine}_rag_config"), mode)
-    memory = get_checkpointer(chackpointer_mode)
+    memory = get_checkpointer(chackpointer_mode, mode)
     search_engine = get_search_engine(search_engine)
     other_kwargs = getattr(vars, f"{mode}_researcher_config").params()
 

@@ -27,8 +27,18 @@ class fake_llm_config(BaseConfig):
 # storage RAG config pattern: {storage_engine}_rag_config
 # checkpointer config pattern: {checkpointer_mode}_saver_config
 class mongodb_config(BaseConfig):
-    db_name = 'FocusGroup'
-    db_uri_key = 'MONGO_URI'
+    prod = {
+        'db_uri_key': 'MONGO_URI',
+        'db_name': 'fcgb-prod',
+    }
+    dev = {
+        'db_uri_key': 'MONGO_URI',
+        'db_name': 'fcgb-dev',
+    }
+    test = {
+        'db_uri_key': 'MONGO_URI',
+        'db_name': 'fcgb-test',
+    }
 
 class mongodb_rag_config(BaseConfig):
     prod = {
@@ -63,7 +73,9 @@ class mongodb_saver_config(mongodb_config):
     pass
 
 class local_saver_config(BaseConfig):
-    pass
+    prod = {}
+    dev = {}
+    test = {}
 
 #------------------------------------------------------------
 
@@ -106,7 +118,7 @@ class prod_researcher_config(BaseConfig):
     web_search_kwargs = {
             'search': {
                 'max_results': 5,
-                'exclude_domains': ['arxiv.org', 'researchgate.net', 'dl.acm.org', 'researchgate.net']
+                'exclude_domains': ['arxiv.org', 'researchgate.net', 'dl.acm.org']
             },
             'extract': {
             }
@@ -117,7 +129,7 @@ class dev_researcher_config(BaseConfig):
     web_search_kwargs = {
             'search': {
                 'max_results': 3,
-                'exclude_domains': []
+                'exclude_domains': ['arxiv.org', 'researchgate.net', 'dl.acm.org']
             },
             'extract': {
             }
@@ -128,7 +140,7 @@ class test_researcher_config(BaseConfig):
     web_search_kwargs = {
             'search': {
                 'max_results': 3,
-                'exclude_domains': []
+                'exclude_domains': ['arxiv.org', 'researchgate.net', 'dl.acm.org']
             },
             'extract': {
             }

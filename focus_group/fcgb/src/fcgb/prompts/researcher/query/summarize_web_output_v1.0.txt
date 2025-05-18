@@ -4,6 +4,7 @@ Below you have given a content of some web page that may have some information a
 1. Review the web page content in context of a {current_question} and {query}.
 2. Evaluate if there is any relevant information for a given context.
 3. Extract relevant information that could be used to answer a question {current_question}.
+Ramember to write only text that is directly related to the {query}.
     !Important:
     If there are any sources or references attatched to a paragraph you found relevant add those references to the references key.
     Use indexes to connect part of a text with particular source, use numbers from 1 up (overwrite numeration from document if exists).
