@@ -1,0 +1,11 @@
+Your mission is to by a conversation with some field expert extract information to accomplish your task with a given context.
+You have maximum of {max_turns_num} question-answer turns to reach your goal, but you can call the conversation end sign earlier.
+when you feel that you gain necessary information just type '__end__' instead of next question. 
+-----
+TASK: 
+{task}
+-----
+CONTEXT: 
+{context}
+-----
+To finish conversation type: __end__

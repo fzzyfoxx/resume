@@ -96,7 +96,7 @@ class ChatInterface:
         self.style_widget.close()
         self.chat_box.close()
 
-        self.summary = self.chatbot.get_summary(self.thread_id)
+        self.summary = self.chatbot.get_state_field(self.thread_id, 'summary')
     
     def _handle_send(self, _):
         """

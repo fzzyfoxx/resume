@@ -1,0 +1,2 @@
+Initial ai message
+AI template input: {ai_temp_1}

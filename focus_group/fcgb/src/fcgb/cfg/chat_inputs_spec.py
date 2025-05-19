@@ -7,13 +7,16 @@ class MainSubjectTemplateInputs(TypedDict, total=False):
     initial_description: str
     customer_name: str
 
-class MainSubjectConfig:
+class ButtonSummaryConfig:
+    init_values = {'summary': None, 'button': False}
+
+class MainSubjectConfig(ButtonSummaryConfig):
     initial_messages_spec = [
             {"source": "system", "template": "main_subject_system", "hidden": False},
             {"source": "ai", "template": "main_subject_hello", "hidden": False},
             {"source": "human", "template": "main_subject_human_init", "hidden": True, "as_node": "human_node"},
         ]
-    button_messsage_spec = {
+    button_message_spec = {
             'answer_format': MainSubjectModel,
             'template': "main_subject_button"
         }
@@ -27,13 +30,13 @@ class SubjectDetailsTemplateInputs(TypedDict, total=False):
     customer_name: str
     main_subject: str
 
-class SubjectDetailsConfig:
+class SubjectDetailsConfig(ButtonSummaryConfig):
     initial_messages_spec = [
             {"source": "system", "template": "subject_details_system", "hidden": False},
             {"source": "ai", "template": "subject_details_hello", "hidden": False},
             {"source": "human", "template": "subject_details_human_init", "hidden": True, "as_node": "human_node"},
         ]
-    button_messsage_spec = {
+    button_message_spec = {
             'answer_format': SubjectDetailsModel,
             'template': "subject_details_button"
         }
