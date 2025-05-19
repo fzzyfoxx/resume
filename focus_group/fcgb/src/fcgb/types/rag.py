@@ -44,13 +44,13 @@ def extend_or_clear(left, right):
 class RAGGeneralState(BaseModel):
     main_question: str
     current_question: str
-    template_inputs: Dict[str, Any]
+    template_inputs: Dict[str, str]
     documents: Annotated[List[WebDocumentModel], append_or_clear]
     retreived_content: Annotated[List[str], add]
 
 class QueriesState(BaseModel):
     current_question: str
-    template_inputs: Dict[str, Any]
+    template_inputs: Dict[str, str]
     queries: List[str]
 
 class WebSearchState(BaseModel):

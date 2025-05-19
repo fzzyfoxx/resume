@@ -22,6 +22,7 @@ class BaseChatBot:
                  memory=None,
                  init_values={},
                  prompt_manager_spec={},
+                 global_inputs={},
                  compile=True
                  ):
         
@@ -30,6 +31,7 @@ class BaseChatBot:
         self.memory = memory if memory else MemorySaver()
 
         self.init_values = init_values
+        self.global_inputs = global_inputs
 
         self.prompts = PromptManager(**prompt_manager_spec)
 
@@ -62,14 +64,14 @@ class BaseChatBot:
 
         self.state_class = State
 
-    def _apply_initial_message(self, config, template_inputs, source, template, hidden=False, as_node=None):
+    def _apply_initial_message(self, config, template_inputs, source, template, var_name='messages', hidden=False, as_node=None):
         """
         Apply a message to the graph state.
         """
-        msg_content = self.prompts.get_prompt(template).format(**template_inputs)
+        msg_content = self.prompts.get_prompt(template).format(**template_inputs, **self.global_inputs)
         msg = self.message_types_map[source](msg_content, name="hidden" if hidden else "basic")
 
-        self.graph.update_state(config=config, values={'messages': msg}, as_node=as_node)
+        self.graph.update_state(config=config, values={var_name: msg}, as_node=as_node)
 
         if as_node:
             # If input is simulating a node, run graph until next interruption (designed for human input)
