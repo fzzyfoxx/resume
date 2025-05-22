@@ -1,4 +1,4 @@
-from typing import Any, List, Dict, Tuple, TypedDict
+from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints
 from pydantic import BaseModel
 import random
 from langchain_core.messages import AIMessage
@@ -51,9 +51,13 @@ class FakeStructuredOutput:
                 return self._generate_dict(field_type.__args__[0], field_type.__args__[1])
             elif field_type.__origin__ is tuple:
                 return self._generate_tuple(field_type.__args__)
-        elif issubclass(field_type, BaseModel):  # Handle nested BaseModel
-            return self._generate_model(field_type)
-        elif (field_type is str) | (field_type is Any):
+        elif isinstance(field_type, type):  # Ensure field_type is a class
+            # Check if field_type is a TypedDict
+            if hasattr(field_type, "__annotations__") and issubclass(field_type, dict):
+                return self._generate_typed_dict(field_type)
+            elif issubclass(field_type, BaseModel):  # Handle nested BaseModel
+                return self._generate_model(field_type)
+        if (field_type is str) | (field_type is Any):
             return self._get_fake_string()
         elif field_type is int:
             return self._get_fake_int()
@@ -65,6 +69,19 @@ class FakeStructuredOutput:
             return None
         else:
             raise ValueError(f"Unsupported field type: {field_type}")
+        
+    def _generate_typed_dict(self, typed_dict: TypedDict) -> Dict[str, Any]: # type: ignore
+        """
+        Generate fake data for a TypedDict.
+
+        Args:
+            typed_dict (TypedDict): The TypedDict class.
+
+        Returns:
+            Dict[str, Any]: A dictionary with fake data matching the TypedDict structure.
+        """
+        type_hints = get_type_hints(typed_dict)
+        return {key: self._generate_field(value) for key, value in type_hints.items()}
 
     def _generate_model(self, model: BaseModel) -> BaseModel:
         """
