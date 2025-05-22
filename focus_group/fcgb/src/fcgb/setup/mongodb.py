@@ -3,7 +3,7 @@ import os
 from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from fcgb.rag.precompiled import get_rag
+from fcgb.cfg.precompiled import get_rag
 from fcgb.cfg.vars import mongodb_rag_config
 
 

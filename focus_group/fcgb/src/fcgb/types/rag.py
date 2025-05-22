@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Annotated
 from operator import add
+from fcgb.types.utils import append_or_clear, extend_or_clear
 
 class QueryListModel(BaseModel):
     queries: List[str]
@@ -20,26 +21,6 @@ class WebDocumentModel(BaseModel):
     query: str
     thread_id: str
     user_id: str
-
-def append_or_clear(left, right):
-    if right=='__clear__':
-        return []
-    elif right is None:
-        return left
-    elif left is None:
-        return right
-    else:
-        return left + [right]
-            
-def extend_or_clear(left, right):
-    if right=='__clear__':
-        return []
-    elif right is None:
-        return left
-    elif left is None:
-        return right
-    else:
-        return left + right
 
 class RAGGeneralState(BaseModel):
     main_question: str
