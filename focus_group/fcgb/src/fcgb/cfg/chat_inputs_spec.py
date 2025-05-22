@@ -1,6 +1,13 @@
 from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, PersonaModel
-from fcgb.types.self_conv import SelfConvModel
-from typing import TypedDict
+from fcgb.types.self_conv import SelfConvModel, SingleStrategyModel, StrategyTaskModel, VerificationPromptsModel
+from typing import TypedDict, Dict
+from pydantic import BaseModel
+
+class InternalMessageSpec(TypedDict):
+    answer_format: BaseModel
+    template_path: str
+
+InternalMessagesSpec = Dict[str, InternalMessageSpec]
 
 ### BUTTON SUMMARY INITIAL MODULES
 
@@ -19,11 +26,14 @@ class MainSubjectConfig(ButtonSummaryConfig):
             {"source": "ai", "template": "main_subject_hello", "hidden": False},
             {"source": "human", "template": "main_subject_human_init", "hidden": True, "as_node": "human_node"},
         ]
-    button_message_spec = {
-            'answer_format': MainSubjectModel,
-            'template': "main_subject_button"
-        }
+    internal_messages_spec = {
+        'button_message': {
+                'answer_format': MainSubjectModel,
+                'template': "main_subject_button"
+            }
+    }
     template_inputs_model = MainSubjectTemplateInputs
+    prompt_manager_spec = {}
 
 
 #subject details part specs
@@ -39,15 +49,19 @@ class SubjectDetailsConfig(ButtonSummaryConfig):
             {"source": "ai", "template": "subject_details_hello", "hidden": False},
             {"source": "human", "template": "subject_details_human_init", "hidden": True, "as_node": "human_node"},
         ]
-    button_message_spec = {
-            'answer_format': SubjectDetailsModel,
-            'template': "subject_details_button"
-        }
+    internal_messages_spec = {
+        'button_message': {
+                'answer_format': SubjectDetailsModel,
+                'template': "subject_details_button"
+            }
+    }
     template_inputs_model = SubjectDetailsTemplateInputs
+    prompt_manager_spec = {}
 
 
 ### SELF-CONVERSATION MODULES
 
+# casual self-conversation
 class SelfConversationTemplateInputs(TypedDict, total=False):
     task: str
     context: str
@@ -58,9 +72,50 @@ class SelfConversationConfig:
         {"var_name": "phantom_perspective", "source": "human", "template": "self_conv_human_init", "hidden": False},
         {"var_name": "llm_perspective", "source": "system", "template": "self_conv_expert_system", "hidden": False}
     ]
-    summary_spec = {
-        'answer_format': SelfConvModel,
-        'template': "self_conv_summary"
+    internal_messages_spec = {
+        'summary': {
+                'answer_format': SelfConvModel,
+                'template': "self_conv_summary"
+            }
     }
     template_inputs_model = SelfConversationTemplateInputs
-    init_values = {'to_summary': False, 'turn': 0, 'summary': None, 'sub_thread_id': None}
+    global_inputs = {'max_turns_num': 6}
+    init_values = {'to_summary': False, 'turn': 0, 'sc_summary': None, 'sc_thread_id': None}
+    prompt_manager_spec = {'version_config': {
+        "self_conv_summary": "1.0",
+        "self_conv_researcher_system": "1.0",
+    }}
+
+
+# strategized self-conversation
+class SelfConversationForstrategyTemplateInputs(SelfConversationTemplateInputs, SingleStrategyModel):
+    pass
+
+class SelfConversationForstrategyConfig(SelfConversationConfig):
+    template_inputs_model = SelfConversationForstrategyTemplateInputs
+    prompt_manager_spec = {}
+
+class StrategizedSelfConversationConfig:
+    initial_messages_spec = []
+    global_inputs = {
+        'min_strategies_num': 1, 
+        'max_strategies_num': 4
+        }
+    internal_messages_spec = {
+        'strategy_task': {
+                'answer_format': StrategyTaskModel,
+                'template': "self_conv_strategy_list"
+            },
+        'summary': {
+                'answer_format': SelfConvModel,
+                'template': "self_conv_strategy_summary"
+            },
+        'verification_prompts': {
+                'answer_format': VerificationPromptsModel,
+                'template': "verification_prompts_gen"
+            }
+        }
+    template_inputs_model = SelfConversationTemplateInputs
+    init_values = {'ssc_thread_id': None, 'ssc_summary': None, 'strategies': None}
+    prompt_manager_spec = {}
+

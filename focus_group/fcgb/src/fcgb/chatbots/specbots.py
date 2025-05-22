@@ -10,10 +10,10 @@ class MainSubjectChatBot(ButtonSummaryChatBot):
         super().__init__(
             llm=llm,
             initial_messages_spec=MainSubjectConfig.initial_messages_spec,
-            button_message_spec=MainSubjectConfig.button_message_spec,
+            internal_messages_spec=MainSubjectConfig.internal_messages_spec,
             memory=memory,
             init_values=MainSubjectConfig.init_values,
-            prompt_manager_spec={}
+            prompt_manager_spec=MainSubjectConfig.prompt_manager_spec
         )
 
         self.inputs_model = MainSubjectConfig.template_inputs_model
@@ -27,10 +27,10 @@ class SubjectDetailsChatBot(ButtonSummaryChatBot):
         super().__init__(
             llm=llm,
             initial_messages_spec=SubjectDetailsConfig.initial_messages_spec,
-            button_message_spec=SubjectDetailsConfig.button_message_spec,
+            internal_messages_spec=SubjectDetailsConfig.internal_messages_spec,
             memory=memory,
             init_values=SubjectDetailsConfig.init_values,
-            prompt_manager_spec={}
+            prompt_manager_spec=SubjectDetailsConfig.prompt_manager_spec
         )
 
         self.inputs_model = SubjectDetailsConfig.template_inputs_model

@@ -19,6 +19,7 @@ class BaseChatBot:
     def __init__(self,
                  llm,
                  initial_messages_spec,
+                 internal_messages_spec,
                  memory=None,
                  init_values={},
                  prompt_manager_spec={},
@@ -28,12 +29,14 @@ class BaseChatBot:
         
         self.llm = llm
         self.initial_messages_spec = initial_messages_spec
+        self.internal_messages_spec = internal_messages_spec
+
         self.memory = memory if memory else MemorySaver()
 
         self.init_values = init_values
         self.global_inputs = global_inputs
 
-        self.prompts = PromptManager(**prompt_manager_spec)
+        self.prompt_manager = PromptManager(**prompt_manager_spec)
 
         self.message_types_map = {
             'system': SystemMessage,
@@ -49,9 +52,20 @@ class BaseChatBot:
             self.compile_graph()
 
     def compile_graph(self):
-
+        
+        self._set_prompts()
         self._set_state_class()
         self._compile_graph()
+
+    def _set_prompts(self):
+
+        self.internal_prompts = {}
+        if self.internal_messages_spec:
+            for prompt_key, prompt_spec in self.internal_messages_spec.items():
+                self.internal_prompts[prompt_key] = {
+                    'prompt': self.prompt_manager.get_prompt(prompt_spec['template']),
+                    'answer_format': prompt_spec['answer_format']
+                }
 
     def _set_state_class(self):
         """
@@ -64,11 +78,11 @@ class BaseChatBot:
 
         self.state_class = State
 
-    def _apply_initial_message(self, config, template_inputs, source, template, var_name='messages', hidden=False, as_node=None):
+    def _apply_initial_message(self, config, template_inputs, source, template, var_name='messages', hidden=False, version=None, as_node=None):
         """
         Apply a message to the graph state.
         """
-        msg_content = self.prompts.get_prompt(template).format(**template_inputs, **self.global_inputs)
+        msg_content = self.prompt_manager.get_prompt(template, version).format(**template_inputs, **self.global_inputs)
         msg = self.message_types_map[source](msg_content, name="hidden" if hidden else "basic")
 
         self.graph.update_state(config=config, values={var_name: msg}, as_node=as_node)
@@ -188,7 +202,7 @@ class BaseChatBot:
             return state['channel_values']
         return None
     
-    def get_messages(self, thread_id: str):
+    def get_messages(self, thread_id: str, field_name: str = 'messages'):
         """
         Get all messages for a given thread ID.
 
@@ -201,7 +215,7 @@ class BaseChatBot:
         config = self._get_config(thread_id)
         state = self.memory.get(config)
         if state:
-            return [(m.type, m.content, m.name) for m in state['channel_values']['messages']]
+            return [(m.type, m.content, m.name) for m in state['channel_values'][field_name]]
         return None
     
     def get_state_field(self, thread_id: str, field_name: str):
@@ -220,25 +234,20 @@ class BaseChatBot:
             return state.get(field_name, None)
         return None
 
-class ButtonMessageSpec(TypedDict):
-    answer_format: BaseModel
-    template_path: str
-
 class ButtonSummaryChatBot(BaseChatBot):
     def __init__(self,
                  llm,
                  initial_messages_spec,
-                 button_message_spec: ButtonMessageSpec,
+                 internal_messages_spec,
                  memory=None,
                  init_values={},
                  prompt_manager_spec={}
                  ):
-        
-        self.button_message_spec = button_message_spec
 
         super().__init__(
             llm=llm,
             initial_messages_spec=initial_messages_spec,
+            internal_messages_spec=internal_messages_spec,
             memory=memory,
             prompt_manager_spec=prompt_manager_spec,
             init_values=init_values,
@@ -247,7 +256,7 @@ class ButtonSummaryChatBot(BaseChatBot):
 
     def _set_state_class(self): 
         
-        summary_type = self.button_message_spec.get('answer_format', None)
+        summary_type = self.internal_prompts['button_message']['answer_format']
 
         class State(MessagesState):
             button: bool
@@ -259,9 +268,9 @@ class ButtonSummaryChatBot(BaseChatBot):
         """
         Set the button prompt for the graph state.
         """
-        if self.button_message_spec:
-            self.button_prompt = self.prompts.get_prompt(self.button_message_spec['template']).format(**template_inputs)
-            self.button_model = self.button_message_spec['answer_format']
+        if self.internal_prompts['button_message']:
+            self.button_prompt = self.internal_prompts['button_message']['prompt'].format(**template_inputs)
+            self.button_model = self.internal_prompts['button_message']['answer_format']
 
     def init_thread(self, thread_id: str, template_inputs: Dict[str, Any] = {}):
         super().init_thread(thread_id, template_inputs)
@@ -270,7 +279,8 @@ class ButtonSummaryChatBot(BaseChatBot):
 
     def _set_summary_func(self):
         def summary_llm_call(state: self.state_class) -> Dict: # type: ignore
-            response = self.llm.with_structured_output(self.button_model).invoke(state['messages'])
+            button_model = self.internal_prompts['button_message']['answer_format']
+            response = self.llm.with_structured_output(button_model).invoke(state['messages'])
             return {'summary': response, 'button': False}
         return summary_llm_call
     
