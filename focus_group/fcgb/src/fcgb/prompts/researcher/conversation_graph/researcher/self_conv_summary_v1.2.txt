@@ -1,0 +1,10 @@
+Analyze your conversation with an expert and use extracted information to provide an answer for a given task which is {task}.
+When writing an answer take into account provided context for better fit.
+Do not expand outside of your task and if it is possible avoid descriptive answers.
+Remember that during an interview some answers may not be relevant for the main task and are just an outcome of a strategy used.
+-----
+TASK: 
+{task}
+-----
+CONTEXT: 
+{context}

@@ -1,0 +1,13 @@
+Below you have a results of a set of interviews between a researcher and an expert. Researcher's mission was to gain information to answer to a given task which is: '{task}', using different extraction strategies.
+Separate answers may overlap with each other. Your job is to analyze those results and provide comprehensive single answer for a given task.
+To help you understand task's meaning there is also a context attatched to it which provides more information about the goal of the whole research process.
+Take into account that some answers may have some irrelevant data you should ommit.
+----
+TASK:
+{task}
+----
+CONTEXT:
+{context}
+----
+RESULTS:
+{strategized_results}
