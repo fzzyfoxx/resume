@@ -1,0 +1,27 @@
+For a task which is: 
+TASK:
+{task}
+
+with given context: 
+CONTEXT:
+{context}
+
+I received an answer:
+ANSWER:
+{answer}
+
+-----------
+During research process for a given task and task's context I received an answer. Now I want you to help me to verify and adjust its content.
+
+Analyze consecutive parts of an answer in terms of how they reflects remarks contained in task and context descriptions.
+During analysis try to find out what different tasks can you delegate to find weak spots of retreived answer.
+Conclude in alaysis list of possible mistakes that may have been made for a task which is: {task}
+Focus primarily on how accurate specific parts are. Use context to catch the essence of the task.
+
+After analysis, prepare list of prompts which will be used to generate recommendations for changes in the answer.
+The goal is to use those prompts to generate recommendations to erase unrelated, redundant or excessive information, correct hallucinations, re-format answer for a better fit to a task description.
+Use task, context, answer and your analysis to attack the answer from different angles. Provide for every prompt different non-overlapping specification for this individual case of how to verify the answer.
+Try to be specific, if it is possible write some examples. Each prompt may contain several questions for verification process.
+
+Prepare list of {min_ver_prompts} to {max_ver_prompts} prompts templates to cover verification tasks from your analysis.
+Don't write task, context and answer in prompts content because they will be provided externally.

@@ -1,7 +1,7 @@
 from fcgb.chatbots.chatbot import ButtonSummaryChatBot
 from fcgb.chatbots.selfconv import SelfConversationChatBot, StrategizedSelfConversationChatBot
 from fcgb.cfg.chat_inputs_spec import MainSubjectConfig, SubjectDetailsConfig
-from fcgb.cfg.chat_inputs_spec import SelfConversationConfig, SelfConversationForstrategyConfig, StrategizedSelfConversationConfig
+from fcgb.cfg.chat_inputs_spec import SelfConversationConfig, SelfConversationForstrategyConfig, StrategizedSelfConversationConfig, ResearchVerificationConfig
 
 
 class MainSubjectSpecBot(ButtonSummaryChatBot):
@@ -88,3 +88,18 @@ class StrategizedSelfResearchSpecBot(StrategizedSelfConversationChatBot):
         )
 
         self.inputs_model = StrategizedSelfConversationConfig.template_inputs_model
+
+"""class ResearchVerificationSpecBot():
+    def __init__(self, llm, memory=None):
+        
+        super().__init__(
+            llm=llm,
+            initial_messages_spec=ResearchVerificationConfig.initial_messages_spec,
+            internal_messages_spec=ResearchVerificationConfig.internal_messages_spec,
+            memory=memory,
+            global_inputs=ResearchVerificationConfig.global_inputs,
+            init_values=ResearchVerificationConfig.init_values,
+            prompt_manager_spec=ResearchVerificationConfig.prompt_manager_spec
+        )
+
+        self.inputs_model = ResearchVerificationConfig.template_inputs_model"""

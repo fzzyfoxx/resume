@@ -58,18 +58,20 @@ class PromptManager:
 
     def get_prompt(self, prompt_name: str, version: Optional[str] = None) -> str:
         """Load and return the content of a specific prompt."""
-        if prompt_name not in self.prompts:
-            raise ValueError(f"Prompt '{prompt_name}' not found.")
+        if prompt_name:
+            if prompt_name not in self.prompts:
+                raise ValueError(f"Prompt '{prompt_name}' not found.")
 
-        for prompt in self.prompts[prompt_name]:
-            if version is None and prompt['default']:
-                version = prompt['version']
-            if version is not None:
-                if prompt['version'] == float(version):
-                    with open(prompt['path'], 'r') as file:
-                        return file.read()
+            for prompt in self.prompts[prompt_name]:
+                if version is None and prompt['default']:
+                    version = prompt['version']
+                if version is not None:
+                    if prompt['version'] == float(version):
+                        with open(prompt['path'], 'r') as file:
+                            return file.read()
 
-        raise ValueError(f"Version {version} for prompt '{prompt_name}' not found.")
+            raise ValueError(f"Version {version} for prompt '{prompt_name}' not found.")
+        return None
 
     def get_prompts(self, prompts: List[str]) -> Dict[str, str]:
         """Return default prompts for a given list of prompt names."""

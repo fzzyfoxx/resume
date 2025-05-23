@@ -8,7 +8,7 @@ from langchain_core.runnables.config import RunnableConfig
 
 from fcgb.types.utils import append_or_clear
 from langgraph.constants import Send
-from fcgb.types.self_conv import Strategyroutingstate
+from fcgb.types.research import Strategyroutingstate
 
 class SelfConversationChatBot(BaseChatBot):
     def __init__(
@@ -144,7 +144,7 @@ class StrategizedSelfConversationChatBot(BaseChatBot):
             memory,
             global_inputs,
             init_values={},
-            prompt_manager_spec = {}
+            prompt_manager_spec={}
         ):
 
         self.self_conv_bot = self_conv_bot

@@ -1,5 +1,5 @@
 from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, PersonaModel
-from fcgb.types.self_conv import SelfConvModel, SingleStrategyModel, StrategyTaskModel, VerificationPromptsModel
+from fcgb.types.research import SimpleAnswerModel, SingleStrategyModel, StrategyTaskModel, PromptTemplatesListModel, SingleVerificationModel
 from typing import TypedDict, Dict
 from pydantic import BaseModel
 
@@ -74,7 +74,7 @@ class SelfConversationConfig:
     ]
     internal_messages_spec = {
         'summary': {
-                'answer_format': SelfConvModel,
+                'answer_format': SimpleAnswerModel,
                 'template': "self_conv_summary"
             }
     }
@@ -107,11 +107,11 @@ class StrategizedSelfConversationConfig:
                 'template': "self_conv_strategy_list"
             },
         'summary': {
-                'answer_format': SelfConvModel,
+                'answer_format': SimpleAnswerModel,
                 'template': "self_conv_strategy_summary"
             },
         'verification_prompts': {
-                'answer_format': VerificationPromptsModel,
+                'answer_format': PromptTemplatesListModel,
                 'template': "verification_prompts_gen"
             }
         }
@@ -119,3 +119,33 @@ class StrategizedSelfConversationConfig:
     init_values = {'ssc_thread_id': None, 'ssc_summary': None, 'strategies': None}
     prompt_manager_spec = {}
 
+### TASK OUTPUT VERIFICATION
+
+class ResearchVerificationTemplateInputs(TypedDict, total=False):
+    task: str
+    context: str
+    answer: str
+
+class ResearchVerificationConfig:
+    initial_messages_spec = []
+    global_inputs = {
+        'min_ver_prompts': 1,
+        'max_ver_prompts': 4,
+    }
+    internal_messages_spec = {
+        'task_list': {
+                'answer_format': PromptTemplatesListModel,
+                'template': "verification_prompts_gen"
+            },
+        'task': {
+                'answer_format': SingleVerificationModel,
+                'template': "verification_task_system"
+            },
+        'answer': {
+                'answer_format': SimpleAnswerModel,
+                'template': "verification_output"
+            }
+        }
+    template_inputs_model = ResearchVerificationTemplateInputs
+    init_values = {'verified_answer': None, 'task_list': None}
+    prompt_manager_spec = {}

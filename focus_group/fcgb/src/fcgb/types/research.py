@@ -1,7 +1,7 @@
 from typing import List, TypedDict, Dict
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 
-class SelfConvModel(BaseModel):
+class SimpleAnswerModel(BaseModel):
     answer: str
 
 class SingleStrategyModel(TypedDict):
@@ -18,5 +18,15 @@ class Strategyroutingstate(BaseModel):
     parent_thread_id: str
     sc_summary: str | None
 
-class VerificationPromptsModel(BaseModel):
-    verification_prompts: List[str]
+class PromptTemplatesListModel(BaseModel):
+    analysis: str
+    tasks: List[str]
+
+class SingleVerificationModel(BaseModel):
+    analysis: str
+    recommendations: str
+
+class SimpleTaskModel(TypedDict):
+    task: str
+    template_inputs: Dict[str, str]
+    simple_task_response: str | None

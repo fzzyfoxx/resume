@@ -78,6 +78,13 @@ class BaseChatBot:
 
         self.state_class = State
 
+    def _invoke_internal_msg(self, name, template_inputs):
+
+        prompt = self.internal_prompts[name]['prompt'].format(**template_inputs, **self.global_inputs)
+        answer_format = self.internal_prompts[name]['answer_format']
+        
+        return self.llm.with_structured_output(answer_format).invoke(prompt)
+
     def _apply_initial_message(self, config, template_inputs, source, template, var_name='messages', hidden=False, version=None, as_node=None):
         """
         Apply a message to the graph state.
