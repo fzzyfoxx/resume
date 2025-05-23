@@ -1,5 +1,5 @@
 from typing import List, TypedDict, Dict
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 class SelfConvModel(BaseModel):
     answer: str
