@@ -1,6 +1,6 @@
 from fcgb.chatbots.chatbot import ButtonSummaryChatBot
 from fcgb.chatbots.selfconv import SelfConversationChatBot, StrategizedSelfConversationChatBot
-from fcgb.cfg.chat_inputs_spec import MainSubjectConfig, SubjectDetailsConfig, PersonasConfig
+from fcgb.cfg.chat_inputs_spec import MainSubjectConfig, SubjectDetailsConfig, PersonasConfig, RestrictionsConfig
 from fcgb.cfg.chat_inputs_spec import SelfConversationConfig, SelfConversationForstrategyConfig, StrategizedSelfConversationConfig, ResearchVerificationConfig
 
 
@@ -53,6 +53,23 @@ class PersonasSpecBot(ButtonSummaryChatBot):
         )
 
         self.inputs_model = PersonasConfig.template_inputs_model
+
+class RestrictionsSpecBot(ButtonSummaryChatBot):
+    def __init__(self, llm, memory=None):
+        """
+        Initialize the RestrictionsChatBot with the given parameters.
+        """
+        super().__init__(
+            llm=llm,
+            initial_messages_spec=RestrictionsConfig.initial_messages_spec,
+            internal_messages_spec=RestrictionsConfig.internal_messages_spec,
+            memory=memory,
+            global_inputs=RestrictionsConfig.global_inputs,
+            init_values=RestrictionsConfig.init_values,
+            prompt_manager_spec=RestrictionsConfig.prompt_manager_spec
+        )
+
+        self.inputs_model = RestrictionsConfig.template_inputs_model
 
 class CasualSelfConvSpecBot(SelfConversationChatBot):
     def __init__(self, llm, memory=None):

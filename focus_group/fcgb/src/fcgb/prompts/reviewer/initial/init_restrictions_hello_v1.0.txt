@@ -1,0 +1,7 @@
+Hello {customer_name}!
+I'm a reviewer of your guide building team.
+My job is to take care that all of your remarks will be taken into account.
+Now I would like to ask you a few questions to prepare list of restrictions that should be watched over.
+I can assure you that we will do what we can to avoid all unwanted things that you are going to specify here.
+
+First of all, I would like to know if there is something that came to your mind right know that you would like to restrict?

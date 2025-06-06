@@ -1,4 +1,4 @@
-from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, PersonaModel
+from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, RestrictionsModel
 from fcgb.types.research import SimpleAnswerModel, SingleStrategyModel, StrategyTaskModel, PromptTemplatesListModel, SingleVerificationModel
 from typing import TypedDict, Dict
 from pydantic import BaseModel
@@ -87,6 +87,32 @@ class PersonasConfig(ButtonSummaryConfig):
     template_inputs_model = PersonasTemplateInputs
     prompt_manager_spec = {}
 
+# restrictions definition part specs
+class RestrictionsTemplateInputs(TypedDict, total=False):
+    main_title: str
+    initial_description: str
+    customer_name: str
+    main_subject: str
+    content_description: str
+    style: str
+    target_audience: str
+    layout: str
+    restrictions: str
+
+class RestrictionsConfig(ButtonSummaryConfig):
+    initial_messages_spec = [
+            {"source": "system", "template": "init_restrictions_system", "hidden": False},
+            {"source": "ai", "template": "init_restrictions_hello", "hidden": False}
+        ]
+    internal_messages_spec = {
+        'button_message': {
+                'answer_format': RestrictionsModel,
+                'template': "init_restrictions_button"
+            }
+    }
+    global_inputs = {}
+    template_inputs_model = RestrictionsTemplateInputs
+    prompt_manager_spec = {}
 
 ### SELF-CONVERSATION MODULES
 

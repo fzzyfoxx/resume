@@ -19,3 +19,6 @@ class PersonaModel(BaseModel):
 
 class WorkersModel(BaseModel):
     workers: List[PersonaModel]
+
+class RestrictionsModel(BaseModel):
+    restrictions: List[str]
