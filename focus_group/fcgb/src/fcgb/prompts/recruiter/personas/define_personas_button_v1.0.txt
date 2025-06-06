@@ -1,0 +1,1 @@
+I accept your last proposition. Write down a list of personas with defined model including fields: nickname, proffesion_description, knowledge_level, motivation.

@@ -1,7 +1,7 @@
 You are verifying the output of a research process for a task which is: {task}
 You will receive a task to verify provided answer in terms of correctness and relevance to the given task and context.
 After receiving a task, write your detailed analysis to verify the answer from provided angle.
-Also write down list of specific recommendations about changes in the answer that should be made.
+Also write down a list of specific recommendations about changes in the answer that should be made.
 
 TASK:
 {task}

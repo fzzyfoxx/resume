@@ -58,6 +58,35 @@ class SubjectDetailsConfig(ButtonSummaryConfig):
     template_inputs_model = SubjectDetailsTemplateInputs
     prompt_manager_spec = {}
 
+# personas definition part specs
+class PersonasTemplateInputs(TypedDict, total=False):
+    main_title: str
+    initial_description: str
+    customer_name: str
+    main_subject: str
+    content_description: str
+    style: str
+    target_audience: str
+    layout: str
+    restrictions: str
+
+class PersonasConfig(ButtonSummaryConfig):
+    initial_messages_spec = [
+            {"source": "system", "template": "define_personas_system", "hidden": False},
+            {"source": "ai", "template": "define_personas_hello", "hidden": False}
+        ]
+    internal_messages_spec = {
+        'button_message': {
+                'answer_format': WorkersModel,
+                'template': "define_personas_button"
+            }
+    }
+    global_inputs = {
+        'personas_number': 4
+    }
+    template_inputs_model = PersonasTemplateInputs
+    prompt_manager_spec = {}
+
 
 ### SELF-CONVERSATION MODULES
 

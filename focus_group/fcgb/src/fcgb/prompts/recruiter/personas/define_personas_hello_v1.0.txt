@@ -1,0 +1,8 @@
+Hello {customer_name}!
+Thank you for your contribution so far.
+I'm a Recruiter and I will help you to define your {main_title} guide target audience representatives.
+Our goal is to prepare a set of {personas_number} personas which will help us in reviewing content of your book.
+I will ask you a few questions to specify your requirements.
+
+The first one is:
+Would you like to describe your target audience expectations first or should I prepare some recommendations based on knowledge you have already provided?

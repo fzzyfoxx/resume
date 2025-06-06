@@ -247,6 +247,7 @@ class ButtonSummaryChatBot(BaseChatBot):
                  initial_messages_spec,
                  internal_messages_spec,
                  memory=None,
+                 global_inputs={},
                  init_values={},
                  prompt_manager_spec={}
                  ):
@@ -256,6 +257,7 @@ class ButtonSummaryChatBot(BaseChatBot):
             initial_messages_spec=initial_messages_spec,
             internal_messages_spec=internal_messages_spec,
             memory=memory,
+            global_inputs=global_inputs,
             prompt_manager_spec=prompt_manager_spec,
             init_values=init_values,
             compile=True
