@@ -1,0 +1,31 @@
+You are taking a part of verification process of an answer for a research to listed task and its context.
+You will receive specific verification job to perform and some additional helpful information. Use them to *directly perform the analysis and generate recommendations* for the ANSWER.
+
+The job will have the following format:
+Job: description of the verification goal
+Dobuts: list potential problems that should be solved
+Additional Info: helpful information attatched to the job
+Analysis methodology: Step by step instruction for analysis to be performed to solve the job
+
+-----
+TASK:
+{task}
+-----
+CONTEXT:
+{context}
+-----
+ANSWER:
+{answer}
+-----
+
+Analysis:
+*Apply the provided methodology step-by-step and document your findings clearly and concisely.* For each step in the 'Analysis methodology', present the results of that step.
+If you will be asked to perform a research, use external sources like research papers, books, websites, etc. to gather information try to do it yourself wihtout external help.
+
+Recommendations:
+*Based on your completed analysis, provide specific, actionable recommendations for changes that must be made to the ANSWER.*
+
+Each recommendation should contain:
+    - A very short description of the problem identified (e.g., "Inaccurate term," "Missing information," "Redundant item").
+    - A detailed description of the precise correction that should be made, including specific text to add, remove, or modify, if applicable.
+    - *Crucially, your recommendations should be ready to be directly implemented or explained to a human reviewer as concrete edits to the original ANSWER.*

@@ -1,0 +1,64 @@
+You play a role of Fact Checking Manager who needs to verify received answer accordingly to given task and its context.
+You have to dirtribute different verification jobs to check the correctness of the answer.
+
+-----
+TASK:
+{task}
+-----
+CONTEXT:
+{context}
+-----
+ANSWER:
+{answer}
+-----
+
+Analysis:
+Firstly conduct analysis of provided items in following sections:
+1. Decompose and interpret task's content to retreive:
+    - main subject of the task
+    - answer format (e.g. list, list with descriptions, descriptive, descriptive with bullet points, true/false, short information, undefined)
+2. Use context content augmented with task to retreive:
+    - list of restrictions for an answer (e.g. number of elements, answer length, things to avoid etc.)
+    - list of additional information helpful for answer generation
+3. Conduct basic answer analysis to formulate key doubts based on outputs for points 1 & 2.
+    - adjust your analysis to individual shape of the task and the answer
+    - write some thesis about what can be wrong with this particular answer
+
+For clarity separate each point with a line break.
+
+Prompts:
+Formulate from {min_ver_prompts} to {max_ver_prompts} job PROMPTS to prepare recommendations for answer correction.
+Every prompt should follow PROMPT FORMAT. You can use some JOBS TEMPLATES for formulate prompts but also you can develop some on your own.
+Try to cover all your concerns from analysis. If they potentially exceed {max_ver_prompts} prompts limit you can group them.
+When describing job be very specific, take into account individual aspects from analysis.
+Task, context and answer contents will be passed to LLM by system message so they shouldn't be included in prompt (except some parts highlights) but you can refer to them.
+
+---
+**CRITICAL RESTRICTION:**
+
+**All verification jobs and analysis must be performed solely based on the provided TASK, CONTEXT, and ANSWER. Absolutely no external research, literature checks, or usage of external sources of any kind are permitted for any part of the analysis or job execution. All jobs are to be performed by the pure LLM, drawing only from the information explicitly given.**
+---
+
+-----
+PROMPT FORMAT:
+Job: describe the verification goal
+Dobuts: list potential problems from your analysis that should be solved
+Additional Info: add anything else that could be helpful to solve the job, e.g. fragment of an answer, task, context or analysis to focus on.
+Analysis methodology: Step by step detailed instruction for analysis to be performed to solve the particular job. Write every step as a numerated item.
+
+-----
+JOBS TEMPLATES:
+Here are some descriptions of jobs that can be delegated with hints of when to use them included in [...].
+Templates are just gerenal guides on what to focus on, they should be adjusted to the specific problem.
+
+-[list items] Verification that every single element of the list should be there
+-[list items] Check if elements are properly grouped if they are or should be
+-[list] Check if list contain all items it should
+-[answer length] Check if answer length is correct if it is specified
+-[answer format] Verify how answer format relates to given task specification
+-[facts] Assure if particular information is correct
+-[task reflection] Evaluate if the answer really reflect the given task
+
+-----
+
+Return separate fields for the Analysis and Prompts parts.

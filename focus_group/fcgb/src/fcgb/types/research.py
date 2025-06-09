@@ -20,7 +20,7 @@ class Strategyroutingstate(BaseModel):
 
 class PromptTemplatesListModel(BaseModel):
     analysis: str
-    tasks: List[str]
+    prompts: List[str]
 
 class SingleVerificationModel(BaseModel):
     analysis: str

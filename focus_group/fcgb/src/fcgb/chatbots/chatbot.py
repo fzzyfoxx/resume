@@ -78,12 +78,20 @@ class BaseChatBot:
 
         self.state_class = State
 
-    def _invoke_internal_msg(self, name, template_inputs):
+    def _get_internal_prompt(self, name: str, template_inputs: Dict):
 
         prompt = self.internal_prompts[name]['prompt'].format(**template_inputs, **self.global_inputs)
         answer_format = self.internal_prompts[name]['answer_format']
+
+        return prompt, answer_format
+
+    def _invoke_internal_msg(self, name, template_inputs):
+
+        prompt, answer_format = self._get_internal_prompt(name, template_inputs)
         
-        return self.llm.with_structured_output(answer_format).invoke(prompt)
+        if answer_format:
+            return self.llm.with_structured_output(answer_format).invoke(prompt)
+        return self.llm.invoke(prompt)
 
     def _apply_initial_message(self, config, template_inputs, source, template, var_name='messages', hidden=False, version=None, as_node=None):
         """

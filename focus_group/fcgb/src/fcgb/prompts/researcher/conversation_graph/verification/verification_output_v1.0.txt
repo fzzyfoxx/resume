@@ -1,18 +1,20 @@
-For a task which is: 
-TASK:
-{task}
-
-with given context: 
-CONTEXT:
-{context}
-
-I received an answer:
-ANSWER:
-{answer}
-
-During verification I get following remarks:
-REMARKS:
-{task_response}
+During research process for a listed below task and its context an answer was produced.
+Next, this answer was verified by different experts from different angles. Results of verification are listed as remarks.
 
 -----
+TASK:
+{task}
+-----
+CONTEXT:
+{context}
+-----
+ANSWER:
+{answer}
+-----
+REMARKS:
+{task_response}
+-----
+
 In relation to a given task and context, modify an answer using provided remarks.
+Pay attention to stick to task subject and if it has mentioned any specific output format, use it.
+Write only pure, corrected answer without any comments.

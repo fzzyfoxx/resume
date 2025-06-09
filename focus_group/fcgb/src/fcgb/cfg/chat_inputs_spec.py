@@ -185,7 +185,7 @@ class ResearchVerificationConfig:
     initial_messages_spec = []
     global_inputs = {
         'min_ver_prompts': 1,
-        'max_ver_prompts': 4,
+        'max_ver_prompts': 8,
     }
     internal_messages_spec = {
         'task_list': {
