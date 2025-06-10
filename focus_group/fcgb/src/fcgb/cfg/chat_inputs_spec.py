@@ -204,3 +204,30 @@ class ResearchVerificationConfig:
     template_inputs_model = ResearchVerificationTemplateInputs
     init_values = {'verified_answer': None, 'task_list': None}
     prompt_manager_spec = {}
+
+### ORGANIZED RESEARCH
+
+# phantom research tool
+
+class PhantomResearchTemplateInputs(BaseModel):
+    job: str
+    motivation: str
+    restrictions: str
+    output_format: str
+
+class PhantomResearchConfig:
+    initial_messages_spec = []
+    global_inputs = {}
+    internal_messages_spec = {
+        'system': {
+            'answer_format': None,
+            'template': "phantom_research_system"
+        },
+        'job': {
+            'answer_format': None,
+            'template': "phantom_research_job"
+        }
+    }
+    template_inputs_model = PhantomResearchTemplateInputs
+    init_values = {}
+    prompt_manager_spec = {}

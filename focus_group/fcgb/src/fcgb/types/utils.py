@@ -4,7 +4,7 @@ def append_or_clear(left, right):
     elif right is None:
         return left
     elif left is None:
-        return right
+        return [right]
     else:
         return left + [right]
             
