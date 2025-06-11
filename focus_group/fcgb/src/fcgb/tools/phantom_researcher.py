@@ -32,9 +32,9 @@ class PhantomResearcherTool(BaseChatBot):
 
         class State(MessagesState):
             job: str
-            motivation: str
             restrictions: str
             output_format: str
+            data: str
             thread_id: str = None
             output: str = None
 
@@ -46,9 +46,9 @@ class PhantomResearcherTool(BaseChatBot):
             
             template_inputs = {
                 "job": state['job'],
-                "motivation": state['motivation'],
                 "restrictions": state['restrictions'],
-                "output_format": state['output_format']
+                "output_format": state['output_format'],
+                "data": state['data']
             }
 
             thread_id = config['configurable']['thread_id']
@@ -88,22 +88,22 @@ class PhantomResearcherTool(BaseChatBot):
             checkpointer=self.memory
         )
 
-    def run(self, job: str, motivation: str, restrictions: str, output_format: str):
+    def run(self, job: str, restrictions: str, output_format: str, data: str) -> ToolOutput:
         """
         Performs research using external sources like web pages, research papers, wikipedia.
         Args:
             job: description of the research task
-            motivation: description of the objectives and purpose of the research
             restrictions: any limitations or constraints for the research
             output_format: the desired format for the research output
+            data: additional data to be used in the research
         """
         thread_id = uuid.uuid4().hex
         return self.graph.invoke(
             input={
                 'job': job,
-                'motivation': motivation,
                 'restrictions': restrictions,
-                'output_format': output_format
+                'output_format': output_format,
+                'data': data
                 },
             config = {'configurable': {'thread_id': thread_id}},
             output_keys=['thread_id', 'output']
@@ -112,15 +112,15 @@ class PhantomResearcherTool(BaseChatBot):
     def get_tool(self):
 
         @tool
-        def external_research(job: str, motivation: str, restrictions: str, output_format: str) -> ToolOutput:
+        def external_research(job: str, restrictions: str, output_format: str, data: str) -> ToolOutput:
             """
             Performs research using external sources like web pages, research papers, wikipedia.
             Args:
                 job: description of the research task
-                motivation: description of the objectives and purpose of the research
                 restrictions: any limitations or constraints for the research
                 output_format: the desired format for the research output
+                data: additional data to be used in the research
             """
-            return self.run(job, motivation, restrictions, output_format)
+            return self.run(job, restrictions, output_format, data)
         
         return external_research

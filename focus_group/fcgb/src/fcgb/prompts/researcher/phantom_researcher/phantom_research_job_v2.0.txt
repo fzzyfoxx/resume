@@ -1,0 +1,19 @@
+Provide an answer for a research job which is:
+**research job**: {job}
+
+When writing your answer be aware of provided restrictions:
+**restrictions**: {restrictions}
+
+There is also specified output format of your answer:
+**output format**: {output_format}
+Your response should be structured according to the output format provided, ensuring clarity and organization in your answer.
+
+In addition, you can use the following additional data, that the job may relate to, to support your answer:
+**additional data**:
+{data}
+
+--------------------
+
+Your answer should be a detailed response that addresses the research job. 
+Use your best knowledge to provide relevant information, and if necessary, you can pretend to use external resources like web pages, research papers, or Wikipedia to support your answer. 
+Remember, accuracy is important, but since this is a testing tool, it doesn't have to be perfect. Focus on delivering a comprehensive and informative response that aligns with the research job's requirements.

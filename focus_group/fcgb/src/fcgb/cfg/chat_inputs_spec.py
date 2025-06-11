@@ -212,9 +212,9 @@ class ResearchVerificationConfig:
 
 class PhantomResearchTemplateInputs(BaseModel):
     job: str
-    motivation: str
     restrictions: str
     output_format: str
+    data: str
 
 class PhantomResearchConfig:
     initial_messages_spec = []
@@ -260,9 +260,9 @@ class JobHanlderConfig:
 
 class PlannedIterativeTaskSolverTemplateInputs(BaseModel):
     job: str
-    motivation: str
     restrictions: str
     output_format: str
+    data: str
 
 class PlannedIterativeTaskSolverConfig:
     initial_messages_spec = []
