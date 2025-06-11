@@ -231,3 +231,26 @@ class PhantomResearchConfig:
     template_inputs_model = PhantomResearchTemplateInputs
     init_values = {}
     prompt_manager_spec = {}
+
+# job handler
+class JobHandlerTemplateInputs(BaseModel):
+    job_description: str
+
+class JobHanlderConfig:
+    initial_messages_spec = []
+    global_inputs = {
+        'max_turns': 4
+    }
+    internal_messages_spec = {
+        'system': {
+            'answer_format': None,
+            'template': "job_handler_system"
+        },
+        'instruction': {
+            'answer_format': None,
+            'template': "job_handler_instruction"
+        }
+    }
+    template_inputs_model = JobHandlerTemplateInputs
+    init_values = {}
+    prompt_manager_spec = {}
