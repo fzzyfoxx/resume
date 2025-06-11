@@ -13,7 +13,7 @@ class google_llm_config(BaseConfig):
         'model': 'gemini-2.0-flash',
         'temperature': 0.5,
         'max_output_tokens': 2048,
-        'max_tokens': 4096
+        'max_tokens': 16000
     }
 
 class fake_llm_config(BaseConfig):

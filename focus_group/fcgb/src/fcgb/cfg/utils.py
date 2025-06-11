@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+from typing import Dict
 
 def extract_class_variables(cls):
     """Extract class-level attributes and their values, including inherited ones."""
@@ -33,3 +35,11 @@ class BaseConfig:
     def named_params(cls, vars):
         """Extract specified class-level attributes and their values, including inherited ones."""
         return extract_named_class_variables(cls, vars)
+    
+def model2string(model: BaseModel) -> str:
+
+    return '\n'.join([f'**{key}**: {value}' for key, value in model.model_dump().items()])
+
+def dict2string(model: Dict) -> str:
+
+    return '\n'.join([f'**{key}**: {value}' for key, value in model.items()])

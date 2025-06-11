@@ -1,0 +1,17 @@
+# **TASK DESCRIPTION**
+
+## **job**
+Here is the main goal of the task:
+{job}
+
+## **motivation**
+For better understanding here is a description of its puprose:
+{motivation}
+
+## **restrictions**
+At every stage of the process bear in mind the following restrictions:
+{restrictions}
+
+## **output format**
+The final report should be written in the following format:
+{output_format}

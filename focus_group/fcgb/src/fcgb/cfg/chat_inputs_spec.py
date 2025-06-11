@@ -1,5 +1,6 @@
 from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, RestrictionsModel
 from fcgb.types.research import SimpleAnswerModel, SingleStrategyModel, StrategyTaskModel, PromptTemplatesListModel, SingleVerificationModel
+from fcgb.types.tools import JobsListModel
 from typing import TypedDict, Dict
 from pydantic import BaseModel
 
@@ -254,3 +255,54 @@ class JobHanlderConfig:
     template_inputs_model = JobHandlerTemplateInputs
     init_values = {}
     prompt_manager_spec = {}
+
+# planned iterative task solver
+
+class PlannedIterativeTaskSolverTemplateInputs(BaseModel):
+    job: str
+    motivation: str
+    restrictions: str
+    output_format: str
+
+class PlannedIterativeTaskSolverConfig:
+    initial_messages_spec = []
+    global_inputs = {
+        'max_turns': 4,
+        'max_jobs': 4
+    }
+    internal_messages_spec = {
+        'system': {
+            'answer_format': None,
+            'template': "general_pts_system",
+            'role': 'system'
+        },
+        'query': {
+            'answer_format': None,
+            'template': "general_pts_query",
+            'role': 'human'
+        },
+        'planning': {
+            'answer_format': None,
+            'template': "general_pts_planning",
+            'role': 'human'
+        },
+        'distribution': {
+            'answer_format': JobsListModel,
+            'template': "general_pts_distribution",
+            'role': 'human'
+        },
+        'base_extension': {
+            'answer_format': None,
+            'template': "general_pts_base_extension",
+            'role': 'human'
+        },
+        'report': {
+            'answer_format': None,
+            'template': "general_pts_report",
+            'role': 'human'
+        }
+    }
+    template_inputs_model = PlannedIterativeTaskSolverTemplateInputs
+    init_values = {}
+    prompt_manager_spec = {}
+    

@@ -1,0 +1,32 @@
+# **TASK DESCRIPTION**
+
+## **job**
+Here is the main goal of the task:
+{job}
+
+## **motivation**
+For better understanding here is a description of its puprose:
+{motivation}
+
+------------------
+
+# **KNOWLEDGE BASE**
+{knowledge_base}
+
+------------------
+
+# **RETREIVED DATA**
+{retrieved_data}
+
+------------------
+
+I'm collecting data to be able to prepare a raport for the described task.
+You have access to my current knowledge base and data I recently retreived.
+
+Your task is to extend my knowledge base with new information that will help me to prepare a final report.
+In your answer provide existing knowledge base with added relevant new information.
+If any descriptions are unnecessary long or not relevant, please shorten them or remove them.
+Also try to keep it as concise as possible and avoid redundant data.
+
+Knowledge base should be divided into sections with titles. For section title use '##' markdown syntax.
+Your answer should contain only extended and properly formatted knowledge base without any additional comments or explanations.

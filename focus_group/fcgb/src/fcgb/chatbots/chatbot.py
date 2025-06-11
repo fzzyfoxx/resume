@@ -81,9 +81,18 @@ class BaseChatBot:
     def _get_internal_prompt(self, name: str, template_inputs: Dict):
 
         prompt = self.internal_prompts[name]['prompt'].format(**template_inputs, **self.global_inputs)
-        answer_format = self.internal_prompts[name]['answer_format']
+        answer_format = self.internal_prompts[name].get('answer_format', None)
 
         return prompt, answer_format
+    
+    def _get_internal_message(self, name: str, template_inputs: Dict):
+
+        prompt, answer_format = self._get_internal_prompt(name, template_inputs)
+        role = self.internal_messages_spec[name]['role'] if 'role' in self.internal_messages_spec[name] else 'human'
+
+        msg = self.message_types_map[role](prompt, name=name)
+
+        return msg, answer_format
 
     def _invoke_internal_msg(self, name, template_inputs):
 
