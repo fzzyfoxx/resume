@@ -1,4 +1,4 @@
-from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints
+from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints, Literal
 from pydantic import BaseModel
 import random
 from langchain_core.messages import AIMessage
@@ -53,6 +53,8 @@ class FakeStructuredOutput:
                 return self._generate_dict(field_type.__args__[0], field_type.__args__[1])
             elif field_type.__origin__ is tuple:
                 return self._generate_tuple(field_type.__args__)
+            elif field_type.__origin__ is Literal:  # Handle Literal type
+                return random.choice(field_type.__args__)
         elif isinstance(field_type, type):  # Ensure field_type is a class
             # Check if field_type is a TypedDict
             if hasattr(field_type, "__annotations__") and issubclass(field_type, dict):
