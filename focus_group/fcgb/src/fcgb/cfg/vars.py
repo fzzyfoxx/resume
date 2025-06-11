@@ -18,7 +18,10 @@ class google_llm_config(BaseConfig):
 
 class fake_llm_config(BaseConfig):
     llm_func = FakeLLM
-    llm_kwargs = {}
+    llm_kwargs = {
+        'max_parallel_tools': 2,
+        'tool_usage_prob': 0.5
+    }
 
 #------------------------------------------------------------
 

@@ -2,9 +2,11 @@ from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints
 from pydantic import BaseModel
 import random
 from langchain_core.messages import AIMessage
-from numpy.random import uniform
+from numpy import arange
+from numpy.random import uniform, choice
 import string
 from fcgb.types.tavily import TavilySearchSingleResult, TavilySearchResults, TavilyExtractSingleResult, TavilyExtractResults
+import uuid
 
 def random_string(length: int) -> str:
     """
@@ -167,13 +169,21 @@ class FakeLLM:
         Returns:
         - A string indicating the response number.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, max_parallel_tools=2, tool_usage_prob=0.5, *args, **kwargs):
         self.counter = 0
         self.structured_output = None
 
+        self.tools = []
+        self.max_parallel_tools = max_parallel_tools
+        self.tool_usage_prob = tool_usage_prob
+
+
     def __call__(self, *args, **kwargs):
         self.counter += 1
-        if self.structured_output:
+        tools_idxs = self._random_tools_selection()
+        if len(tools_idxs) > 0:
+            return self._get_tool_message(tools_idxs)
+        elif self.structured_output:
             response = self.structured_output
             self.structured_output = None
             return response
@@ -189,6 +199,49 @@ class FakeLLM:
     def with_structured_output(self, structure):
         self.structured_output = self.generate_fake_output(structure)
 
+        return self
+    
+    def _random_tools_selection(self):
+        tools_num = len(self.tools)
+
+        if tools_num == 0:
+            return []
+        
+        indexes = arange(tools_num)
+        max_tools = self.max_parallel_tools if self.parallel_tool_calls else 1
+        drawn_idxs = choice(indexes, size=max_tools, replace=True)
+        draw_probs = uniform(0, 1, size=max_tools)
+
+        selected_idxs = [idx for idx, prob in zip(drawn_idxs.tolist(), draw_probs) if prob > self.tool_usage_prob]
+
+        return selected_idxs
+    
+    def _get_tool_message(self, tools_idxs: List[int]):
+
+        tool_calls = [self._set_tool_call(self.tools[i]) for i in tools_idxs]
+
+        return AIMessage(
+            content="",
+            tool_calls=tool_calls,
+        )
+
+    def _set_tool_call(self, tool):
+
+
+        call_id = 'call_' + uuid.uuid4().hex
+        name = tool.name
+        args = self.generate_fake_output(tool.args_schema).model_dump()
+
+        return {
+            'id': call_id,
+            'name': name,
+            'args': args,
+        }
+    
+    def bind_tools(self, tools: List[Any], parallel_tool_calls: bool=True):
+
+        self.tools = tools
+        self.parallel_tool_calls = parallel_tool_calls
         return self
     
 
