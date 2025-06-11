@@ -239,10 +239,25 @@ class FakeLLM:
         }
     
     def bind_tools(self, tools: List[Any], parallel_tool_calls: bool=True):
+        """
+        Create a new FakeLLM instance with the specified tools bound to it.
 
-        self.tools = tools
-        self.parallel_tool_calls = parallel_tool_calls
-        return self
+        Args:
+            tools (List[Any]): List of tools to bind.
+            parallel_tool_calls (bool): Whether to allow parallel tool calls.
+
+        Returns:
+            FakeLLM: A new FakeLLM instance with the tools bound.
+        """
+        # Create a new instance of FakeLLM
+        new_instance = FakeLLM(
+            max_parallel_tools=self.max_parallel_tools,
+            tool_usage_prob=self.tool_usage_prob
+        )
+        # Bind tools and parallel_tool_calls to the new instance
+        new_instance.tools = tools
+        new_instance.parallel_tool_calls = parallel_tool_calls
+        return new_instance
     
 
 class FakeHuman:
