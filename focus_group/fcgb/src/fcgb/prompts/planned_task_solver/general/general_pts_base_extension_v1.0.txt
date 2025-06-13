@@ -4,10 +4,6 @@
 Here is the main goal of the task:
 {job}
 
-## **motivation**
-For better understanding here is a description of its puprose:
-{motivation}
-
 ------------------
 
 # **KNOWLEDGE BASE**
@@ -20,11 +16,17 @@ For better understanding here is a description of its puprose:
 
 ------------------
 
+# **JOBS**
+{current_jobs}
+
+------------------
+
 I'm collecting data to be able to prepare a raport for the described task.
 You have access to my current knowledge base and data I recently retreived.
 
 Your task is to extend my knowledge base with new information that will help me to prepare a final report.
 In your answer provide existing knowledge base with added relevant new information.
+Assure that you relate to the job's goals that were performed to gather retreived data.
 If any descriptions are unnecessary long or not relevant, please shorten them or remove them.
 Also try to keep it as concise as possible and avoid redundant data.
 

@@ -1,0 +1,17 @@
+# **TASK DESCRIPTION**
+
+## **job**
+Here is the main goal of the task:
+{job}
+
+## **restrictions**
+At every stage of the process bear in mind the following restrictions:
+{restrictions}
+
+## **output format**
+The final report should be written in the following format:
+{output_format}
+
+## **data**
+Additional data that you can relate to during task solving:
+{data}

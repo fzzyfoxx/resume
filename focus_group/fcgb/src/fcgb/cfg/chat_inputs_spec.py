@@ -1,6 +1,6 @@
 from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, RestrictionsModel
 from fcgb.types.research import SimpleAnswerModel, SingleStrategyModel, StrategyTaskModel, PromptTemplatesListModel, SingleVerificationModel
-from fcgb.types.tools import JobsListModel
+from fcgb.types.tools import JobsListModel, PlannedTaskRoutingModel
 from typing import TypedDict, Dict
 from pydantic import BaseModel
 
@@ -294,6 +294,11 @@ class PlannedIterativeTaskSolverConfig:
         'base_extension': {
             'answer_format': None,
             'template': "general_pts_base_extension",
+            'role': 'human'
+        },
+        'process_end_routing': {
+            'answer_format': PlannedTaskRoutingModel,
+            'template': "general_pts_end",
             'role': 'human'
         },
         'report': {

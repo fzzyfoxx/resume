@@ -112,7 +112,7 @@ class PhantomResearcherTool(BaseChatBot):
     def get_tool(self):
 
         @tool
-        def external_research(job: str, restrictions: str, output_format: str, data: str) -> ToolOutput:
+        def external_research(job: str, restrictions: str=None, output_format: str=None, data: str=None) -> ToolOutput:
             """
             Performs research using external sources like web pages, research papers, wikipedia.
             Args:

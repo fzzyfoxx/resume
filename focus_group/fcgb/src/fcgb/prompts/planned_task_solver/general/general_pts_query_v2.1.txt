@@ -1,0 +1,19 @@
+# **TASK DESCRIPTION**
+
+## **MAIN TASK** 
+*Here is the main goal of the task:*
+{job}
+
+## **RESTRICTIONS** 
+*At every stage of the process bear in mind the following restrictions:*
+{restrictions}
+
+## **OUTPUT FORMAT** 
+*The final report should be written in the following format:*
+{output_format}
+
+## **CONTEXTUAL DATA** 
+*This is additional, fixed information provided for your reference during task resolution. Use it to either better planning or knowledge base extension.*
+```
+{data}
+```

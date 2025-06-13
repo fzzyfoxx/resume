@@ -1,0 +1,26 @@
+# **TASK DESCRIPTION**
+
+## **job**
+Here is the main goal of the task:
+{job}
+
+## **restrictions**
+At every stage of the process bear in mind the following restrictions:
+{restrictions}
+
+## **output format**
+The final report should be written in the following format:
+{output_format}
+
+------------------
+
+# **KNOWLEDGE BASE**
+{knowledge_base}
+
+------------------
+
+For a given task description, especially the job field write an answer.
+- watch out for restrictions that should be taken into account while performing the job
+- follow strictly the output format that should be used for your answer
+- use data collected in the knowledge base to write comprehensive but concise answer
+- avoid any comments that are not part of the final report

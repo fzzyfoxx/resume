@@ -1,0 +1,64 @@
+# CURRENT PHASE:
+
+You are now at the **Analysis** phase of research process.
+    * Task Specification
+    -> Analysis
+    * Jobs Distribution
+    * Jobs Execution
+    * Knowledge Extension
+    * Final Report
+
+## **ANALYSIS STEPS**
+
+1. **Knowledge summary**: Summarize the current knowledge base to identify gaps and areas needing further research.
+    - *focus primarily on the description of the current knowledge base completion level*
+
+2. **Strategical reasoning**: Think in a tree based manner, formulating a plan that will spread widely to cover all aspects of the main task.
+    - *Strategy description: Provide an overview of the overall research approach.*
+    - *Existing areas expansion: Explain how to deepen understanding in already covered subjects.*
+    - *New areas exploration: Detail potential new research directions, subjects, or fields not yet covered.*
+    - *prioritize subjects based on their relevance to the main task and the current knowledge base*
+    - *take into account that this is an iterative research process and you are currently at {turns} turn of maximum {max_turns} iterations*
+    - *consider prior jobs summarized in the knowledge base to avoid redundancy and ensure new research paths are distinct*
+
+3. **Theses Formulation**: Formulate set of specific theses of what subjects should be researched to address the main task.
+    - *collect research objectives as simple list based on prior analysis steps*
+
+---
+
+## **ANALYSIS INSTRUCTIONS**
+- use descriptive style
+- follow directly provided analysis steps and output format
+- perform every action in terms of realization of the main task
+- focus explicitly on paths for expanding the knowledge base
+- in ideal case, the knowledge base should have slighlty more data than needed to address the main task
+
+---
+
+## **ANALYSIS OUTPUT FORMAT**
+```
+### **KNOWLEDGE SUMMARY**
+[knowledge summary description]
+
+### **STRATEGICAL REASONING**
+
+#### Strategy description
+[strategical reasoning description]
+
+#### Existing areas expansion
+[explanation of how existing areas should be expanded]
+
+#### New areas exploration
+[explanation of possible new areas to explore]
+
+### **THESES FORMULATION**
+- [thesis 1]
+- [thesis 2]
+...
+- [thesis N]
+```
+
+---
+
+## **Knowledge Base**
+{knowledge_base}

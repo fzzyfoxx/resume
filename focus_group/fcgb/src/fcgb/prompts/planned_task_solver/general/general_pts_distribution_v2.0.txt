@@ -1,0 +1,18 @@
+Use your reasoning and main task description to delegate from 1 to {max_jobs} specific jobs to specialized agents that will be performed in the next step.
+If prepared plan sugests more than {max_jobs} select the most important ones or group similar ones together to fit into the limit.
+
+Follow directly provided answer format by besides of job description also add:
+- restrictions that should be taken into account while performing the job
+- output format that should be used to report the results of the job.
+- variables with contextual information that an agent would have to use to perform the job.
+
+**available data variables**
+- knowledge_base - already gathered knowledge base
+- restrictions - restrictions from main task description
+
+
+// Use fields of job description to force agents answers to be clear and as concise as possible.
+// In jobs description you can enforce external sources to be used like web search or research papers if needed.
+// Be careful to not duplicate already done jobs.
+// Agents won't have access to the current conversation so they will not be able to use any variables that are not provided in the job description.
+// Do not add variables to the job definition if they are not crucial for its goal.
