@@ -4,3 +4,5 @@ focus_group/studio
 get-pip.py
 __pycache__/
 .vscode
+deep_retrieval/docs
+deep_retrieval/docs_metadata
