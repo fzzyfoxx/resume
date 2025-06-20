@@ -1,6 +1,6 @@
 from fcgb.types.initial import MainSubjectModel, SubjectDetailsModel, WorkersModel, RestrictionsModel
 from fcgb.types.research import SimpleAnswerModel, SingleStrategyModel, StrategyTaskModel, PromptTemplatesListModel, SingleVerificationModel
-from fcgb.types.tools import JobsListModel, PlannedTaskRoutingModel
+from fcgb.types.tools import JobsVarListModel, PlannedTaskRoutingModel
 from typing import TypedDict, Dict
 from pydantic import BaseModel
 
@@ -287,7 +287,7 @@ class PlannedIterativeTaskSolverConfig:
             'role': 'human'
         },
         'distribution': {
-            'answer_format': JobsListModel,
+            'answer_format': JobsVarListModel,
             'template': "general_pts_distribution",
             'role': 'human'
         },

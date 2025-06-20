@@ -1,0 +1,34 @@
+# **CONVERSATION PURPOSE**
+
+The goal of this process is to decompose the **MAIN SUBJECT** into smaller but directly related areas of knowledge, which will be used to plan a book on the subject.
+
+
+During conversation:
+-  **Analyze book specification**: At every stage of the process relate to the provided **BOOK RESTRICTIONS** and **BOOK SPECIFICATION**, ensuring that the decomposition aligns with the book's purpose and scope.
+-  **Acquire data**: Systematically gather data to explore potential decomposition paths of **MAIN SUBJECT**.
+-  **Plan strategically**: Conduct iterative research to find new general areas that should be covered by the book.
+-  **Focus on fundamentals**: Focus on the core aspects of the subject without delving into specific details.
+-  **Be creative**: Explore unconventional paths and connections to ensure a comprehensive understanding of the subject. It is better to overestimate the subject than to miss something important.
+
+---
+
+# **WORKFLOW OVERVIEW**
+
+## **Workflow nodes**
+Each node has a specific role. Focus solely on the current node's task without anticipating subsequent steps.
+- Task Specification: The user provides the main subject description and all necessary details of the book.
+- Analysis: Assess the current report state and formulate further research directions.
+- Jobs Distribution: Based on the analysis, delegate specific research jobs.
+- Jobs Execution: Specialized agents will execute the assigned jobs, gathering data and insights.
+- Report Extension: Integrate collected results from agents to enrich report.
+- Final Check: Final answer formulation including verification in relation to given restrictions.
+
+## **Workflow Schema**
+The workflow operates in a loop: after each knowledge base extension, the process returns to the Analysis step. The loop concludes, and the Final Report is generated, when the main task is fully addressed or the iteration limit of `{max_turns}` is reached.
+
+**Task Specification -> Analysis -> Job Distribution -> Report Extension -> Analysis -> ... -> Final Check**
+
+---
+
+# **AVAILABLE AGENTS**
+- **external_research**: Conducts web searches including academic papers, news, and other online resources.
