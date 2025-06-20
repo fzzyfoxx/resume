@@ -1,0 +1,7 @@
+{
+    "title": "Beyond Chain-of-Thought, Effective Graph-of-Thought Reasoning in\n  Language Models",
+    "summary": "With the widespread use of language models (LMs) in NLP tasks, researchers\nhave discovered the potential of Chain-of-thought (CoT) to assist LMs in\naccomplishing complex reasoning tasks by generating intermediate steps.\nHowever, human thought processes are often non-linear, rather than simply\nsequential chains of thoughts. Therefore, we propose Graph-of-Thought (GoT)\nreasoning, which models human thought processes not only as a chain but also as\na graph. By representing thought units as nodes and connections between them as\nedges, our approach captures the non-sequential nature of human thinking and\nallows for a more realistic modeling of thought processes. GoT adopts a\ntwo-stage framework with an additional GoT encoder for thought graph\nrepresentation and fuses the graph representation with the original input\nrepresentation through a gated fusion mechanism. We evaluate GoT's performance\non a text-only reasoning task (AQUA-RAT) and a multimodal reasoning task\n(ScienceQA). Our model achieves significant improvement over the strong CoT\nbaseline on the AQUA-RAT test set and boosts accuracy from 85.19% to 87.59%\nusing the T5-base model over the state-of-the-art Multimodal-CoT on the\nScienceQA test set.",
+    "published": "2023-05-26T02:15:09Z",
+    "url": "http://arxiv.org/pdf/2305.16582v2",
+    "path": "../docs/2305.16582v2.pdf"
+}
