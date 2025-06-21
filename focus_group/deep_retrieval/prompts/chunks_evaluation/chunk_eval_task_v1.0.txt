@@ -1,0 +1,56 @@
+# **TASK:**
+Evaluate if the **MIDDLE CHUNK** of a research paper is relevant to the query.
+Relevance should be understood as the middle chunk being definitely useful for answering the query.
+
+To catch the meaning of the middle chunk, you can use the previous and next chunks which are neighboring the middle chunk.
+Also use the **CONTEXT** so it provides additional information about current section of the paper and summarization of earlier important parts.
+
+You are currently at {current_chunk_index} chunk of {total_chunks_num} chunks.
+---
+
+# **QUERY:**
+{query}
+
+---
+
+# **CONTEXT:**
+{context}
+
+---
+
+**PREVIOUS CHUNK**
+{prev_chunk}
+
+# **MIDDLE CHUNK (EVALUATION)**
+{current_chunk}
+
+**NEXT CHUNK**
+{next_chunk}
+
+---
+
+# **EVALUATION EXAMPLES:**
+
+Example 1 (Middle is Relevant):
+
+    query: "What are the benefits of exercise?"
+    prev: "Many people seek ways to improve their health. Diet is one important factor."
+    middle: "Regular physical activity can significantly reduce the risk of chronic diseases such as heart disease and diabetes."
+    next: "It also helps with weight management and improves mood."
+    **evaluation: True** (Here, the middle chunk directly addresses the benefits of exercise, making it relevant to the query.)
+
+Example 2 (Continuation is also Relevant):
+
+    query: "What are the benefits of exercise?"
+    prev: "Regular physical activity can significantly reduce the risk of chronic diseases such as heart disease and diabetes."
+    middle: "It also helps with weight management and improves mood."
+    next: "On the other hand, a sedentary lifestyle can lead to various health issues."
+    **evaluation: True** (In this case, even though the middle chunk doesn't address physical activity directly, it continues the discussion about health benefits, making it relevant.)
+
+Example 2 (Middle is Irrelevant, Context is Related):
+
+    query: "What are the benefits of exercise?"
+    prev: "Diet is a key component of a healthy lifestyle. Consuming nutrient-rich foods is vital."
+    middle: "The typical Western diet often lacks sufficient fiber and essential vitamins, leading to various health issues."
+    next: "However, incorporating more fruits and vegetables can counteract these negative effects."
+    **evaluation: False** (Even though the surrounding chunks are about health, the middle chunk isn't about exercise benefits.)

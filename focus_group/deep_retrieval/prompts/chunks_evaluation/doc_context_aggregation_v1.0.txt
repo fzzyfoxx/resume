@@ -1,0 +1,26 @@
+# **TASK:**
+Aggregate or erase **CURRENT CONTEXT** summaries to reduce amount of information.
+Keep only data that is relevant to the **QUERY**.
+You can paraphrase the summaries to make them more concise, but keep the meaning intact.
+
+---
+
+# **QUERY:**
+{query}
+
+---
+
+# **CURRENT CONTEXT:**
+{context}
+
+---
+
+# **ANSWER FORMAT:**
+```
+## Summary of previous sections:
+- [summary 1]
+- [summary 2]
+...
+## Current Section:
+[rewrite this field as is]
+```

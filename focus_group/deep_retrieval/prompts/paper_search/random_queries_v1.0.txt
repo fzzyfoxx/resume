@@ -1,0 +1,11 @@
+Write random {main_queries_num} queries for arXiv research papers search. Use different topics and styles.
+Be creative and diverse in your queries. 
+
+Be specific avoiding general or too broad queries.
+
+examples:
+- quantum machine learning NISQ algorithms limitations
+- deep reinforcement learning multi-agent cooperation dilemmas
+- liquid crystal tunable optical filters telecom applications
+- Graph Neural Networks applications in drug discovery
+- novel MRI techniques for brain tumor detection survey

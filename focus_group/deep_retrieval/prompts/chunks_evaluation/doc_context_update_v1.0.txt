@@ -1,0 +1,38 @@
+# **TASK:**
+Update **CURRENT CONTEXT** information based on the current chunk.
+
+- treat the context as a long-term memory of the paper
+- gather key information from the **CURRENT CHUNK** in terms of the query so it would help to evaluate the relevant of future chunks
+- recognize structure of the document like sections, subsections, and paragraphs for better understanding of what the current chunk is about
+- adjust the current context field to the dynamic of the paper including removal of outdated information.
+
+You are currently at {current_chunk_index} chunk of {total_chunks_num} chunks.
+---
+
+# **QUERY:**
+{query}
+
+---
+
+# **CURRENT CONTEXT:**
+{context}
+
+---
+
+## **PREVIOUS CHUNK**
+{prev_chunk}
+
+## **CURRENT CHUNK**
+{current_chunk}
+
+---
+
+# **ANSWER FORMAT:**
+```
+## Key information:
+- [information 1]
+- [information 2]
+...
+## Current context:
+[description of the current section/subsection of the paper, including its purpose and how it relates to the overall paper]
+```

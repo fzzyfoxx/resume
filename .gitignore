@@ -6,3 +6,4 @@ __pycache__/
 .vscode
 focus_group/deep_retrieval/docs
 focus_group/deep_retrieval/docs_metadata
+focus_group/deep_retrieval/chunk_eval_results
