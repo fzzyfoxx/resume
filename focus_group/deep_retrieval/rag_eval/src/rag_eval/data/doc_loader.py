@@ -3,8 +3,9 @@ from typing import List, Dict, Any, TypedDict, Annotated
 from pydantic import BaseModel
 from langgraph.constants import Send
 import json
+import random
 from operator import add
-from fcgb.prompt_manager import PromptManager
+from rag_eval.prompt_manager import PromptManager
 from rag_eval.utils import create_path_if_not_exists, arxiv_search, download_pdf
 import fitz  # PyMuPDF
 import os
@@ -105,6 +106,9 @@ class PapersRetrieveGraph:
 class QueriesModel(BaseModel):
     queries: List[str]
 
+class KeywordCloudModel(BaseModel):
+    keywords: List[str]
+
 class RandomQueriesPaperSearchGraphState(BaseModel):
     queries: QueriesModel = []
     metadata_files: Annotated[List[str], add] = []
@@ -123,6 +127,7 @@ class RandomQueriesPaperSearchGraph:
             docs_path: str,
             docs_metadata_path: str,
             memory=None,
+            keyword_cloud_size: int = 50,
             main_queries_num: int = 5,
             paper_queries_num: int = 10,
             max_results: int = 5,
@@ -137,9 +142,11 @@ class RandomQueriesPaperSearchGraph:
                 'path': main path where prompts are stored,
                 'random_queries': title of the prompt for generating random queries,
                 'paper_queries': title of the prompt for generating queries based on papers.
+                'keyword_cloud': title of the prompt for generating keyword cloud.
             docs_path (str): Path to save downloaded documents.
             docs_metadata_path (str): Path to save metadata of downloaded documents.
             memory: Optional memory for the graph.
+            keyword_cloud_size (int): Size of the keyword cloud to generate.
             main_queries_num (int): Number of main queries to generate.
             paper_queries_num (int): Number of queries to generate for each paper.
             max_results (int): Maximum number of results to retrieve from arXiv.
@@ -152,6 +159,7 @@ class RandomQueriesPaperSearchGraph:
         self.docs_path = docs_path
         self.docs_metadata_path = docs_metadata_path
         self.memory = memory
+        self.keyword_cloud_size = keyword_cloud_size
         self.main_queries_num = main_queries_num
         self.paper_queries_num = paper_queries_num
         self.prompt_manager_spec = prompt_manager_spec
@@ -184,15 +192,23 @@ class RandomQueriesPaperSearchGraph:
             path=self.prompts_config['path']
         )
 
-        self.prompts = prompt_manager.get_prompts([self.prompts_config[name] for name in ['random_queries', 'paper_queries']])
+        self.prompts = prompt_manager.get_prompts([self.prompts_config[name] for name in ['random_queries', 'paper_queries', 'keyword_cloud']])
 
     def main_queries_node(self, state: RandomQueriesPaperSearchGraphState):
         """
         Generates a set of random queries for searching papers.
         """    
         #print("Generating random queries for paper search...")
+
+        keyword_cloud_prompt = self.prompts['keyword_cloud'].format(
+            keyword_cloud_size=self.keyword_cloud_size
+        )
+        keyword_cloud = self.llm.with_structured_output(KeywordCloudModel).invoke(keyword_cloud_prompt).keywords
+        topics = str(random.sample(keyword_cloud, min(self.main_queries_num, len(keyword_cloud))))
+
         query_prompt = self.prompts['random_queries'].format(
-            main_queries_num=self.main_queries_num
+            main_queries_num=self.main_queries_num,
+            topics=topics
         )
         queries = self.llm.with_structured_output(QueriesModel).invoke(query_prompt)
         return {'queries': queries}

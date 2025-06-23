@@ -4,7 +4,7 @@ from typing import List, Dict, TypedDict, Annotated
 from pydantic import BaseModel
 import json
 from operator import add
-from fcgb.prompt_manager import PromptManager
+from rag_eval.prompt_manager import PromptManager
 import os
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter

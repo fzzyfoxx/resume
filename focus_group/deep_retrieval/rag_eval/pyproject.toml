@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag_eval"
+version = "0.1.1"
+description = "A Python package for collecting documents and evaluating retrieval-augmented generation (RAG) models."
+authors = [
+    { name = "Dariusz Łazor", email = "fzzyfoxx@gmail.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["RAG", "evaluation", "python"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "pydantic>=2.11.4",          
+    "langchain-core>=0.3.58",     
+    "langgraph>=0.4.3",          
+    "IPython>=9.2.0",            
+    "numpy>=2.2.5",    
+    "pymupdf>=1.26.1"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rag_eval = [
+    "rag_eval/prompts/**/*.txt",
+    "rag_eval/prompts/**/*.json"
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*.pyo", "*~", "*.bak"]

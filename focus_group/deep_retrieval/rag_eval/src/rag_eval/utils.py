@@ -5,6 +5,7 @@ import urllib.request as libreq
 import feedparser
 import re
 from typing import List, Dict, Any
+import json
 
 def sanitize_query(query: str) -> str:
     """
@@ -120,3 +121,45 @@ def sort_dicts_by_id(dicts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Sorted list of dictionaries.
     """
     return sorted(dicts, key=lambda x: x.get('id', float('inf')))
+
+
+def get_filename(file):
+    return '.'.join(os.path.basename(file).split('.')[:-1])
+
+def get_files(path):
+    """
+    Return list of files from a given folder.
+    """
+    return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+
+def get_filenames_list(path):
+    """
+    Return list of files from a given folder without extensions.
+    """
+    return [get_filename(f) for f in get_files(path)]
+
+def get_files_without(path, filenames):
+    """
+    Returns a list of files from a given folder that are not in the provided filenames list.
+    """
+    return [f for f in get_files(path) if get_filename(f) not in filenames]
+
+def get_filenames_without(path, filenames):
+    """
+    Returns a list of files from a given folder without extensions that are not in the provided filenames list.
+    """
+    return [get_filename(f) for f in get_files_without(path, filenames)]
+
+def remove_files(path, filenames):
+    """
+    Remove files from a given folder that are in the provided filenames list.
+    """
+    for f in filenames:
+        os.remove(os.path.join(path, f))
+
+def load_json(path):
+    """
+    Load a JSON file from the given path.
+    """
+    with open(path, 'r') as f:
+        return json.load(f)

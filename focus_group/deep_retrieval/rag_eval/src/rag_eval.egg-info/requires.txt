@@ -1,0 +1,9 @@
+pydantic>=2.11.4
+langchain-core>=0.3.58
+langgraph>=0.4.3
+IPython>=9.2.0
+numpy>=2.2.5
+pymupdf>=1.26.1
+
+[dev]
+pytest>=6.0
