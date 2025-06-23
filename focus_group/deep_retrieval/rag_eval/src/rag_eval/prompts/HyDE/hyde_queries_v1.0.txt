@@ -1,0 +1,47 @@
+# **TASK:**
+Generate exactly {hyde_queries_num} distinct examples of phrases or blocks of text that could be used to answer the **Query**.
+Those phrases would be used to retreive relevant chunks of text from a research paper which title and summary are provided below.
+Use **Summary** to anticipate the content of the paper and generate phrases that would be relevant to the **Query**.
+
+Rules:
+- If it is possible The phrases should reflect actual distinct parts of an answer to the **Query**.
+- The phrases should be not longer than 25 words
+- The phrases should be diverse and not too similar to each other.
+- Phrases may contain plain text, data examples, code snippets, equations, or any other relevant content that could be used to retrieve information from the paper.
+- Base on provided **Examples** for proper phrases format.
+- Do not be afraid of making mistakes, the more diverse the phrases are, the better.
+
+---
+
+## **Title**:
+{title}
+
+---
+
+## **Summary**:
+{summary}
+
+---
+
+## **Query**:
+{query}
+
+---
+
+## **Examples:**
+
+### Example 1:
+Query: How Vision Transformers work
+phrase: "Vision Transformers (ViTs) utilize self-attention mechanisms to process image patches, enabling them to capture long-range dependencies in visual data."
+
+### Example 2:
+Query: Comparison of CNNs and ViTs
+phrase: "While CNNs excel in local feature extraction, Vision Transformers leverage global context through self-attention, leading to improved performance on large datasets."
+
+### Example 3:
+Query: Applications of Vision Transformers
+phrase: "Vision Transformers have been successfully applied in image classification, object detection, and segmentation tasks, demonstrating their versatility across various computer vision challenges."
+
+### Example 4:
+Query: Evaluation of Vision Transformers
+phrase: "| Benchmark | ViT | CNN | Accuracy |\n|-----------|-----|-----|---------|\n| ImageNet  | 85% | 82% | ViT outperforms CNNs in large-scale image classification tasks."

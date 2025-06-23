@@ -22,6 +22,7 @@ class ChunkDataHandler:
         self.docs_metadata_path = os.path.join(self.output_path, 'docs_metadata')
         self.docs_path = os.path.join(self.output_path, 'docs')
         self.eval_path = os.path.join(self.output_path, 'chunks_eval')
+        self.hyde_path = os.path.join(self.output_path, 'hyde_queries')
 
     def _evaluated_docs(self):
         """
@@ -34,6 +35,18 @@ class ChunkDataHandler:
         Returns a list of documents that have not been evaluated yet.
         """
         return get_filenames_without(self.docs_metadata_path, self._evaluated_docs())
+    
+    def _docs_with_hyde(self):
+        """
+        Returns a list of documents that have set of HyDE queries saved.
+        """
+        return get_filenames_list(self.hyde_path)
+    
+    def _docs_without_hyde(self):
+        """
+        Returns a list of documents that do not have set of HyDE queries saved but have evaluated chunks.
+        """
+        return get_filenames_without(self.eval_path, self._docs_with_hyde())
     
     def _all_docs(self):
         """
@@ -61,6 +74,16 @@ class ChunkDataHandler:
         else:
             raise FileNotFoundError(f"Metadata file for document '{doc_name}' not found at {self.docs_metadata_path}.")
         
+    def get_hyde_file(self, doc_name: str):
+        """
+        Loads the HyDE queries file for a given document name.
+        """
+        path = os.path.join(self.hyde_path, f"{doc_name}.json")
+        if os.path.exists(path):
+            return load_json(path)
+        else:
+            raise FileNotFoundError(f"HyDE queries file for document '{doc_name}' not found at {self.hyde_path}.")
+        
     def get_doc_titles(self, docs_names: list):
         """
         Returns a list of titles for the given document names.
@@ -70,6 +93,18 @@ class ChunkDataHandler:
             metadata = self.get_metadata_file(doc_name)
             titles.append(metadata.get('title', 'Unknown Title'))
         return titles
+    
+    def summary(self):
+        """
+        Prints a summary of the current state of the document loader and evaluator.
+        """
+        print(f"All docs: {self.all_docs}")
+        if self.all_docs > 0:
+            print(f"Docs to evaluate: {self.docs_to_evaluate} - {self.docs_to_evaluate/self.all_docs:.2%} of all docs")
+            evaluated_docs = self.docs_evaluated
+            print(f"Docs evaluated: {evaluated_docs} - {evaluated_docs/self.all_docs:.2%} of all docs")
+            if evaluated_docs > 0 & os.path.exists(self.hyde_path):
+                print(f"Docs with HyDE queries: {len(self._docs_with_hyde())} - {len(self._docs_with_hyde())/evaluated_docs:.2%} of evaluated docs")
     
     @property
     def docs_to_evaluate(self):

@@ -129,3 +129,105 @@ class ChunkEncoder:
             'similarity_coverage': similarity_coverage.result().numpy(),
             'labels_coverage': labels_coverage.result().numpy()
         }
+    
+
+class HyDEChunkEncoder(ChunkEncoder):
+    def __init__(
+            self,
+            data_path: str = '../data',
+            preprocessor_path: str = '../models/preprocessor/en_uncased_preprocess',
+            encoder_path: str = '../models/encoder/cmlm-en-base',
+            seq_length: int = 256
+    ):
+        super().__init__(
+            data_path=data_path,
+            preprocessor_path=preprocessor_path,
+            encoder_path=encoder_path,
+            seq_length=seq_length
+        )
+
+    def get_doc_names(self):
+        return self.data_handler._docs_with_hyde()
+    
+    def load_hyde_doc(self, doc_name):
+        chunks, chunks_labels, _ = self.load_doc(doc_name)
+        hyde_doc = self.data_handler.get_hyde_file(doc_name)
+
+        queries_lengths = [len(hyde_set['hyde_queries'])+1 for hyde_set in hyde_doc['queries_set']]
+        concatenated_queries = [query for queries_set in hyde_doc['queries_set'] for query in [queries_set['query']] + queries_set['hyde_queries']]
+
+        return chunks, chunks_labels, concatenated_queries, queries_lengths
+    
+    def encode_doc(self, doc_name, return_all=False):
+        chunks, chunks_labels, queries, queries_lengths = self.load_hyde_doc(doc_name)
+        inputs, queries_num = self.prepare_inputs(chunks, queries)
+        encoded_chunks, encoded_queries = self.encode_inputs(inputs, queries_num)
+        if return_all:
+            return {
+                'encoded_chunks': encoded_chunks,
+                'encoded_queries': encoded_queries,
+                'chunks_labels': chunks_labels,
+                'queries': queries,
+                'queries_lengths': queries_lengths,
+                'chunks': chunks,
+            }
+        return {
+            'encoded_chunks': encoded_chunks,
+            'encoded_queries': encoded_queries,
+            'chunks_labels': chunks_labels,
+            'queries_lengths': queries_lengths
+        }
+    
+    def aggregate_hyde_queries(self, results, queries_lengths):
+        results_set = tf.split(results, num_or_size_splits=queries_lengths, axis=-1)
+        return tf.concat([tf.reduce_max(x, axis=-1, keepdims=True) for x in results_set], axis=-1)
+    
+    def evaluate_similarities(self, max_docs=None, threshold=0.45):
+        doc_names = self.get_doc_names()
+        if max_docs is not None:
+            doc_names = doc_names[:max_docs]
+
+        f1_score = tf.keras.metrics.F1Score(threshold=threshold, average='macro')
+        precision = tf.keras.metrics.Precision(thresholds=threshold)
+        recall = tf.keras.metrics.Recall(thresholds=threshold)
+        similarity_coverage = tf.keras.metrics.Mean(name='similarity_coverage')
+        labels_coverage = tf.keras.metrics.Mean(name='labels_coverage')
+
+        pb = tf.keras.utils.Progbar(len(doc_names), stateful_metrics=['f1_score', 'precision', 'recall', 'similarity_coverage', 'labels_coverage'])
+        
+        for i, doc_name in enumerate(doc_names):
+            encodings = self.encode_doc(doc_name, return_all=False)
+            similarity = chunk2query_cosine_similarity(encodings['encoded_chunks'], encodings['encoded_queries'])
+            labels = tf.cast(encodings['chunks_labels'], tf.float32)
+
+            similarity = self.aggregate_hyde_queries(similarity, encodings['queries_lengths'])
+
+            f1_score.update_state(labels, similarity)
+            precision.update_state(labels, similarity)
+            recall.update_state(labels, similarity)
+
+            similarity_coverage.update_state(tf.reduce_mean(tf.where(similarity> threshold, 1.0, 0.0)))
+            labels_coverage.update_state(tf.reduce_mean(labels))
+
+            pb.update(i+1, values=[('f1_score', f1_score.result().numpy()),
+                                ('precision', precision.result().numpy()),
+                                ('recall', recall.result().numpy()),
+                                ('similarity_coverage', similarity_coverage.result().numpy()),
+                                ('labels_coverage', labels_coverage.result().numpy())
+                                ])
+
+        # Return the evaluation metrics
+        print("\nEvaluation Results:")
+        print(f"F1 Score: {f1_score.result().numpy():.2f}")
+        print(f"Precision: {precision.result().numpy():.2f}")
+        print(f"Recall: {recall.result().numpy():.2f}")
+        print(f"Similarity Coverage: {similarity_coverage.result().numpy():.2%}")
+        print(f"Labels Coverage: {labels_coverage.result().numpy():.2%}")
+
+        return {
+            'f1_score': f1_score.result().numpy(),
+            'precision': precision.result().numpy(),
+            'recall': recall.result().numpy(),
+            'similarity_coverage': similarity_coverage.result().numpy(),
+            'labels_coverage': labels_coverage.result().numpy()
+        }
