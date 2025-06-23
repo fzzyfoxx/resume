@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
-from typing import List, Dict, TypedDict, Annotated
+from typing_extensions import List, Dict, TypedDict, Annotated
 from pydantic import BaseModel
 import json
 from operator import add
@@ -139,8 +139,8 @@ class ChunkEvalGraph:
             'context': '',
             'queries': queries,
             'doc_file': doc_file,
-            'title': state.title,
-            'summary': state.summary
+            'title': metadata['title'],
+            'summary': metadata['summary']
         }
     
     @staticmethod

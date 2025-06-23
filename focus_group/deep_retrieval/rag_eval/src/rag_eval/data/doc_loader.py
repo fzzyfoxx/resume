@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from typing import List, Dict, Any, TypedDict, Annotated
+from typing_extensions import List, Dict, Any, TypedDict, Annotated
 from pydantic import BaseModel
 from langgraph.constants import Send
 import json

@@ -5,12 +5,108 @@ import math
 import uuid
 from rag_eval import RandomQueriesPaperSearchGraph
 from rag_eval import ChunkEvalGraph
-from rag_eval.utils import get_filenames_list, get_filenames_without, load_json, remove_files
+from rag_eval.utils import get_filenames_list, get_filenames_without, load_json, remove_files, create_path_if_not_exists
 
 import asyncio
 from tqdm.notebook import tqdm as notebook_tqdm
 
-class ChunkEvalBaseBuilder:
+class ChunkDataHandler:
+    def __init__(
+            self,
+            output_path: str,
+        ):
+
+        self.output_path = output_path
+        create_path_if_not_exists(self.output_path)
+
+        self.docs_metadata_path = os.path.join(self.output_path, 'docs_metadata')
+        self.docs_path = os.path.join(self.output_path, 'docs')
+        self.eval_path = os.path.join(self.output_path, 'chunks_eval')
+
+    def _evaluated_docs(self):
+        """
+        Returns a list of evaluated documents.
+        """
+        return get_filenames_list(self.eval_path)
+
+    def _docs_without_evaluation(self):
+        """
+        Returns a list of documents that have not been evaluated yet.
+        """
+        return get_filenames_without(self.docs_metadata_path, self._evaluated_docs())
+    
+    def _all_docs(self):
+        """
+        Returns a list of all documents.
+        """
+        return get_filenames_list(self.docs_metadata_path)
+    
+    def get_eval_file(self, doc_name: str):
+        """
+        Loads the evaluation file for a given document name.
+        """
+        path = os.path.join(self.eval_path, f"{doc_name}.json")
+        if os.path.exists(path):
+            return load_json(path)
+        else:
+            raise FileNotFoundError(f"Evaluation file for document '{doc_name}' not found at {self.eval_path}.")
+        
+    def get_metadata_file(self, doc_name: str):
+        """
+        Loads the metadata file for a given document name.
+        """
+        path = os.path.join(self.docs_metadata_path, f"{doc_name}.json")
+        if os.path.exists(path):
+            return load_json(path)
+        else:
+            raise FileNotFoundError(f"Metadata file for document '{doc_name}' not found at {self.docs_metadata_path}.")
+        
+    def get_doc_titles(self, docs_names: list):
+        """
+        Returns a list of titles for the given document names.
+        """
+        titles = []
+        for doc_name in docs_names:
+            metadata = self.get_metadata_file(doc_name)
+            titles.append(metadata.get('title', 'Unknown Title'))
+        return titles
+    
+    @property
+    def docs_to_evaluate(self):
+        """
+        Returns a number of documents that need to be evaluated.
+        """
+        return len(self._docs_without_evaluation())
+    
+    @property
+    def docs_evaluated(self):
+        """
+        Returns a number of documents that have been evaluated.
+        """
+        return len(self._evaluated_docs())
+    
+    @property
+    def all_docs(self):
+        """
+        Returns a number of all documents.
+        """
+        return len(self._all_docs())
+    
+    @staticmethod
+    def _add_json_extension(paths):
+        """
+        Adds '.json' extension to a list of paths.
+        """
+        return [f + '.json' for f in paths]
+    
+    @staticmethod
+    def _add_pdf_extension(paths):
+        """
+        Adds '.pdf' extension to a list of paths.
+        """
+        return [f + '.pdf' for f in paths]
+
+class ChunkEvalBaseBuilder(ChunkDataHandler):
     def __init__(
             self,
             llm,
@@ -43,9 +139,11 @@ class ChunkEvalBaseBuilder:
             memory=None,
             prompt_manager_spec: dict = {}
         ):
+        super().__init__(
+            output_path=output_path
+            )
 
         self.llm = llm
-        self.output_path = output_path
         self.builder_config = builder_config
         self.prompts_config = prompts_config
         self.doc_search_config = doc_search_config
@@ -56,10 +154,6 @@ class ChunkEvalBaseBuilder:
         self.build()
 
     def build(self):
-
-        self.docs_metadata_path = os.path.join(self.output_path, 'docs_metadata')
-        self.docs_path = os.path.join(self.output_path, 'docs')
-        self.eval_path = os.path.join(self.output_path, 'chunks_eval')
 
         self.doc_loader = RandomQueriesPaperSearchGraph(
             llm=self.llm,
@@ -80,45 +174,6 @@ class ChunkEvalBaseBuilder:
             prompt_manager_spec=self.prompt_manager_spec,
             **self.chunk_eval_config
         )
-    
-    def _evaluated_docs(self):
-        """
-        Returns a list of evaluated documents.
-        """
-        return get_filenames_list(self.eval_path)
-
-    def _docs_without_evaluation(self):
-        """
-        Returns a list of documents that have not been evaluated yet.
-        """
-        return get_filenames_without(self.docs_metadata_path, self._evaluated_docs())
-    
-    def _all_docs(self):
-        """
-        Returns a list of all documents.
-        """
-        return get_filenames_list(self.docs_metadata_path)
-    
-    @property
-    def docs_to_evaluate(self):
-        """
-        Returns a number of documents that need to be evaluated.
-        """
-        return len(self._docs_without_evaluation())
-    
-    @property
-    def docs_evaluated(self):
-        """
-        Returns a number of documents that have been evaluated.
-        """
-        return len(self._evaluated_docs())
-    
-    @property
-    def all_docs(self):
-        """
-        Returns a number of all documents.
-        """
-        return len(self._all_docs())
     
     @property
     def new_docs_per_turn(self):
@@ -143,20 +198,6 @@ class ChunkEvalBaseBuilder:
     def _is_doc_oversized(path, pages_limit):
         doc_metadata = load_json(path)
         return doc_metadata['pages_count'] > pages_limit
-    
-    @staticmethod
-    def _add_json_extension(paths):
-        """
-        Adds '.json' extension to a list of paths.
-        """
-        return [f + '.json' for f in paths]
-    
-    @staticmethod
-    def _add_pdf_extension(paths):
-        """
-        Adds '.pdf' extension to a list of paths.
-        """
-        return [f + '.pdf' for f in paths]
     
     def _remove_oversized_docs(self):
         """

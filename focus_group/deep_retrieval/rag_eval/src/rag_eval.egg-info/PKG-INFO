@@ -14,9 +14,11 @@ License-File: LICENSE
 Requires-Dist: pydantic>=2.11.4
 Requires-Dist: langchain-core>=0.3.58
 Requires-Dist: langgraph>=0.4.3
-Requires-Dist: IPython>=9.2.0
-Requires-Dist: numpy>=2.2.5
+Requires-Dist: IPython>=8.8.0
+Requires-Dist: numpy>=1.20.0
 Requires-Dist: pymupdf>=1.26.1
+Requires-Dist: feedparser>=6.0.10
+Requires-Dist: langchain-community>=0.0.1
 Provides-Extra: dev
 Requires-Dist: pytest>=6.0; extra == "dev"
 Dynamic: license-file
