@@ -6,7 +6,8 @@
             "output_format": "concatenated",
             "norm_ord": 2,
             "proper_node_threshold": 2.5,
-            "masked_dist": 1000
+            "masked_dist": 1000,
+            "vertices_dim": 35
         },
         "node_incr_args": {
             "mode": "static",
