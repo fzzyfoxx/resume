@@ -65,6 +65,12 @@ def process_shapefile_for_columns(file_path, columns_set, encode=None, decode=No
 
     gdf.geometry = gdf.geometry.apply(remove_z)
 
+    # Try to validate geometries inproper geometries
+    if not gdf.geometry.is_valid.all():
+        print(f"Invalid geometries found in {file_path}. Attempting to fix them.")
+        gdf.geometry = gdf['geometry'].apply(lambda geom: geom.buffer(0) if not geom.is_valid else geom)
+
+
     # Make sure that every geometry is valid, if not, skip the row
     initial_rows = len(gdf)
     gdf = gdf[gdf.geometry.is_valid]
