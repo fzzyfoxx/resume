@@ -83,3 +83,39 @@ def delete_local_temp_files(temp_dir):
             print(f"Deleted local temporary directory: {temp_dir}")
         except Exception as e:
             print(f"Error deleting local temporary directory {temp_dir}: {e}")
+
+def download_data_from_sources(sources, target_path, timeout=120):
+    """
+    Downloads files from the specified sources, unzips them, and saves them to the target path.
+    Args:
+        sources (list): List of dictionaries containing 'name' and 'url' for each source
+        target_path (str): Path where the downloaded files will be saved
+        timeout (int): Timeout for the download operation in seconds
+    Returns:
+        list: A list of dictionaries with the status of each download operation
+    """
+    os.makedirs(target_path, exist_ok=True)
+    files_to_download = len(sources)
+    results = []
+    for i, source in enumerate(sources):
+        name = source['name']
+        print(f"Downloading {i + 1}/{files_to_download}: {name}")
+        url = source['url']
+        target_file = f"{target_path}/{name}.zip"
+
+        result, err = download_file_with_progress(url, target_file, timeout=timeout)
+        if not result:
+            print(f"Error downloading {url}: {err}")
+            results.append({'name': name, 'status': 'failed', 'error': str(err)})
+            continue
+
+        result, err = unzip_file(target_file, f'{target_path}/{name}', delete_file=True)
+        if not result:
+            print(f"Error unzipping {target_file}: {err}")
+            results.append({'name': name, 'status': 'failed', 'error': str(err)})
+            continue
+
+        results.append({'name': name, 'status': 'success', 'error': None})
+        print(f"Successfully downloaded and unzipped {name}")
+
+    return results

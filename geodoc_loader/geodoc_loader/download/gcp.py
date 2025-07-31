@@ -1,4 +1,115 @@
 from google.cloud import bigquery, storage
+from google.api_core.exceptions import Conflict, NotFound, GoogleAPIError
+
+def create_gcs_bucket(project_id, bucket_name):
+    """Creates a GCS bucket if it doesn't already exist."""
+    storage_client = storage.Client(project=project_id)
+    try:
+        bucket = storage_client.get_bucket(bucket_name)
+        print(f"Bucket '{bucket_name}' already exists.")
+    except NotFound:
+        print(f"Bucket '{bucket_name}' does not exist. Creating it...")
+        try:
+            bucket = storage_client.create_bucket(bucket_name, project=project_id)
+            print(f"Bucket '{bucket_name}' created successfully.")
+        except Conflict:
+            # This can happen if another process creates it concurrently
+            print(f"Bucket '{bucket_name}' was just created by another process.")
+            bucket = storage_client.get_bucket(bucket_name) # Get a reference to it
+        except Exception as e:
+            print(f"Error creating bucket '{bucket_name}': {e}")
+            exit(1)
+    except Exception as e:
+        print(f"Error checking bucket '{bucket_name}': {e}")
+        exit(1)
+    return bucket
+
+def create_bigquery_dataset(project_id, dataset_name, location="EU"):
+    """
+    Creates a BigQuery dataset with the specified name and location.
+
+    Args:
+        project_id (str): Google Cloud project ID.
+        dataset_name (str): Name of the dataset to create.
+        location (str): Location for the dataset (default is "EU").
+
+    Returns:
+        str: The full dataset ID of the created dataset, or None if an error occurred.
+    """
+    try:
+        # Initialize BigQuery client
+        client = bigquery.Client(project=project_id)
+
+        # Construct the full dataset ID
+        dataset_id = f"{project_id}.{dataset_name}"
+
+        # Define the dataset
+        dataset = bigquery.Dataset(dataset_id)
+        dataset.location = location
+
+        # Create the dataset
+        dataset = client.create_dataset(dataset, exists_ok=False)  # API request
+        print(f"Dataset '{dataset.dataset_id}' created successfully.")
+        return dataset_id
+
+    except Conflict:
+        print(f"Dataset '{dataset_name}' already exists in project '{project_id}'.")
+        return None
+    except GoogleAPIError as e:
+        print(f"Google API error while creating dataset '{dataset_name}': {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error while creating dataset '{dataset_name}': {e}")
+        return None
+
+
+def create_bigquery_table(table_name, collection_name, project_id, columns_spec, additional_columns):
+    """
+    Creates a BigQuery table with the specified schema.
+
+    Args:
+        table_name (str): Name of the BigQuery table to create.
+        collection_name (str): Name of the dataset/collection in BigQuery.
+        project_id (str): Google Cloud project ID.
+        columns_spec (list): List of dictionaries specifying column schema (name, type, mode).
+        additional_columns (list): List of additional nullable string columns to add to the schema.
+
+    Returns:
+        str: The full table ID of the created table, or None if an error occurred.
+    """
+    try:
+        # Initialize BigQuery client
+        client = bigquery.Client(project=project_id)
+
+        # Construct the full table ID
+        dataset_id = f"{project_id}.{collection_name}"
+        table_id = f"{dataset_id}.{table_name}"
+
+        # Define the schema
+        schema = [
+            bigquery.SchemaField(col["name"], col["type"], mode=col["mode"])
+            for col in columns_spec
+        ]
+
+        # Add additional nullable string columns
+        for col_name in additional_columns:
+            schema.append(bigquery.SchemaField(col_name, "STRING", mode="NULLABLE"))
+
+        # Define the table
+        table = bigquery.Table(table_id, schema=schema)
+
+        # Create the table
+        table = client.create_table(table)  # API request
+
+        print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+        return table_id
+
+    except Conflict:
+        print(f"Table '{table_name}' already exists in dataset '{collection_name}'.")
+        return None
+    except Exception as e:
+        print(f"Error creating table '{table_name}': {e}")
+        return None
 
 def get_bq_table_schema(client, project_id, dataset_name, table_name):
     """
