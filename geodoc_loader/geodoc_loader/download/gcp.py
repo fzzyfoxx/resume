@@ -1,5 +1,6 @@
 from google.cloud import bigquery, storage
 from google.api_core.exceptions import Conflict, NotFound, GoogleAPIError
+from tqdm.auto import tqdm
 
 def create_gcs_bucket(project_id, bucket_name):
     """Creates a GCS bucket if it doesn't already exist."""
@@ -151,8 +152,10 @@ def upload_to_gcs(storage_client, bucket_name, folder_name, file_name, local_fil
     try:
         blob.upload_from_filename(local_file_path)
         gcs_uri = f'gs://{bucket_name}/{blob_name}'
+        print(f"Uploaded {local_file_path} to {gcs_uri}")
         return gcs_uri, None
     except Exception as e:
+        print(f"Error uploading {local_file_path} to GCS: {e}")
         return None, str(e)
     
 def load_geojson_to_bigquery(client, project_id, dataset_name, table_name, gcs_uri):

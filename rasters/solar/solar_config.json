@@ -1,0 +1,42 @@
+{
+    "legend": {
+        "DIF": "Longterm yearly average of diffuse horizontal irradiation",
+        "DNI": "Longterm yearly average of direct normal irradiation",
+        "GHI": "Longterm yearly average of global horizontal irradiation",
+        "GTI": "Longterm yearly average of global irradiation at optimum tilt",
+        "OPTA": "Optimum tilt of photovoltaic module",
+        "PVOUT": "Longterm yearly average of Potential photovoltaic electricity production",
+        "TEMP": "Longterm yearly average of air temperature"
+    },
+    "source": "https://cms.solargis.com/file?url=download/Poland/Poland_GISdata_LTAym_YearlyMonthlyTotals_GlobalSolarAtlas-v2_GEOTIFF.zip&bucket=globalsolaratlas.info",
+    "filename": "solar_data.zip",
+    "dataset_name": "solar",
+    "bucket_name": "single-loads",
+    "tables": [
+        {
+            "table_name": "irradiation",
+            "symbols": ["GTI", "DIF", "GHI", "DNI"],
+            "types": ["FLOAT64", "FLOAT64", "FLOAT64", "FLOAT64"]
+        },
+        {
+            "table_name": "pv",
+            "symbols": ["TEMP", "PVOUT"],
+            "types": ["FLOAT64", "FLOAT64"]
+        },
+        {
+            "table_name": "optimum",
+            "symbols": ["OPTA"],
+            "types": ["INT64"]
+        }
+    ],
+    "base_columns":[
+        {"name": "id", "type": "STRING", "mode": "REQUIRED"},
+        {"name": "geometry", "type": "GEOGRAPHY", "mode": "REQUIRED"}
+    ],
+    "additional_columns": [
+        {"name": "row", "type": "INT64", "mode": "REQUIRED"},
+        {"name": "col", "type": "INT64", "mode": "REQUIRED"},
+        {"name": "x", "type": "FLOAT64", "mode": "REQUIRED"},
+        {"name": "y", "type": "FLOAT64", "mode": "REQUIRED"}
+    ]
+}
