@@ -1,6 +1,7 @@
 from google.cloud import bigquery, storage
 from google.api_core.exceptions import Conflict, NotFound, GoogleAPIError
-from tqdm.auto import tqdm
+import os
+from geodoc_loader.download.core import delete_local_temp_files
 
 def create_gcs_bucket(project_id, bucket_name):
     """Creates a GCS bucket if it doesn't already exist."""
@@ -107,10 +108,10 @@ def create_bigquery_table(table_name, collection_name, project_id, columns_spec,
 
     except Conflict:
         print(f"Table '{table_name}' already exists in dataset '{collection_name}'.")
-        return None
+        return True
     except Exception as e:
         print(f"Error creating table '{table_name}': {e}")
-        return None
+        return False
 
 def get_bq_table_schema(client, project_id, dataset_name, table_name):
     """
@@ -146,7 +147,7 @@ def upload_to_gcs(storage_client, bucket_name, folder_name, file_name, local_fil
         tuple: (str, str) - The GCS URI of the uploaded file and None if successful, or None and an error message if failed.
     """
     bucket = storage_client.bucket(bucket_name)
-    blob_name = f'{folder_name}/{file_name}'
+    blob_name = f'{folder_name}/{file_name}' if folder_name else file_name
     blob = bucket.blob(blob_name)
 
     try:
@@ -210,7 +211,7 @@ def delete_gcs_temp_files(storage_client, bucket_name, folder_name, file_name):
         None
     """
     bucket = storage_client.bucket(bucket_name)
-    blob_name = f'{folder_name}/{file_name}'
+    blob_name = f'{folder_name}/{file_name}' if folder_name else file_name
     blob = bucket.blob(blob_name)
     try:
         if blob.exists():
@@ -243,3 +244,53 @@ def list_files_in_gcs_folder(bucket_name, folder_path):
             file_list.append((file_name, gcs_uri))
     
     return file_list
+
+
+def load_single_geojson_to_bigquery(
+        bucket_name, 
+        bucket_folder, 
+        dataset_id, 
+        table_name, 
+        table_schema, 
+        gcs_file_name, 
+        local_file_path, 
+        additional_columns=[], 
+        location="EU", 
+        delete_local=True):
+    """
+    Loads a single GeoJSON file to BigQuery after uploading it to Google Cloud Storage.
+    Args:
+        bucket_name (str): Name of the GCS bucket.
+        bucket_folder (str): Folder in the GCS bucket.
+        dataset_id (str): BigQuery dataset ID.
+        table_name (str): Name of the BigQuery table.
+        table_schema (list): Schema for the BigQuery table.
+        gcs_file_name (str): Name of the file in GCS.
+        local_file_path (str): Path to the local GeoJSON file.
+        additional_columns (list, optional): Additional columns to add to the table schema. Defaults to [].
+        location (str, optional): Location for the BigQuery dataset. Defaults to "EU".
+        delete_local (bool, optional): Whether to delete local temporary files after upload. Defaults to True.
+    Returns:
+        bool: True if the operation was successful, False otherwise.
+    """
+
+    bigquery_client = bigquery.Client()
+    project_id = bigquery_client.project
+    storage_client = storage.Client(project=project_id)
+
+    create_gcs_bucket(project_id, bucket_name)
+    ds_id = create_bigquery_dataset(project_id, dataset_id, location=location)
+    table_id = create_bigquery_table(table_name, dataset_id, project_id, table_schema, additional_columns)
+    if not table_id:
+        return False
+    gcs_uri, err = upload_to_gcs(storage_client, bucket_name, bucket_folder, gcs_file_name, local_file_path)
+    if err:
+        return False
+    result, err = load_geojson_to_bigquery(bigquery_client, project_id, dataset_id, table_name, gcs_uri)
+    if err:
+        return False
+    delete_gcs_temp_files(storage_client, bucket_name, bucket_folder, gcs_file_name)
+    if delete_local:
+        delete_local_temp_files(os.path.dirname(local_file_path))
+    
+    return result
