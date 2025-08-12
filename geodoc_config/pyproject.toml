@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"] # Updated setuptools version for modern
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "geodoc_loader"
+name = "geodoc_config"
 version = "0.1.0"
-description = "A Python package for downloading, processing, and loading geospatial data."
+description = "A Python package for loading GeoDoc services config files."
 authors = [
     { name = "Dariusz Łazor", email = "dariuszlazor@gmail.com" }
 ]
@@ -20,13 +20,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "requests",
-    "tqdm",
-    "geopandas",
-    "pandas",
-    "google-cloud-bigquery",
-    "google-cloud-storage",
-    "shapely",
 ]
 
 [tool.setuptools]
@@ -35,7 +28,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."] # Search for packages in the current directory (where pyproject.toml is)
-include = ["geodoc_loader*"] # Include your main package and its sub-packages
+include = ["geodoc_config*"] # Include your main package and its sub-packages
 
 [tool.setuptools.package-data]
-geodoc_loader = ["resources/fonts/*"]
+geodoc_config = ["configs/**/*"]

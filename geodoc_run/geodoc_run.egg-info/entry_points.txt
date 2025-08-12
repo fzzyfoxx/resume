@@ -1,0 +1,2 @@
+[console_scripts]
+geodoc-add-to-queue = geodoc_run.add_to_queue:main

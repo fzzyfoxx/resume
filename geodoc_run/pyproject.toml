@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geodoc_run"
+version = "0.1.0"
+description = "Run GeoDoc services"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "geodoc_config", # Dependency on geodoc_config for configuration loading
+]
+
+[tool.uv.sources]
+geodoc_config = { path = "../geodoc_config" } # Path to geodoc_config package for configuration loading
+
+[project.scripts]
+geodoc-add-to-queue = "geodoc_run.add_to_queue:main"
+
+[tool.setuptools.packages.find]
+where = ["."] # Search for packages in the current directory (where pyproject.toml is)
+include = ["geodoc_run*"] # Include your main package and its sub-packages

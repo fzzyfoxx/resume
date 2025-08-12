@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geodoc_deploy"
+version = "0.1.0"
+description = "Deployment tools for GeoDoc services"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "docker", # To interact with the Docker daemon programmatically
+    "setuptools", # For importlib.resources.files to work correctly if installed via pip
+]
+
+[project.scripts]
+geodoc-deploy = "geodoc_deploy.deploy_service:main"
+
+[tool.setuptools.packages.find]
+where = ["."] # Search for packages in the current directory (where pyproject.toml is)
+include = ["geodoc_deploy*"] # Include your main package and its sub-packages
+
+[tool.setuptools.package-data]
+geodoc_deploy = ["packages/*.whl", "services/**/*"]

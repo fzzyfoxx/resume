@@ -1,3 +1,5 @@
+
+
 def get_teryts_for_teryts_pattern_query(teryts, table_id, project_id, dataset_id="geo"):
 
     teryt_len = len(teryts[0])

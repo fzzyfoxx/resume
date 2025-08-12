@@ -1,0 +1,7 @@
+{
+    "soil_complexes": {
+        "worker": "soil_complexes_config",
+        "setup": "soil_complexes_setup",
+        "legend": "soil_complexes_legend"
+    }
+}

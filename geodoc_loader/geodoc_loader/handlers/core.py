@@ -165,3 +165,8 @@ def save_geojson(gdf, target_path, file_name):
         if os.path.exists(output_geojson_path):
             os.remove(output_geojson_path)  # Clean up partial file
         return None, err
+    
+def load_json(path):
+    """Load a JSON file"""
+    with open(path, "r") as f:
+        return json.load(f)

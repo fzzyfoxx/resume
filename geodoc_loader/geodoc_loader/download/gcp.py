@@ -2,6 +2,7 @@ from google.cloud import bigquery, storage
 from google.api_core.exceptions import Conflict, NotFound, GoogleAPIError
 import os
 from geodoc_loader.download.core import delete_local_temp_files
+from geodoc_loader.handlers.core import save_geojson
 
 def create_gcs_bucket(project_id, bucket_name):
     """Creates a GCS bucket if it doesn't already exist."""
@@ -294,3 +295,190 @@ def load_single_geojson_to_bigquery(
         delete_local_temp_files(os.path.dirname(local_file_path))
     
     return result
+
+def upload_dicts_to_bigquery_table(project_id, dataset_id, table_name, data):
+    """
+    Uploads a list of dictionaries to an existing BigQuery table.
+
+    Args:
+        project_id (str): Google Cloud project ID.
+        dataset_id (str): BigQuery dataset ID.
+        table_name (str): Name of the BigQuery table.
+        data (list): List of dictionaries to upload.
+
+    Returns:
+        bool: True if the operation was successful, False otherwise.
+    """
+    client = bigquery.Client(project=project_id)
+    table_id = f"{project_id}.{dataset_id}.{table_name}"
+
+    try:
+        # Insert rows into the table
+        errors = client.insert_rows_json(table_id, data)
+        if errors:
+            print(f"Errors occurred while inserting rows: {errors}")
+            return False
+        print(f"Successfully inserted {len(data)} rows into {table_id}.")
+        return True
+    except Exception as e:
+        print(f"Error uploading data to BigQuery table '{table_name}': {e}")
+        return False
+    
+def upload_gdf_to_existing_table(gdf, bq_client, storage_client, project_id, temp_folder, filename, gcs_bucket_name, gcs_folder_name, dataset_name, table_name):
+    """
+    Uploads a GeoDataFrame to an existing BigQuery table by saving it as a GeoJSON file and uploading it to Google Cloud Storage.
+    Args:
+        gdf (GeoDataFrame): The GeoDataFrame to upload.
+        bq_client (bigquery.Client): The BigQuery client instance.
+        storage_client (storage.Client): The Google Cloud Storage client instance.
+        project_id (str): The Google Cloud project ID.
+        temp_folder (str): The local temporary folder to save the GeoJSON file.
+        filename (str): The name of the GeoJSON file to save.
+        gcs_bucket_name (str): The name of the GCS bucket to upload the file to.
+        gcs_folder_name (str): The folder in the GCS bucket where the file will be uploaded.
+        dataset_name (str): The name of the BigQuery dataset.
+        table_name (str): The name of the BigQuery table to upload the data to.
+    Returns:
+        tuple: (bool, str) - True if the upload was successful, False and an error message if it failed.
+    """
+    # Save the GeoDataFrame to a temporary file in GeoJSON format
+    gdf_path, err = save_geojson(gdf, temp_folder, filename)
+
+    if err:
+        err_msg = f"Error saving GeoDataFrame to file {filename}.geojson: {err}"
+        print(err_msg)
+        return False, err_msg
+    
+    # Upload the GeoDataFrame to Google Cloud Storage
+    gcs_uri, err = upload_to_gcs(
+        storage_client=storage_client,
+        bucket_name=gcs_bucket_name,
+        folder_name=gcs_folder_name,
+        file_name=f"{filename}.geojson",
+        local_file_path=gdf_path
+    )
+
+    if err:
+        err_msg = f"Error uploading GeoDataFrame to GCS {filename}: {err}"
+        print(err_msg)
+        return False, err_msg
+    
+    insert_result, err = load_geojson_to_bigquery(
+        client=bq_client,
+        project_id=project_id,
+        dataset_name=dataset_name,
+        table_name=table_name,
+        gcs_uri=gcs_uri
+    )
+
+    if err:
+        err_msg = f"Error loading GeoDataFrame from GCS {filename} to BigQuery: {err}"
+        print(err_msg)
+        return False, err_msg
+    
+    delete_gcs_temp_files(
+        storage_client=storage_client,
+        bucket_name=gcs_bucket_name,
+        folder_name=gcs_folder_name,
+        file_name=f"{filename}.geojson"
+    )
+
+    delete_local_temp_files(temp_folder)
+
+    return True, None    
+
+def upload_geom_set_to_bigquery(
+        gdf,
+        errors_data,
+        log_data,
+        temp_folder,
+        geojson_filename,
+        bq_client,
+        storage_client,
+        project_id,
+        bucket_name,
+        bucket_folder_name,
+        dataset_name,
+        shapes_table,
+        errors_table,
+        log_table
+    ):
+    """
+    Uploads a set of geometries to BigQuery and handles errors and logs for provided config and entry data.
+    Args:
+        gdf (GeoDataFrame): The GeoDataFrame containing geometries to upload.
+        errors_data (list): List of dictionaries containing error records to upload.
+        log_data (list): List of dictionaries containing log records to upload.
+        temp_folder (str): Local temporary folder to save the GeoJSON file.
+        geojson_filename (str): Name of the GeoJSON file to save.
+        bq_client (bigquery.Client): The BigQuery client instance.
+        storage_client (storage.Client): The Google Cloud Storage client instance.
+        project_id (str): The Google Cloud project ID.
+        bucket_name (str): The name of the GCS bucket to upload the GeoJSON file to.
+        bucket_folder_name (str): The folder in the GCS bucket where the file will be uploaded.
+        dataset_name (str): The name of the BigQuery dataset.
+        shapes_table (str): The name of the BigQuery table to upload the geometries to.
+        errors_table (str): The name of the BigQuery table to upload error records to.
+        log_table (str): The name of the BigQuery table to upload log records to.
+    Returns:
+        tuple: (bool, bool, bool) - Returns three booleans indicating the success of uploading geometries, errors, and logs respectively.
+    """
+
+    # Upload the GeoDataFrame to BigQuery
+    if len(gdf) > 0:
+        # remove empty geometries
+        gdf = gdf[~gdf['geometry'].is_empty]
+        gdf = gdf.reset_index(drop=True)
+
+        print(f"Uploading {len(gdf)} geometries to BigQuery table '{shapes_table}'.")
+
+        # Upload the GeoDataFrame to BigQuery
+
+        shapes_upload, err = upload_gdf_to_existing_table(
+            gdf=gdf,
+            bq_client=bq_client,
+            storage_client=storage_client,
+            project_id=project_id,
+            temp_folder=temp_folder,
+            filename=geojson_filename,
+            gcs_bucket_name=f"{project_id}-{bucket_name}",
+            gcs_folder_name=bucket_folder_name,
+            dataset_name=dataset_name,
+            table_name=shapes_table
+        )
+
+        
+    else:
+        print("No geometries to upload.")
+        shapes_upload = True
+    
+    if not shapes_upload:
+        return False, None, None
+
+    # Upload error records to BigQuery
+    if len(errors_data) > 0:
+        print(f"Uploading {len(errors_data)} error records to BigQuery table '{errors_table}'.")
+        error_upload = upload_dicts_to_bigquery_table(
+            project_id=project_id,
+            dataset_id=dataset_name,
+            table_name=errors_table,
+            data=errors_data
+        )
+    else:
+        print("No errors to upload.")
+        error_upload = True
+
+    # Upload log records to BigQuery
+    if (len(log_data) > 0) & shapes_upload:
+        print(f"Uploading {len(log_data)} log records to BigQuery table '{log_table}'.")
+        log_upload = upload_dicts_to_bigquery_table(
+            project_id=project_id,
+            dataset_id=dataset_name,
+            table_name=log_table,
+            data=log_data
+        )
+    else:
+        print("No logs to upload.")
+        log_upload = True
+
+    return shapes_upload, error_upload, log_upload

@@ -1,0 +1,22 @@
+{
+    "soil_complexes_config": {
+        "folder": "soil_complexes",
+        "file": "soil_config.json",
+        "description": "Configuration for soil complexes download processing"
+    },
+    "soil_complexes_legend": {
+        "folder": "soil_complexes",
+        "file": "soil_legend.json",
+        "description": "Soil complexes legend for parsing and processing"
+    },
+    "soil_complexes_setup": {
+        "folder": "soil_complexes",
+        "file": "soil_setup_config.json",
+        "description": "GCS and BigQuery Setup configuration for soil complexes processing"
+    },
+    "administration_units": {
+        "folder": "areas",
+        "file": "teryts.json",
+        "description": "Teryt administrative units configuration"
+    }
+}
