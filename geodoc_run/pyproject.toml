@@ -17,6 +17,8 @@ geodoc_config = { path = "../geodoc_config" } # Path to geodoc_config package fo
 
 [project.scripts]
 geodoc-add-to-queue = "geodoc_run.add_to_queue:main"
+geodoc-run-job = "geodoc_run.run_job:main"
+geodoc-run-local-job = "geodoc_run.run_local_job:main"
 
 [tool.setuptools.packages.find]
 where = ["."] # Search for packages in the current directory (where pyproject.toml is)

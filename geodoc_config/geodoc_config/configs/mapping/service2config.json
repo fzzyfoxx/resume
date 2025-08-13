@@ -1,7 +1,17 @@
 {
-    "soil_complexes": {
+    "soil-complexes": {
         "worker": "soil_complexes_config",
         "setup": "soil_complexes_setup",
         "legend": "soil_complexes_legend"
+    },
+    "service-reports": {
+        "service": "service_reports_service"
+    },
+    "gcp": {
+        "general": "gcp_general",
+        "services": "gcp_services"
+    },
+    "spatial-data-downloader": {
+        "service": "spatial_data_downloader_service"
     }
 }

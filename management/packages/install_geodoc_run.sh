@@ -1,0 +1,1 @@
+pip install -e ./geodoc_run --config-setting editable_mode=compat

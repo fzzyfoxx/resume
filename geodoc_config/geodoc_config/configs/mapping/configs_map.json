@@ -18,5 +18,25 @@
         "folder": "areas",
         "file": "teryts.json",
         "description": "Teryt administrative units configuration"
+    },
+    "service_reports_service": {
+        "folder": "service_reports",
+        "file": "service_reports_service_config.json",
+        "description": "Docker configuration for service reports generation service"
+    },
+    "gcp_general": {
+        "folder": "gcp",
+        "file": "gcp_general.json",
+        "description": "General GCP configuration for GeoDoc project"
+    },
+    "gcp_services": {
+        "folder": "gcp",
+        "file": "gcp_services.json",
+        "description": "GCP services configuration for GeoDoc project"
+    },
+    "spatial_data_downloader_service": {
+        "folder": "spatial_data_downloader",
+        "file": "spatial_data_downloader_service_config.json",
+        "description": "Configuration for spatial data downloader service"
     }
 }

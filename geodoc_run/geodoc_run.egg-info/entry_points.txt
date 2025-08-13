@@ -1,2 +1,4 @@
 [console_scripts]
 geodoc-add-to-queue = geodoc_run.add_to_queue:main
+geodoc-run-job = geodoc_run.run_job:main
+geodoc-run-local-job = geodoc_run.run_local_job:main

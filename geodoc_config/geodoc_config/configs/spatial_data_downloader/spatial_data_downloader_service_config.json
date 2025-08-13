@@ -1,0 +1,12 @@
+{
+    "gcp_job": {
+        "taskCount": 1,
+        "cpu": "2",
+        "memory": "4G",
+        "maxRetries": 0,
+        "timeoutSeconds": 7200,
+        "env": [
+            {"name": "QUEUE_LIMIT", "value": "5"}
+        ]
+    }
+}
