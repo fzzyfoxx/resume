@@ -13,5 +13,8 @@
     },
     "spatial-data-downloader": {
         "service": "spatial_data_downloader_service"
+    },
+    "grid": {
+        "worker": "grid_config"
     }
 }

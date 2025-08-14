@@ -131,11 +131,7 @@ from geodoc_loader.handlers.core import save_geojson
 from geodoc_loader.download.gcp import load_single_geojson_to_bigquery
 import os
     
-def prepare_and_load_grid(grid_size, min_side_buffer, config_path, delete_local=True):
-
-    # load config file
-    with open(config_path, 'r') as f:
-        config = json.load(f)
+def prepare_and_load_grid(grid_size, min_side_buffer, config, delete_local=True):
 
     # Extract configuration parameters
     source_crs = config.get('source_crs', 'EPSG:4326')

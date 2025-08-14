@@ -38,5 +38,10 @@
         "folder": "spatial_data_downloader",
         "file": "spatial_data_downloader_service_config.json",
         "description": "Configuration for spatial data downloader service"
+    },
+    "grid_config": {
+        "folder": "grid",
+        "file": "grid_config_pl.json",
+        "description": "Configuration for grid processing"
     }
 }

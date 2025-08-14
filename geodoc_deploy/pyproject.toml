@@ -14,10 +14,12 @@ dependencies = [
 ]
 
 [project.scripts]
-geodoc-build-image = "geodoc_deploy.build_image:main"
-geodoc-deploy-image-gcp = "geodoc_deploy.deploy_image_gcp:main"
-geodoc-create-job = "geodoc_deploy.create_job:main"
-geodoc-add-service = "geodoc_deploy.add_service:main"
+geodoc-build-image = "geodoc_deploy.endpoints.build_image:main"
+geodoc-deploy-image-gcp = "geodoc_deploy.endpoints.deploy_image_gcp:main"
+geodoc-create-job = "geodoc_deploy.endpoints.create_job:main"
+geodoc-add-service = "geodoc_deploy.endpoints.add_service:main"
+geodoc-setup-gcp-for-service = "geodoc_deploy.endpoints.setup_gcp_for_service:main"
+geodoc-prepare-grid = "geodoc_deploy.endpoints.prepare_grid_pl:main"
 
 [tool.setuptools.packages.find]
 where = ["."] # Search for packages in the current directory (where pyproject.toml is)
