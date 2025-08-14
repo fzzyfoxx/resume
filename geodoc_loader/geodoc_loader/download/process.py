@@ -7,7 +7,12 @@ import datetime
 import importlib
 
 def download_spatial_data_from_queue(queue_limit, service):
-
+    """
+    Downloads spatial data from the queue for a given service and processes it.
+    Args:
+        queue_limit (int): The maximum number of items to process from the queue.
+        service (str): The name of the service to process data for.
+    """
     print("Setting up BigQuery and Storage clients...")
     bq_client = bigquery.Client()
     project_id = bq_client.project
@@ -63,7 +68,7 @@ def download_spatial_data_from_queue(queue_limit, service):
 
         upload_errors = [
             {
-                'cell_id': None,
+                config['error_id_column']: None,
                 'teryt': teryt,
                 'error_message': error,
                 'timestamp': str(datetime.datetime.now())

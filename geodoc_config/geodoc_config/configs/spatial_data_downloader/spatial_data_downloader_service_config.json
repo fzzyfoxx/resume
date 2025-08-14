@@ -2,7 +2,7 @@
     "gcp_job": {
         "taskCount": 1,
         "cpu": "2",
-        "memory": "4G",
+        "memory": "8G",
         "maxRetries": 0,
         "timeoutSeconds": 7200,
         "env": [

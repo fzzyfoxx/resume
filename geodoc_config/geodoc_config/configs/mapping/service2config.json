@@ -4,6 +4,10 @@
         "setup": "soil_complexes_setup",
         "legend": "soil_complexes_legend"
     },
+    "bdot": {
+        "worker": "bdot_config",
+        "setup": "bdot_setup_config"
+    },
     "service-reports": {
         "service": "service_reports_service"
     },

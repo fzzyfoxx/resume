@@ -14,6 +14,16 @@
         "file": "soil_setup_config.json",
         "description": "GCS and BigQuery Setup configuration for soil complexes processing"
     },
+    "bdot_config": {
+        "folder": "bdot",
+        "file": "bdot_config.json",
+        "description": "Configuration for BDOT data processing"
+    },
+    "bdot_setup_config": {
+        "folder": "bdot",
+        "file": "bdot_setup_config.json",
+        "description": "Setup configuration for BDOT data processing"
+    },
     "administration_units": {
         "folder": "areas",
         "file": "teryts.json",

@@ -89,6 +89,25 @@ def get_filtered_grid_for_teryts(teryts, teryts_table_id, grid_table_id, project
 
     return query
 
+def get_results_for_teryt_query(teryt, table_id, dataset_id, project_id):
+    """
+    Generates a SQL query to retrieve results for a specific TERYT from a given table.
+    
+    Args:
+        teryt (str): The TERYT code to filter by.
+        table_id (str): The ID of the table to query.
+        dataset_id (str): The ID of the dataset containing the table.
+        project_id (str): The ID of the Google Cloud project.
+
+    Returns:
+        str: A SQL query string to retrieve results for the specified TERYT.
+    """
+    return f"""
+    SELECT *
+    FROM `{project_id}.{dataset_id}.{table_id}`
+    WHERE teryt = '{teryt}'
+    """
+
 def get_query_result(client, query):
     """
     Executes a SQL query using the provided BigQuery client and returns the result.

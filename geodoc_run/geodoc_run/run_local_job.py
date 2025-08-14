@@ -9,7 +9,7 @@ def main():
         description="Run a Google Cloud Run job with custom environment variables."
     )
     parser.add_argument(
-        "--job_name",
+        "--job",
         required=True,
         help="The name of the Cloud Run job to execute."
     )
@@ -43,7 +43,7 @@ def main():
 
     # Call the function to run the container.
     result, container_id = run_docker_container(
-        image_name=args.job_name,
+        image_name=args.job,
         volume_mapping=volume_mapping,
         env_variables=parsed_env_vars
     )

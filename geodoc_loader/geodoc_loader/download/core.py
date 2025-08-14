@@ -27,6 +27,7 @@ def download_file_with_progress(url, target_path, timeout=120):
             unit='MB',
             unit_scale=True,
             unit_divisor=1024,
+            mininterval=10.0
         ) as progress_bar:
             for data in response.iter_content(block_size):
                 file.write(data)

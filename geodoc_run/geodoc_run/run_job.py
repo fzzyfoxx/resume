@@ -7,7 +7,7 @@ def main():
         description="Run a Google Cloud Run job with custom environment variables."
     )
     parser.add_argument(
-        "--job_name",
+        "--job",
         required=True,
         help="The name of the Cloud Run job to execute."
     )
@@ -32,7 +32,7 @@ def main():
                   "Expected KEY=VALUE format. Please check your input.")
 
     # Call the function to run the Cloud Run job.
-    success = run_cloud_run_job(args.job_name, parsed_env_vars)
+    success = run_cloud_run_job(args.job, parsed_env_vars)
 
     if success:
         print("\nCloud Run job execution request processed.")
