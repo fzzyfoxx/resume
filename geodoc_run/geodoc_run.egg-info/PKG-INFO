@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: geodoc_run
-Version: 0.1.0
-Summary: Run GeoDoc services
-Requires-Python: >=3.8
-Description-Content-Type: text/markdown
-License-File: LICENSE
-Requires-Dist: geodoc_config
-Dynamic: license-file
