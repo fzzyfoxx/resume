@@ -11,17 +11,18 @@ def main():
     # --- Configuration ---
     general_gcp_config = get_service_config("gcp", "general")
     services_config = get_service_config("gcp", "services")
+    service_config = get_service_config(args.service, "service")
 
     SERVICE_NAME = args.service
     GCP_PROJECT_ID = general_gcp_config['project_id']
-    SERVICE_CONFIG = get_service_config(SERVICE_NAME, "service")['gcp_job']
+    SERVICE_JOB_CONFIG = service_config['gcp_job']
     ARTIFACT_REGISTRY_LOCATION = services_config['location'] # e.g., us-central1, europe-west1
     ARTIFACT_REGISTRY_REPO = services_config['registry_repository'] # Artifact Registry repository name
     REGION = services_config['location']  # e.g., us-central1, europe-west1
 
     # Define the full image tag for Artifact Registry
     # Format: <LOCATION>-docker.pkg.dev/<PROJECT_ID>/<REPOSITORY>/<IMAGE_NAME>:<TAG>
-    IMAGE_NAME = f"{ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/{GCP_PROJECT_ID}/{ARTIFACT_REGISTRY_REPO}/{SERVICE_NAME}:latest"
+    IMAGE_NAME = f"{ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/{GCP_PROJECT_ID}/{ARTIFACT_REGISTRY_REPO}/{service_config['image_name']}:latest"
 
     # Call the function to create/update the job
     create_or_update_cloud_run_job(
@@ -29,7 +30,7 @@ def main():
         region=REGION,
         job_name=SERVICE_NAME,
         image_url=IMAGE_NAME,
-        config=SERVICE_CONFIG
+        config=SERVICE_JOB_CONFIG
     )
 
 if __name__ == "__main__":

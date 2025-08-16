@@ -8,6 +8,11 @@
         "worker": "bdot_config",
         "setup": "bdot_setup_config"
     },
+    "parcels": {
+        "worker": "parcels_config",
+        "setup": "parcels_setup_config",
+        "service": "parcels_service_config"
+    },
     "service-reports": {
         "service": "service_reports_service"
     },

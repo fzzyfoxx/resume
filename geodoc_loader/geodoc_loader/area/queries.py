@@ -13,6 +13,20 @@ def get_teryts_for_teryts_pattern_query(teryts, table_id, project_id, dataset_id
 
     return query
 
+def get_teryts_geoms_query(teryts, table_id, project_id, dataset_id="geo"):
+
+    teryt_len = len(teryts[0])
+
+    query = f"""SELECT
+    teryt,
+    geometry
+    FROM
+    `{project_id}.{dataset_id}.{table_id}`
+    WHERE
+    LEFT(teryt, {teryt_len}) IN UNNEST({teryts})"""
+
+    return query
+
 def get_geom_for_teryts_query(teryts, table_id, project_id, dataset_id="geo"):
     query = f"""SELECT
     ST_UNION_AGG(geometry) AS geometry
@@ -107,6 +121,28 @@ def get_results_for_teryt_query(teryt, table_id, dataset_id, project_id):
     FROM `{project_id}.{dataset_id}.{table_id}`
     WHERE teryt = '{teryt}'
     """
+
+def get_teryt_geom_left_by_teryt_pattern_query(teryt, teryt_table_id, teryt_dataset_id, shapes_table_id, shapes_dataset_id, shapes_teryt_column, project_id):
+    
+    query = f"""
+    WITH shapes AS (
+        SELECT ST_UNION_AGG(geometry) as fill, COUNT(*) as shapes_count
+        FROM `{project_id}.{shapes_dataset_id}.{shapes_table_id}`
+        WHERE {shapes_teryt_column} LIKE '{teryt}%'
+        ),
+    teryt AS (
+        SELECT t.teryt, t.geometry
+        FROM `{project_id}.{teryt_dataset_id}.{teryt_table_id}` AS t
+        WHERE t.teryt LIKE '{teryt}'
+    )
+    SELECT 
+    teryt.teryt, 
+    CASE WHEN shapes.fill IS null THEN teryt.geometry ELSE ST_DIFFERENCE(teryt.geometry, shapes.fill) END AS geometry, 
+    shapes.shapes_count
+    FROM teryt, shapes
+    """
+
+    return query
 
 def get_query_result(client, query):
     """

@@ -6,7 +6,7 @@ def get_queue_items_query(project_id, dataset_id, table_id, limit):
     FROM
     `{project_id}.{dataset_id}.{table_id}`
     ORDER BY
-    priority DESC
+    priority DESC, teryt
     LIMIT {limit}
     """
 

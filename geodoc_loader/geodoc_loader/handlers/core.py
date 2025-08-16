@@ -170,3 +170,50 @@ def load_json(path):
     """Load a JSON file"""
     with open(path, "r") as f:
         return json.load(f)
+    
+def list_to_geodataframe(data, geometry_col='geometry', crs='EPSG:2180', constant_columns=None):
+    """
+    Convert a list of dictionaries to a GeoDataFrame.
+    Args:
+        data (list): List of dictionaries containing data.
+        geometry_col (str): Name of the column that contains geometry data.
+        crs (str): Coordinate reference system to set for the GeoDataFrame.
+        constant_columns (dict, optional): Dictionary of constant values to add as columns.
+    Returns:
+        gpd.GeoDataFrame: A GeoDataFrame containing the data and geometry.
+    """
+    # Convert list of dictionaries to DataFrame
+    df = pd.DataFrame(data)
+    if constant_columns:
+        for col, value in constant_columns.items():
+            df[col] = value
+
+    # Add id column with unique values for each row
+    df['id'] = [str(uuid.uuid4()) for _ in range(len(df))]
+
+    # Convert DataFrame to GeoDataFrame
+    gdf = gpd.GeoDataFrame(df, geometry=geometry_col)
+    gdf = gdf.set_crs(crs)  # Set the coordinate reference system
+
+
+    return gdf
+
+def overwrite_metaparams_from_env(meta_params):
+
+    for key, value in meta_params.items():
+        env_value = os.environ.get(f'ULDK_{key.upper()}')
+        if env_value is not None:
+            try:
+                # Try to convert the environment variable to the appropriate type
+                if isinstance(value, int):
+                    meta_params[key] = int(env_value)
+                elif isinstance(value, float):
+                    meta_params[key] = float(env_value)
+                elif isinstance(value, bool):
+                    meta_params[key] = env_value.lower() in ['true', '1', 'yes']
+                else:
+                    meta_params[key] = env_value
+            except ValueError:
+                print(f"Warning: Could not convert environment variable {key} with value {env_value} to type {type(value)}")
+    
+    return meta_params

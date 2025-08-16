@@ -24,6 +24,21 @@
         "file": "bdot_setup_config.json",
         "description": "Setup configuration for BDOT data processing"
     },
+    "parcels_config": {
+        "folder": "parcels",
+        "file": "parcels_config.json",
+        "description": "Configuration for parcels data processing"
+    },
+    "parcels_setup_config": {
+        "folder": "parcels",
+        "file": "parcels_setup_config.json",
+        "description": "Setup configuration for parcels data processing"
+    },
+    "parcels_service_config": {
+        "folder": "parcels",
+        "file": "parcels_service_config.json",
+        "description": "CloudRun job configuration for parcels service"
+    },
     "administration_units": {
         "folder": "areas",
         "file": "teryts.json",

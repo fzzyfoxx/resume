@@ -5,6 +5,25 @@ from geodoc_loader.download.bigquery import get_query_result, run_delete_query
 from geodoc_loader.download.gcp import upload_dicts_to_bigquery_table
 import datetime
 import importlib
+import os
+
+def filter_queue_by_worker(queue_items):
+
+    if len(queue_items) == 0:
+        return queue_items
+    
+    gcp_worker_id = os.environ.get('CLOUD_RUN_TASK_INDEX', None)
+    if gcp_worker_id is None:
+        print(f"Queue items to process: {len(queue_items)}")
+        return queue_items
+    
+    gcp_worker_id = int(gcp_worker_id) + 1
+    total_workers = int(os.environ.get('CLOUD_RUN_TASK_COUNT'))
+
+    filtered_queue_items = [item for item in queue_items if item['assignment_id'] % total_workers == gcp_worker_id % total_workers]
+    print(f"{len(filtered_queue_items)} from {len(queue_items)} queue items assigned to this worker (ID: {gcp_worker_id}).")
+    return filtered_queue_items
+
 
 def download_spatial_data_from_queue(queue_limit, service):
     """
@@ -31,11 +50,12 @@ def download_spatial_data_from_queue(queue_limit, service):
     )
 
     queue_items = get_query_result(client=bq_client, query=queue_query)
-    print(f"Queue items to process: {len(queue_items)}")
+    queue_items = filter_queue_by_worker(queue_items)
 
     if len(queue_items) == 0:
         print("No queue items to process.")
         return
+    
     
     for i, item in enumerate(queue_items):
         teryt = item['teryt']

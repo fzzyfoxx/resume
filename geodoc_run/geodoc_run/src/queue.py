@@ -38,7 +38,11 @@ def add_teryts_to_queue(service_name, source_type, source_key, teryt_pattern, pr
     project_id = client.project
     query = f"""
         INSERT INTO `{project_id}.{spec['queue_dataset']}.{spec['queue_table']}`
-        SELECT source.teryt as teryt, '{spec['source_table']}' as table_name, {priority} as priority
+        SELECT 
+        source.teryt as teryt, 
+        '{spec['source_table']}' as table_name, 
+        {priority} as priority,
+        ROW_NUMBER() OVER (ORDER BY source.teryt) as assignment_id
         FROM 
         `{project_id}.{spec['source_dataset']}.{spec['source_table']}` as source
         LEFT JOIN `{project_id}.{spec['queue_dataset']}.{spec['queue_table']}` as target ON source.teryt = target.teryt
