@@ -7,6 +7,31 @@ import datetime
 import importlib
 import os
 
+def divide_list_by_worker(data_list, total_workers, worker_id):
+    """
+    Divides a list of dictionaries equally among workers while maintaining order.
+
+    Args:
+        data_list (list): The list of dictionaries to divide.
+        total_workers (int): Total number of workers.
+        worker_id (int): The ID of the worker (0-based).
+
+    Returns:
+        list: The portion of the list assigned to the specified worker.
+    """
+    if worker_id < 0 or worker_id >= total_workers:
+        raise ValueError("Invalid worker_id. Must be between 0 and total_workers - 1.")
+
+    # Calculate chunk size for each worker
+    chunk_size = len(data_list) // total_workers
+    remainder = len(data_list) % total_workers
+
+    # Determine start and end indices for the worker's portion
+    start_idx = worker_id * chunk_size + min(worker_id, remainder)
+    end_idx = start_idx + chunk_size + (1 if worker_id < remainder else 0)
+
+    return data_list[start_idx:end_idx]
+
 def filter_queue_by_worker(queue_items):
 
     if len(queue_items) == 0:
@@ -20,7 +45,15 @@ def filter_queue_by_worker(queue_items):
     gcp_worker_id = int(gcp_worker_id) + 1
     total_workers = int(os.environ.get('CLOUD_RUN_TASK_COUNT'))
 
-    filtered_queue_items = [item for item in queue_items if item['assignment_id'] % total_workers == gcp_worker_id % total_workers]
+    split_method = os.environ.get('QUEUE_SPLIT_METHOD', 'cut')
+
+    if split_method == 'cut':
+        filtered_queue_items = divide_list_by_worker(queue_items, total_workers, gcp_worker_id - 1)
+    elif split_method == 'modulo':
+        filtered_queue_items = [item for item in queue_items if item['assignment_id'] % total_workers == gcp_worker_id % total_workers]
+    else:
+        raise ValueError(f"Unknown QUEUE_SPLIT_METHOD: {split_method}. Supported methods are 'cut' and 'modulo'.")
+    
     print(f"{len(filtered_queue_items)} from {len(queue_items)} queue items assigned to this worker (ID: {gcp_worker_id}).")
     return filtered_queue_items
 
