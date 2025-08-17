@@ -107,3 +107,16 @@ geodoc-run-job --service spatial-data-downloader --e SERVICE=SERVICE_NAME --e QU
 ### SUPPORTED SERVICES
 - bdot: Downloads and processes BDOT data for counties.
 - soil-complexes: Downloads and processes soil complexes data based on a grid.
+- parcels: Downloads and processes parcel data based on a grid.
+
+## PARCELS
+
+Separate instance of the spatial-data-downloader service to handle multi-worker processing of parcels data.
+Designed for CloudRun jobs, running it locally will not launch multiple workers.
+```bash
+geodoc-run-job --service parcels --e QUEUE_LIMIT=QUEUE_LIMIT --e QUEUE_SPLIT_METHOD=QUEUE_SPLIT_METHOD
+```
+- QUEUE_LIMIT: The maximum number of items to process in the queue (default: 5).
+- QUEUE_SPLIT_METHOD: The method to split the queue items (default: cut). Options are:
+  - cut: Splits the queue items into equal parts for each worker by separating a list like [1,2], [3,4], [5,6].
+  - modulo: Splits the queue items based on the modulo operation, allowing for more flexible distribution across workers like [1,4], [2,5], [3,6].

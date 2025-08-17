@@ -68,5 +68,10 @@
         "folder": "grid",
         "file": "grid_config_pl.json",
         "description": "Configuration for grid processing"
+    },
+    "bdot_search": {
+        "folder": "search.bdot",
+        "file": "bdot_tables.json",
+        "description": "Configuration for search across BDOT tables"
     }
 }
