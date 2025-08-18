@@ -10,7 +10,7 @@ import argparse
 def main():
 
     parser = argparse.ArgumentParser(description='Generate filter values for a specific table and column.')
-    parser.add_argument('--main_path', type=str, default='./geodoc_config/configs/search', help='Path to the main configuration directory.')
+    parser.add_argument('--main_path', type=str, default='./geodoc_config/geodoc_config/configs/search', help='Path to the main configuration directory.')
     parser.add_argument('--folder_name', type=str, default='columns', help='Name of the folder to save the filter values.')
 
     args = parser.parse_args()
@@ -34,9 +34,9 @@ def main():
         for table_symbol, table_config in collection_config['tables'].items():
 
             for column, column_spec in table_config['columns'].items():
-                
+
                 if column_spec['type'] not in ['CATEGORICAL', 'SEARCH']:
-                    print(f"Skipping column {column} in table {table_symbol} - not a CATEGORICAL or SEARCH type ({column_spec['type']}).")
+                    #print(f"Skipping column {column} in table {table_symbol} - not a CATEGORICAL or SEARCH type ({column_spec['type']}).")
                     continue
 
                 table_query = distinct_table_column_values_query(
@@ -58,10 +58,10 @@ def main():
                 with open(file_path, 'w', encoding='utf=8') as f:
                     json.dump(file_content, f, indent=4, ensure_ascii=False)
 
-                print(f"Saved filter values for {collection_symbol} - {table_symbol} - {column} to {file_path}")
+                #print(f"Saved filter values for {collection_symbol} - {table_symbol} - {column} to {file_path}")
                 progress_bar.update(1)  # Update progress bar after processing each column
 
-            print(f"Processed table {table_symbol} in collection {collection_symbol}")
+            #print(f"Processed table {table_symbol} in collection {collection_symbol}")
 
         print(f"Processed collection {collection_symbol}")
 
