@@ -6,6 +6,21 @@ def load_json(path):
     with path.open("r") as f:
         return json.load(f)
     
+def load_config_by_path(folder, file):
+    """
+    Load a configuration file from a specified folder and file name.
+    Args:
+        folder (str): The folder where the configuration file is located.
+        file (str): The name of the configuration file.
+    Returns:
+        dict: The loaded configuration data.
+    """
+    # Access the specified configuration file within the geodoc_config package
+    config_path = files(f"geodoc_config.configs.{folder}").joinpath(file)
+    
+    # Load and return the JSON data
+    return load_json(config_path)
+    
 def load_mapping():
     """
     Load the mapping configuration from the package's resources.

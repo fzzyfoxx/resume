@@ -69,9 +69,9 @@
         "file": "grid_config_pl.json",
         "description": "Configuration for grid processing"
     },
-    "bdot_search": {
-        "folder": "search.bdot",
-        "file": "bdot_tables.json",
-        "description": "Configuration for search across BDOT tables"
+    "app_collections": {
+        "folder": "search.mappings",
+        "file": "collections.json",
+        "description": "Mappings for add filter initial options in geodoc-app"
     }
 }

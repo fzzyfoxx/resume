@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"] # Updated setuptools version for modern practices
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geodoc_app"
+version = "0.1.0"
+description = "A Python package for handling internal processing of geodoc app."
+authors = [
+    { name = "Dariusz Łazor", email = "dariuszlazor@gmail.com" }
+]
+# Corrected: Referencing the license file directly under [project.license]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.8" # Added recommended minimum Python version
+keywords = ["geospatial", "bigquery", "google-cloud", "data-processing"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: Other/Proprietary License", # This classifier is appropriate for "Commercial" license
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "importlib-resources>=5.12.0,<7.0.0"
+]
+
+[tool.setuptools]
+# Removed: license_file is not a valid property directly under [tool.setuptools]
+# The license file is now specified under [project.license]
+
+[tool.setuptools.packages.find]
+where = ["."] # Search for packages in the current directory (where pyproject.toml is)
+include = ["geodoc_app*"] # Include your main package and its sub-packages
+
+[tool.setuptools.package-data]
+#geodoc_config = ["configs/**/*"]
