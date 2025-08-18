@@ -8,7 +8,7 @@ def get_collections_list():
     Returns:
         list: List of collection display names.
     """
-    return {
+    answer = {
         "title": COLLECTIONS_CONFIG['title'],
         "default": COLLECTIONS_CONFIG['default'],
         "items": [v['name'] for v in COLLECTIONS_CONFIG['collections'].values()],
@@ -16,6 +16,8 @@ def get_collections_list():
         "selector_type": "combo_box",
         "symbols": ['collections']
     }
+
+    return {'filters': [answer]}
 
 def get_collection_item_config(symbol):
     """
@@ -65,7 +67,7 @@ def get_collection_tables_by_name(name, symbols=['collections']):
     if symbol is None:
         return None
     collection_config = get_collection_item_config(symbol)
-    return {
+    answer = {
         "title": collection_config['title'],
         "default": collection_config.get('default', ''),
         "items": get_collection_tables(collection_config),
@@ -73,6 +75,8 @@ def get_collection_tables_by_name(name, symbols=['collections']):
         "selector_type": "combo_box",
         "symbols": symbols + [symbol]
     }
+
+    return {"filters": [answer]}
 
 def get_collection_table_spec_by_name(collection_symbol, table_name):
     """
@@ -84,12 +88,39 @@ def get_collection_table_spec_by_name(collection_symbol, table_name):
         dict: Table specification.
     """
     collection_config = get_collection_item_config(collection_symbol)
-    for table in collection_config['tables'].values():
+    for table_symbol, table in collection_config['tables'].items():
         if table['name'] == table_name:
-            return table
-    raise ValueError(f"Table '{table_name}' not found in collection '{collection_symbol}'.")
+            return {**table, 'table_symbol': table_symbol}
+    return None
 
-def get_collection_table_columns_spec_by_name(collection_symbol, table_name):
+def get_selector_type(column_type):
+    """
+    Get selector type based on column type.
+    Args:
+        column_type (str): Type of the column.
+    Returns:
+        str: Selector type.
+    """
+    if column_type == 'CATEGORICAL':
+        return 'hook'
+    elif column_type == 'SEARCH':
+        return 'search'
+    elif column_type == 'NUMERIC':
+        return 'numeric'
+    
+def get_items_for_column(column_type, column_symbol, table_symbol, collection_symbol):
+
+    if column_type == 'CATEGORICAL':
+        try:
+            items =  load_config_by_path(f'search.{collection_symbol}.columns', f'{table_symbol}_{column_symbol}.json')['values']
+        except Exception as e:
+            items = ['No items found']
+        
+        return items
+    
+    return None
+
+def get_collection_table_columns_spec_by_name(name, symbols):
     """
     Get columns specification for a table in a collection.
     Args:
@@ -98,16 +129,46 @@ def get_collection_table_columns_spec_by_name(collection_symbol, table_name):
     Returns:
         list: List of column specifications.
     """
-    table_spec = get_collection_table_spec_by_name(collection_symbol, table_name)
-    return table_spec.get('columns', [])
+    table_spec = get_collection_table_spec_by_name(symbols[-1], name)
+    columns_def = table_spec.get('columns', {})
+    answer = []
+    for i, (column, column_spec) in enumerate(columns_def.items()):
+        answer.append({
+            "title": column_spec['name'],
+            "default": column_spec.get('default', ''),
+            "items": get_items_for_column(column_spec['type'], column, table_spec['table_symbol'], symbols[-1]),
+            "children": column_spec.get('children', False),
+            "selector_type": get_selector_type(column_spec['type']),
+            "symbols": symbols + [column]
+        })
+    
+    return {'filters': answer}
 
 def get_filter_spec(symbols, name=None):
     print(f'symbols: {symbols} | name: {name}')
     if symbols is None:
         return None
-    elif len(symbols) == 0:
-        return get_collections_list()
-    elif len(symbols) == 1 and symbols[0] == 'collections':
-        return get_collection_tables_by_name(name=name, symbols=symbols)
     
+    if len(symbols) == 0:
+        answer = get_collections_list()
+        answer_item = answer['filters'][0]
+        if len(answer_item['items']) == 1:
+            symbols = answer_item['symbols']
+            name = answer_item['items'][0]
+        else:
+            return answer
+    
+    if len(symbols) == 1 and symbols[0] == 'collections':
+        answer = get_collection_tables_by_name(name=name, symbols=symbols)
+        answer_item = answer['filters'][0]
+        if len(answer_item['items']) == 1:
+            symbols = answer_item['symbols']
+            name = answer_item['items'][0]
+        else:
+            return answer
+        
+    if len(symbols) == 2 and symbols[0] == 'collections':
+        answer = get_collection_table_columns_spec_by_name(name=name, symbols=symbols)
+        return answer
+
     return None
