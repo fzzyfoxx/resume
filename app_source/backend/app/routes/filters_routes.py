@@ -53,3 +53,23 @@ def get_filter_search_hints_route():
         return jsonify({"items": hints}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+@filters_bp.route('/calculate_filters', methods=['POST'])
+def calculate_filters_route():
+    """
+    Endpoint to calculate filters based on provided parameters.
+    Returns:
+        JSON response with calculated filters.
+    """
+    filters = request.json.get('filters', [])
+    qualification = request.json.get('qualification', None)
+
+    for filter in filters:
+        print(filter)
+
+    print(qualification)
+
+    try:
+        return jsonify({"status": 'ok'}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

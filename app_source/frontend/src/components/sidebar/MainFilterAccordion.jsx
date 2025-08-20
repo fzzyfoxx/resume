@@ -18,7 +18,7 @@ import CircularLoader from '../common/CircularLoader'; // Using the new loader c
  * @param {boolean} props.isLoading - Whether the initial filters are loading.
  * @param {React.Node} props.children - Child elements (the filter chains and "Add New Filter Chain" button).
  */
-function MainFilterAccordion({ expanded, onToggle, isLoading, children }) {
+function MainFilterAccordion({caption, expanded, onToggle, isLoading, children }) {
   return (
     <Accordion
       expanded={expanded}
@@ -49,7 +49,7 @@ function MainFilterAccordion({ expanded, onToggle, isLoading, children }) {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 1.5, py: 0.75 }}>
-          <Typography variant="h6">Filters</Typography>
+          <Typography variant="h8">{caption}</Typography>
           {isLoading && (
             <CircularLoader size={16} sx={{ ml: 1 }} />
           )}

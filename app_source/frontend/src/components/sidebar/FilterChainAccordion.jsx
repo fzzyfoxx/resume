@@ -12,6 +12,8 @@ import CircularLoader from '../common/CircularLoader';
 import AddButton from './AddButton';
 import Subtitle from '../common/Subtitle';
 import QualificationFilter from '../filters/QualificationFilter';
+import Button from '@mui/material/Button';
+import axios from 'axios';
 
 function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent }) {
   // State to hold the QualificationFilter's value
@@ -96,8 +98,42 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
 
     return selectedFilterParts.length > 0
       ? selectedFilterParts.join(' > ')
-      : `New Filter ${chainIndex + 1}`;
+      : `nowy filtr ${chainIndex + 1}`;
   }, [chain.filters, chainIndex, qualificationValue]); // Add qualificationValue to dependencies
+
+  const handleAddFilter = async () => {
+    try {
+      // Collect filters with children === false
+      const filters = chain.filters
+        .filter((filter) => !filter.children)
+        .map((filter) => ({
+          filterId: filter.id,
+          selector_type: filter.selector_type,
+          symbols: filter.symbolsForNextCall || [],
+          values: filter.selectedValue || {},
+        }));
+
+      // Prepare the payload
+      const payload = {
+        filters,
+        qualification: qualificationValue
+          ? {
+              option: qualificationValue.option,
+              value: qualificationValue.value,
+            }
+          : null,
+      };
+
+      // Send the POST request
+      const response = await axios.post('http://127.0.0.1:5000/api/filters/calculate_filters', payload);
+
+      // Handle the response (e.g., show success message or update UI)
+      console.log('Filter calculation successful:', response.data);
+    } catch (error) {
+      // Handle errors (e.g., show error message)
+      console.error('Error calculating filters:', error);
+    }
+  };
 
   return (
     <Accordion
@@ -168,8 +204,8 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
               px: 1,
               paddingLeft: '14px',
               paddingRight: '12px',
-              marginBottom: '10px',
-              marginTop: '10px',
+              marginBottom: '4px',
+              marginTop: '14px',
             }}
           >
             <Subtitle label="Objects definition" />
@@ -207,8 +243,8 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                 px: 1,
                 paddingLeft: '14px',
                 paddingRight: '12px',
-                marginBottom: '10px',
-                marginTop: '10px',
+                marginBottom: '4px',
+                marginTop: '24px',
               }}
             >
               <Subtitle label="Qualification" />
@@ -234,6 +270,24 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                   handleFilterValueChange(filterId, value, null, null, isValueEmpty, 'qualification')
                 }
               />
+            </Box>
+            <Box
+              sx={{
+                width: '90%',
+                maxWidth: 'calc(100% - 24px)',
+                display: 'flex',
+                justifyContent: 'center',
+                my: 1,
+                ml: 2.0,
+              }}
+            >
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleAddFilter}
+              >
+                Add Filter
+              </Button>
             </Box>
           </>
         )}
