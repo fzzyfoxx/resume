@@ -8,6 +8,8 @@ import {
   Box,
   IconButton, // Import Button component
 } from '@mui/material';
+import Tooltip from '@mui/material/Tooltip';
+import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HistoryIcon from '@mui/icons-material/History';
 import CircularLoader from '../common/CircularLoader';
@@ -17,35 +19,15 @@ import QualificationFilter from '../filters/QualificationFilter';
 import LinearProgress from '@mui/material/LinearProgress';
 import HideLayer from '../../drawing/HideLayer';
 
-function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent, mapRef }) {
+function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent, mapRef, onRemove}) {
+  const [addFilterStatus, setAddFilterStatus] = useState('initial');
   const [qualificationValue, setQualificationValue] = useState(chain.qualificationFilterValue || null);
-  const [addFilterStatus, setAddFilterStatus] = useState('initial'); // Track AddFilterButton status
   const [marker, setMarker] = useState(null);
 
   // New state to store a snapshot of filter values and qualification value
   const [storedFilterValues, setStoredFilterValues] = useState(null);
   const [storedQualificationValue, setStoredQualificationValue] = useState(null);
   const [hasChanges, setHasChanges] = useState(false); // New state to track if changes have been made
-
-  useEffect(() => {
-    const shouldDisable = addFilterStatus === 'update';
-    
-    const updatedFilters = chain.filters.map(filter => {
-      if (filter.children) {
-        console.log('Filter with children detected, disabling:', filter.id);
-        return { ...filter, disabled: shouldDisable };
-      }
-      return filter;
-    });
-
-    // To avoid unnecessary updates, check if the disabled state actually changed
-    const hasChanged = updatedFilters.some((uf, i) => uf.disabled !== chain.filters[i].disabled);
-
-    if (hasChanged) {
-      const updatedChain = { ...chain, filters: updatedFilters };
-      onToggle(updatedChain.id, updatedChain.isExpanded, updatedChain);
-    }
-  }, [addFilterStatus, chain.filters, onToggle, chain.id, chain.isExpanded]);
 
   // Effect to update qualificationValue when parent chain object changes
   useEffect(() => {
@@ -240,6 +222,8 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
     return color;
   };
 
+  const memoizedHasChanges = React.useMemo(() => hasChanges, [hasChanges]);
+
   return (
     <Box sx={{ position: 'relative' }}>
       <Box
@@ -357,7 +341,7 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                 <Box sx={{ width: '90%', maxWidth: 'calc(100% - 24px)' }}>
                   {renderFilterComponent(
                     chain.id, 
-                    { ...filter, type: filter.type }
+                    { ...filter, type: filter.type , addFilterStatus},
                   )}
                 </Box>
               </Box>
@@ -417,7 +401,27 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                   mr: 2.0
                 }}
               >
+              <Tooltip title="usuń filtr">
+              <IconButton
+                  onClick={() => {
+                    onRemove(chain.id, marker); // Call the onRemove function after removing the layer
+                  }}
+                  sx={{
+                    backgroundColor: 'gray', // Red background
+                    '&:hover': {
+                      backgroundColor: 'darkgray', // Darker red on hover
+                    },
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+                </Tooltip>
                 {hasChanges && (
+                <Tooltip title="cofnij zmiany">
                 <IconButton
                   onClick={handleRestoreValues}
                   sx={{
@@ -433,7 +437,9 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                 >
                   <HistoryIcon />
                 </IconButton>
+                </Tooltip>
                 )}
+                
                   <AddFilterButton
                     filters={chain.filters}
                     qualification={qualificationValue}
@@ -442,6 +448,7 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                     accordionSummary={accordionTitle}
                     marker={marker}
                     setMarker={setMarker}
+                    hasChanges={memoizedHasChanges} // Pass hasChanges as a prop
                   />
               </Box>
           </>

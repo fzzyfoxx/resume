@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
 import StopIcon from '@mui/icons-material/Stop';
@@ -6,13 +7,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
 
-const AddFilterButton = ({ filters, qualification, onStatusChange, mapRef, accordionSummary, marker, setMarker}) => {
+const AddFilterButton = ({ filters, qualification, onStatusChange, mapRef, accordionSummary, marker, setMarker, hasChanges}) => {
   const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
   const [queryId, setQueryId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [previousStatus, setPreviousStatus] = useState('add'); // Track the previous status
   //const [marker, setMarker] = useState(null); // Marker for rendering shapes
   const [hasUpdated, setHasUpdated] = useState(false);
+  console.log('AddFilterButton - hasChanges:', hasChanges);
 
   useEffect(() => {
     if (onStatusChange) {
@@ -147,18 +149,23 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, mapRef, accor
   };
 
   return (
+    <Tooltip title={status === 'add' ? "dodaj filtr" 
+        : status === 'update' && !hasChanges ? "brak zmian do odświeżenia"
+        : status === 'update' ? "odśwież filtr" 
+        : status === 'stop' ? "zatrzymaj" : ""}
+        >
+        <span>
     <IconButton
       onClick={
-        status === 'add' || status === 'update'
-          ? handleAddOrUpdate
-          : status === 'stop'
-          ? handleStop
-          : null
+        status === 'update' && !hasChanges ? null
+        : status === 'add' || status === 'update' ? handleAddOrUpdate
+        : status === 'stop' ? handleStop
+        : null
       }
       sx={{
-        backgroundColor: 'gray',
+        backgroundColor: status === 'update' && !hasChanges ? 'lightgray' : 'gray', // Change color when disabled lightgray
         '&:hover': {
-          backgroundColor: 'darkgray'
+          backgroundColor: status === 'update' && !hasChanges ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
         },
         color: 'white',
         borderRadius: '50%',
@@ -168,6 +175,8 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, mapRef, accor
     >
       {getIcon()}
     </IconButton>
+    </span>
+    </Tooltip>
   );
 };
 
