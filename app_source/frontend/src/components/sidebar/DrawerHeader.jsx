@@ -24,7 +24,12 @@ function DrawerHeader({ handleDrawerClose }) {
   const theme = useTheme();
   return (
     <StyledDrawerHeader>
-      <IconButton onClick={handleDrawerClose}>
+      <IconButton
+        onClick={handleDrawerClose}
+        sx={{
+          paddingRight: '0px', // Adjust the padding here
+        }}
+      >
         {theme.direction === 'ltr' ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </IconButton>
     </StyledDrawerHeader>

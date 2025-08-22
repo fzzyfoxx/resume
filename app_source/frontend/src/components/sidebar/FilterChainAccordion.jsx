@@ -6,27 +6,53 @@ import {
   AccordionDetails,
   Typography,
   Box,
+  IconButton, // Import Button component
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import HistoryIcon from '@mui/icons-material/History';
 import CircularLoader from '../common/CircularLoader';
-import AddButton from './AddButton';
+import AddFilterButton from './AddFilterButton';
 import Subtitle from '../common/Subtitle';
 import QualificationFilter from '../filters/QualificationFilter';
-import Button from '@mui/material/Button';
-import axios from 'axios';
+import LinearProgress from '@mui/material/LinearProgress';
+import HideLayer from '../../drawing/HideLayer';
 
-function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent }) {
-  // State to hold the QualificationFilter's value
-  // Initialize with any existing qualification data from the chain if available
-  // You might need to adjust how your 'chain' object stores this qualification data
+function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent, mapRef }) {
   const [qualificationValue, setQualificationValue] = useState(chain.qualificationFilterValue || null);
+  const [addFilterStatus, setAddFilterStatus] = useState('initial'); // Track AddFilterButton status
+  const [marker, setMarker] = useState(null);
+
+  // New state to store a snapshot of filter values and qualification value
+  const [storedFilterValues, setStoredFilterValues] = useState(null);
+  const [storedQualificationValue, setStoredQualificationValue] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false); // New state to track if changes have been made
 
   useEffect(() => {
-    // This effect ensures that if the parent chain object's qualificationFilterValue changes,
-    // the internal state is updated.
-    setQualificationValue(chain.qualificationFilterValue || null);
-  }, [chain.qualificationFilterValue]); // Depend on qualificationFilterValue from chain
+    const shouldDisable = addFilterStatus === 'update';
+    
+    const updatedFilters = chain.filters.map(filter => {
+      if (filter.children) {
+        console.log('Filter with children detected, disabling:', filter.id);
+        return { ...filter, disabled: shouldDisable };
+      }
+      return filter;
+    });
 
+    // To avoid unnecessary updates, check if the disabled state actually changed
+    const hasChanged = updatedFilters.some((uf, i) => uf.disabled !== chain.filters[i].disabled);
+
+    if (hasChanged) {
+      const updatedChain = { ...chain, filters: updatedFilters };
+      onToggle(updatedChain.id, updatedChain.isExpanded, updatedChain);
+    }
+  }, [addFilterStatus, chain.filters, onToggle, chain.id, chain.isExpanded]);
+
+  // Effect to update qualificationValue when parent chain object changes
+  useEffect(() => {
+    setQualificationValue(chain.qualificationFilterValue || null);
+  }, [chain.qualificationFilterValue]);
+
+  // Effect to set initial qualification value and reset if children exist
   useEffect(() => {
     const resetQualificationValueIfChildrenExist = () => {
       if (chain.filters[chain.filters.length - 1]?.children) {
@@ -34,7 +60,6 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
       }
     };
     const SetInitialQualificationValue = () => {
-      // Set initial qualification value when the component mounts or chain.filters changes
       if (!qualificationValue && !chain.qualificationFilterValue) {
         setQualificationValue({option: 'Excluded', label: 'obszar wykluczony', value: ''});
       }
@@ -43,23 +68,66 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
     resetQualificationValueIfChildrenExist();
   }, [chain.filters]);
 
-  const handleFilterValueChange = (filterId, value, symbols, hasChildren, isValueEmpty, filterType) => {
-    if (filterType === 'qualification') {
-      // Handle QualificationFilter's value change
-      const newQualificationValue = isValueEmpty ? null : value;
-      setQualificationValue(newQualificationValue);
+  // Effect to capture filter values when addFilterStatus turns to 'stop'
+  // This establishes the baseline for comparison
+  useEffect(() => {
+    if (addFilterStatus === 'stop') {
+      // Store the current state of filters and qualification
+      const currentFilterSelectedValues = chain.filters.map(f => ({
+        id: f.id,
+        selectedValue: f.selectedValue,
+      }));
+      setStoredFilterValues(currentFilterSelectedValues);
+      setStoredQualificationValue(qualificationValue);
+      // setHasChanges(false) is handled by the new effect below
+    }
+  }, [addFilterStatus, chain.filters, qualificationValue]); // Depend on addFilterStatus and current values
 
-      // Also, update the chain prop with the new qualification value if you want it persistent
-      // This part depends on how you want to manage chain state in the parent component
-      // For now, let's assume `onToggle` can take an updated chain object
-      onToggle(
-        chain.id,
-        chain.isExpanded,
-        { ...chain, qualificationFilterValue: newQualificationValue } // Pass updated chain with qualification
-      );
+  // Function to compare current values with stored values
+  const checkChanges = (currentFilters, currentQualification) => {
+    if (!storedFilterValues || !storedQualificationValue) {
+      return false; // No stored values to compare against
+    }
+
+    // Compare qualification value
+    if (JSON.stringify(currentQualification) !== JSON.stringify(storedQualificationValue)) {
+      return true;
+    }
+
+    // Compare individual filter values
+    if (currentFilters.length !== storedFilterValues.length) {
+      return true; // Filters added or removed
+    }
+
+    for (let i = 0; i < currentFilters.length; i++) {
+      const currentFilter = currentFilters[i];
+      const storedFilter = storedFilterValues.find(f => f.id === currentFilter.id);
+
+      // If a filter is missing or its selectedValue is different
+      if (!storedFilter || JSON.stringify(currentFilter.selectedValue) !== JSON.stringify(storedFilter.selectedValue)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // NEW EFFECT: To continuously check for changes against the stored state
+  useEffect(() => {
+    // Only check for changes if a baseline (stored values) exists
+    if (storedFilterValues !== null || storedQualificationValue !== null) {
+      setHasChanges(checkChanges(chain.filters, qualificationValue));
+    }
+  }, [chain.filters, qualificationValue, storedFilterValues, storedQualificationValue, checkChanges]); // Depend on all values that can change and the checkChanges function
+
+  const handleFilterValueChange = (filterId, value, symbols, hasChildren, isValueEmpty, filterType) => {
+    let newQualificationValue = qualificationValue;
+    let updatedFilters = chain.filters;
+
+    if (filterType === 'qualification') {
+      newQualificationValue = isValueEmpty ? null : value;
+      setQualificationValue(newQualificationValue);
     } else {
-      // Handle other filter types
-      const updatedFilters = chain.filters.map((filter) => {
+      updatedFilters = chain.filters.map((filter) => {
         if (filter.id === filterId) {
           return {
             ...filter,
@@ -68,14 +136,42 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
         }
         return filter;
       });
+    }
 
-      const updatedChain = {
+    const updatedChain = {
+      ...chain,
+      qualificationFilterValue: newQualificationValue,
+      filters: updatedFilters,
+    };
+
+    onToggle(updatedChain.id, updatedChain.isExpanded, updatedChain);
+
+    // The setHasChanges is now handled by the new useEffect above,
+    // which reacts to changes in chain.filters and qualificationValue.
+  };
+
+  const handleRestoreValues = () => {
+    if (storedFilterValues && storedQualificationValue) {
+      // Revert individual filters
+      const restoredFilters = chain.filters.map(filter => {
+        const stored = storedFilterValues.find(f => f.id === filter.id);
+        return {
+          ...filter,
+          selectedValue: stored ? stored.selectedValue : null,
+        };
+      });
+
+      // Revert qualification filter (local state and prop for parent)
+      setQualificationValue(storedQualificationValue);
+
+      const restoredChain = {
         ...chain,
-        filters: updatedFilters,
+        filters: restoredFilters,
+        qualificationFilterValue: storedQualificationValue,
       };
 
-      // Call onToggle with the updated chain
-      onToggle(updatedChain.id, updatedChain.isExpanded, updatedChain);
+      onToggle(restoredChain.id, restoredChain.isExpanded, restoredChain);
+      setHasChanges(false); // No changes after restoring
     }
   };
 
@@ -91,54 +187,76 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
       })
       .filter(Boolean);
 
-    // Add QualificationFilter label
     if (qualificationValue !== null) {
       selectedFilterParts.push(`${qualificationValue.label}`);
     }
 
     return selectedFilterParts.length > 0
       ? selectedFilterParts.join(' > ')
-      : `nowy filtr ${chainIndex + 1}`;
-  }, [chain.filters, chainIndex, qualificationValue]); // Add qualificationValue to dependencies
+      : `NowyFiltr-${chainIndex + 1}`;
+  }, [chain.filters, chainIndex, qualificationValue]);
 
-  const handleAddFilter = async () => {
-    try {
-      // Collect filters with children === false
-      const filters = chain.filters
-        .filter((filter) => !filter.children)
-        .map((filter) => ({
-          filterId: filter.id,
-          selector_type: filter.selector_type,
-          symbols: filter.symbolsForNextCall || [],
-          values: filter.selectedValue || {},
-        }));
-
-      // Prepare the payload
-      const payload = {
-        filters,
-        qualification: qualificationValue
-          ? {
-              option: qualificationValue.option,
-              value: qualificationValue.value,
-            }
-          : null,
-      };
-
-      // Send the POST request
-      const response = await axios.post('http://127.0.0.1:5000/api/filters/calculate_filters', payload);
-
-      // Handle the response (e.g., show success message or update UI)
-      console.log('Filter calculation successful:', response.data);
-    } catch (error) {
-      // Handle errors (e.g., show error message)
-      console.error('Error calculating filters:', error);
+  const renderBottomBar = () => {
+    if (addFilterStatus === 'stop') {
+      return (
+        <Box sx={{ width: 'calc(100% - 14px)', position: 'relative', left: '4px'}}>
+                  <LinearProgress
+          sx={{
+            position: 'relative', // Ensure it can be moved
+            left: '4px', // Shift it to the right
+            width: '100%-14px', // Adjust the width to fit within the shifted container
+          }}
+        />
+        </Box>
+      );
     }
+
+    let backgroundColor = 'transparent';
+    if (addFilterStatus === 'update') {
+      backgroundColor = 'transparent';
+    }
+
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '4px',
+          backgroundColor
+        }}
+      />
+    );
+  };
+
+  const indicatorColor = () => {
+    let color = '#e0e0e0'; // lightgray
+
+    if (!hasChanges && addFilterStatus !== 'stop' && addFilterStatus !== 'add' && addFilterStatus !== 'initial') {
+      color = '#81c784'; // lightgreen
+    } else if (hasChanges) {
+      color = '#ffb74d'; // Orange for unsaved changes
+    } else if (addFilterStatus === 'stop' && !hasChanges) { // Added !hasChanges to ensure it's lightgreen only if no new changes after stop
+      color = '#e0e0e0'; // Lightgreen when stopped and no new changes
+    }
+    return color;
   };
 
   return (
+    <Box sx={{ position: 'relative' }}>
+      <Box
+      sx={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        width: '4px',
+        backgroundColor: indicatorColor(),
+        zIndex: 1,
+        pointerEvents: 'none',
+      }}
+      />
     <Accordion
       expanded={chain.isExpanded}
-      onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })} // Pass updated chain on toggle
+      onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })}
       disableGutters
       sx={{
         mt: 0,
@@ -159,7 +277,10 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
           '& .MuiAccordionSummary-content': {
             margin: '0 !important',
             flexGrow: 1,
-            display: 'block',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0 !important',
           },
           '& .MuiAccordionSummary-root': {
             padding: '0 !important',
@@ -170,25 +291,33 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
+            flexGrow: 1,
+            alignItems: 'flex-start',
             ml: 1.5,
             py: 0.5,
-            minHeight: '26px',
           }}
         >
           <Typography
             variant="caption"
             color="textSecondary"
             sx={{
-              flexGrow: 1,
               wordBreak: 'break-word',
             }}
           >
             {accordionTitle}
           </Typography>
           {chain.isLoading && (
-            <CircularLoader size={14} sx={{ ml: 0.75, flexShrink: 0 }} />
+            <CircularLoader size={14} sx={{ mt: 0.5, flexShrink: 0 }} />
           )}
+        </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          {marker && <HideLayer marker={marker} mapRef={mapRef} />}
         </Box>
       </AccordionSummary>
       <AccordionDetails sx={{ p: 0 }}>
@@ -211,25 +340,30 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
             <Subtitle label="Objects definition" />
           </Box>
         )}
-        {chain.filters.map((filter) => (
-          <Box key={filter.id} sx={{ mb: 0.5 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'left',
-                my: 0.5,
-                ml: 2.0,
-                paddingLeft: '14px',
-              }}
-            >
-              <Box sx={{ width: '90%', maxWidth: 'calc(100% - 24px)' }}>
-                {renderFilterComponent(chain.id, { ...filter, type: filter.type }, (value, symbols, hasChildren, isValueEmpty) =>
-                  handleFilterValueChange(filter.id, value, symbols, hasChildren, isValueEmpty, filter.type)
-                )}
+        {chain.filters.map((filter) => {
+          // Calculate disabled state for each filter individually
+          
+          return (
+            <Box key={filter.id} sx={{ mb: 0.5 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'left',
+                  my: 0.5,
+                  ml: 2.0,
+                  paddingLeft: '14px',
+                }}
+              >
+                <Box sx={{ width: '90%', maxWidth: 'calc(100% - 24px)' }}>
+                  {renderFilterComponent(
+                    chain.id, 
+                    { ...filter, type: filter.type }
+                  )}
+                </Box>
               </Box>
             </Box>
-          </Box>
-        ))}
+          );
+        })}
         {chain.filters.length > 0 && !chain.filters[chain.filters.length - 1].children && (
           <>
             <Box
@@ -264,7 +398,7 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
             >
               <QualificationFilter
                 filterId={`${chain.id}-qualification`}
-                defaultValue={qualificationValue} // Pass the state as defaultValue
+                defaultValue={qualificationValue}
                 compact={true}
                 onValueChange={(filterId, value, isValueEmpty) =>
                   handleFilterValueChange(filterId, value, null, null, isValueEmpty, 'qualification')
@@ -272,28 +406,52 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
               />
             </Box>
             <Box
-              sx={{
-                width: '90%',
-                maxWidth: 'calc(100% - 24px)',
-                display: 'flex',
-                justifyContent: 'center',
-                my: 1,
-                ml: 2.0,
-              }}
-            >
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleAddFilter}
+                sx={{
+                  width: '90%',
+                  maxWidth: 'calc(100% - 53px)',
+                  display: 'flex',
+                  justifyContent: 'right',
+                  gap: 2, // Add spacing between buttons
+                  my: 1,
+                  ml: 2.0,
+                  mr: 2.0
+                }}
               >
-                Add Filter
-              </Button>
-            </Box>
+                {hasChanges && (
+                <IconButton
+                  onClick={handleRestoreValues}
+                  sx={{
+                    backgroundColor: 'gray', // Red background
+                    '&:hover': {
+                      backgroundColor: 'darkgray', // Darker red on hover
+                    },
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <HistoryIcon />
+                </IconButton>
+                )}
+                  <AddFilterButton
+                    filters={chain.filters}
+                    qualification={qualificationValue}
+                    onStatusChange={setAddFilterStatus}
+                    mapRef={mapRef}
+                    accordionSummary={accordionTitle}
+                    marker={marker}
+                    setMarker={setMarker}
+                  />
+              </Box>
           </>
         )}
       </AccordionDetails>
+      {renderBottomBar()}
     </Accordion>
+    </Box>
   );
 }
 
 export default FilterChainAccordion;
+

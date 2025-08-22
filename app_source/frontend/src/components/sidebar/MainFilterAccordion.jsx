@@ -55,9 +55,9 @@ function MainFilterAccordion({caption, expanded, onToggle, isLoading, children }
           )}
         </Box>
       </AccordionSummary>
-      <AccordionDetails sx={{ p: 0 }}>
-        {children} {/* This is where the filter chains and add button will be rendered */}
-      </AccordionDetails>
+      <AccordionDetails sx={{ p: 0}}>
+            {children}
+        </AccordionDetails>
     </Accordion>
   );
 }

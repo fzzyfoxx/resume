@@ -115,9 +115,14 @@ def get_items_for_column(column_spec, column_symbol, table_symbol, collection_sy
         try:
             items =  load_config_by_path(f'search.{collection_symbol}.columns', f'{table_symbol}_{column_symbol}.json')['values']
             mapping_code = column_spec.get('mapping', None)
+
             if mapping_code is not None and mappings is not None:
                 reversed_mapping = {v: k for k, v in mappings[mapping_code].items()}
                 items = [reversed_mapping.get(item, item) for item in items]
+
+            null_value = column_spec.get('ifnull', None)
+            if null_value is not None:
+                items.append(null_value)
         except Exception as e:
             print(e)
             items = []
@@ -129,7 +134,7 @@ def get_items_for_column(column_spec, column_symbol, table_symbol, collection_sy
 def get_column_items_from_symbols(symbols):
     try:
         _, collection_symbol, table_symbol, column_symbol = symbols
-        return load_config_by_path(f'search.{collection_symbol}.columns', f'{table_symbol}_{column_symbol}.json')['values']
+        return load_config_by_path(f'search.{collection_symbol}.columns', f'{table_symbol}_{column_symbol}.json')
     except Exception as e:
         return []
     

@@ -5,7 +5,8 @@ def get_teryts_for_teryts_pattern_query(teryts, table_id, project_id, dataset_id
     teryt_len = len(teryts[0])
 
     query = f"""SELECT
-    teryt
+    teryt,
+    name
     FROM
     `{project_id}.{dataset_id}.{table_id}`
     WHERE

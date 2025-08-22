@@ -5,7 +5,7 @@
         "cpu": "2",
         "memory": "8G",
         "maxRetries": 0,
-        "timeoutSeconds": 7200,
+        "timeoutSeconds": 36000,
         "env": [
             {"name": "QUEUE_LIMIT", "value": "5"}
         ]
