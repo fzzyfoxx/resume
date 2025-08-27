@@ -1,7 +1,7 @@
 from geodoc_app.inputs.values import get_filter_spec, get_column_items_from_symbols
 from geodoc_app.inputs.utils import filter_strings_by_search, filter_strings_set_by_search
 
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, session
 
 filters_bp = Blueprint('filters', __name__)
 
@@ -12,15 +12,16 @@ def get_filter_spec_route():
     Returns:
         JSON response with filter specification.
     """
-    print(request.args)
+    #print(request.args)
+    print('SESSION ID /get_gilter_spec:', session.sid)
 
     symbols = dict(request.args.lists()).get('symbols', [])
     name = request.args.get('name', None)
 
     try:
         filter_spec = get_filter_spec(symbols, name=name)
-        for item in filter_spec['filters']:
-            print(item)
+        #for item in filter_spec['filters']:
+            #print(item)
         return jsonify(filter_spec), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -32,7 +33,8 @@ def get_filter_search_hints_route():
     Returns:
         JSON response with search hints.
     """
-    print(request.args)
+    #print(request.args)
+    print('SESSION ID /get_filter_search_hints:', session.sid)
 
     symbols = dict(request.args.lists()).get('symbols', [])
     value = request.args.get('value', None)
@@ -62,7 +64,7 @@ def get_filter_search_hints_route():
                 threshold=threshold,
                 max_difference=max_difference
             )
-        print(hints)
+        #print(hints)
         return jsonify({"items": hints}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400

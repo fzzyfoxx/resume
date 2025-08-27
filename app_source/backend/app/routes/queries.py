@@ -23,7 +23,8 @@ def calculate_filters_route():
     Returns:
         JSON response with calculated filters.
     """
-    print(request.json)
+    #print(request.json)
+    print('SESSION ID /calculate_filters:', session.sid)
     filters = request.json.get('filters', [])
     qualification = request.json.get('qualification', None)
 
@@ -60,7 +61,7 @@ def calculate_filters_route():
         'start_time': start_time,
         'status': 'pending'
         }
-    session.modified = True
+    #session.modified = True
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -106,7 +107,7 @@ def set_search_area_route():
         'start_time': start_time,
         'status': 'pending'
         }
-    session.modified = True
+    #session.modified = True
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -122,20 +123,22 @@ def check_query_status_route():
     Returns:
         JSON response with the status of the query.
     """
-    print(request.args)
+    #print(request.args)
+    print('SESSION ID /check_query_status:', session.sid)
     query_id = request.args.get('query_id', None)
     
     if not query_id:
         return jsonify({"error": "Query ID is required"}), 400
 
     query_state = session['queries'].get(query_id, None)
+    print(session['queries'])
     if query_state:
         start_time = query_state['start_time']
         elapsed_time = time.time() - start_time
         if elapsed_time > 2:
             query_state['status'] = 'completed'
             #session['queries'][query_id] = query_state
-            session.modified = True
+            #session.modified = True
         print(f"Query ID: {query_id} | Status: {query_state['status']} | Elapsed Time: {elapsed_time:.2f} seconds")
         return jsonify({"status": query_state['status']}), 200
 
@@ -148,40 +151,49 @@ import shapely.wkt
 
 @queries_bp.route('/get_query_result', methods=['POST'])
 def get_query_result_route():
-    print(request.json)
+    #print(request.json)
+    print('SESSION ID /get_query_result:', session.sid)
     query_id = request.json.get('query_id', None)
     qualification = request.json.get('qualification', None)
     name = request.json.get('name', None)
     query_state = session['queries'].get(query_id, None)
     try:
         if not query_id or not query_state:
-            print(f"Query ID: {query_id} not found in session.")
             return jsonify({"error": "Query ID is required or query not found"}), 400
         if query_state['status'] != 'completed':
-            print(f"Query ID: {query_id} is not completed yet.")
             return jsonify({"error": "Query is not completed yet"}), 400
         
         ## Simulate a random record for demonstration purposes
-        print("Setting up to read data from CSV file...")
         data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
         file_path = os.path.join(data_dir, 'example_polygons.csv')
-        print(f"Reading data from: {file_path}")
         with open(file_path, "r") as file:
             reader = list(csv.DictReader(file))  # Read rows as dictionaries
             random_record = random.choice(reader)  # Select a random row
-        print("Data loaded successfully.")
         random_record['geometry'] = shapely.wkt.loads(random_record['geometry'])
-        print("Geom loaded successfully.")
         #results processing
         style, properties = get_properties_from_qualification(qualification)
-        print("Properties extracted from qualification")
         if name:
             properties['Źródło'] = name
         geojson = prepare_geojson([random_record], additional_attributes=properties)
-        print("GeoJSON prepared successfully.")
         return jsonify({
             "geojson": geojson,
             "style": style
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@queries_bp.route('/session/debug', methods=['GET'])
+def debug_session():
+    """
+    A temporary endpoint to dump the contents of the session.
+    Use this for debugging purposes.
+    """
+    print('SESSION ID /session/debug:', session.sid)
+    
+    # We can't return the entire session object directly as it's not JSON serializable.
+    # Convert it to a dictionary first.
+    session_data = dict(session)
+    
+    # Return the session data as a JSON response
+    return jsonify(session_data), 200
