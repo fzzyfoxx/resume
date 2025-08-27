@@ -10,7 +10,7 @@ const StyledDrawerHeader = styled('div')(({ theme }) => ({
   alignItems: 'center',
   padding: theme.spacing(0, 1),
   // Remove or override theme.mixins.toolbar's height property
-  minHeight: '20px', // Set minHeight to 40px
+  minHeight: '36px', // Set minHeight to 40px
   height: '36px',    // Explicitly set height to 40px
   justifyContent: 'flex-end',
 }));

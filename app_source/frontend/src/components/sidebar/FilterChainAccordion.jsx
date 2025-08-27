@@ -28,6 +28,7 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
   const [storedFilterValues, setStoredFilterValues] = useState(null);
   const [storedQualificationValue, setStoredQualificationValue] = useState(null);
   const [hasChanges, setHasChanges] = useState(false); // New state to track if changes have been made
+  const [implied, setImplied] = useState(false);
 
   // Effect to update qualificationValue when parent chain object changes
   useEffect(() => {
@@ -53,7 +54,7 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
   // Effect to capture filter values when addFilterStatus turns to 'stop'
   // This establishes the baseline for comparison
   useEffect(() => {
-    if (addFilterStatus === 'stop') {
+    if (addFilterStatus === 'update' && implied) {
       // Store the current state of filters and qualification
       const currentFilterSelectedValues = chain.filters.map(f => ({
         id: f.id,
@@ -63,12 +64,16 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
       setStoredQualificationValue(qualificationValue);
       // setHasChanges(false) is handled by the new effect below
     }
-  }, [addFilterStatus, chain.filters, qualificationValue]); // Depend on addFilterStatus and current values
+  }, [addFilterStatus, implied]); // Depend on addFilterStatus and current values
 
   // Function to compare current values with stored values
   const checkChanges = (currentFilters, currentQualification) => {
     if (!storedFilterValues || !storedQualificationValue) {
       return false; // No stored values to compare against
+    }
+
+    if (addFilterStatus !== 'update') {
+      return false; // Only check for changes in 'update' mode
     }
 
     // Compare qualification value
@@ -401,25 +406,6 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                   mr: 2.0
                 }}
               >
-              <Tooltip title="usuń filtr">
-              <IconButton
-                  onClick={() => {
-                    onRemove(chain.id, marker); // Call the onRemove function after removing the layer
-                  }}
-                  sx={{
-                    backgroundColor: 'gray', // Red background
-                    '&:hover': {
-                      backgroundColor: 'darkgray', // Darker red on hover
-                    },
-                    color: 'white',
-                    borderRadius: '50%',
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-                </Tooltip>
                 {hasChanges && (
                 <Tooltip title="cofnij zmiany">
                 <IconButton
@@ -439,16 +425,38 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                 </IconButton>
                 </Tooltip>
                 )}
+
+              <Tooltip title="usuń filtr">
+              <IconButton
+                  onClick={() => {
+                    onRemove(chain.id, marker); // Call the onRemove function after removing the layer
+                  }}
+                  sx={{
+                    backgroundColor: 'gray', // Red background
+                    '&:hover': {
+                      backgroundColor: 'darkgray', // Darker red on hover
+                    },
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+                </Tooltip>
                 
                   <AddFilterButton
                     filters={chain.filters}
                     qualification={qualificationValue}
                     onStatusChange={setAddFilterStatus}
+                    onImpliedChange={setImplied}
                     mapRef={mapRef}
                     accordionSummary={accordionTitle}
                     marker={marker}
                     setMarker={setMarker}
                     hasChanges={memoizedHasChanges} // Pass hasChanges as a prop
+                    endpoint={'calculate_filters'}
                   />
               </Box>
           </>

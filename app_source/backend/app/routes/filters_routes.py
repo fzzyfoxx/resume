@@ -21,7 +21,7 @@ def get_filter_spec_route():
     try:
         filter_spec = get_filter_spec(symbols, name=name)
         #for item in filter_spec['filters']:
-            #print(item)
+        #    print(item)
         return jsonify(filter_spec), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400

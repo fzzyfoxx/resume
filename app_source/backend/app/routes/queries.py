@@ -72,7 +72,8 @@ def calculate_filters_route():
 @queries_bp.route('/set_search_area', methods=['POST'])
 def set_search_area_route():
 
-    teryts_spec = request.json.get('teryt_spec', None)
+    print(request.json)
+    teryts_spec = request.json.get('filters', [])[0].get('values', None)
     if not teryts_spec:
         return jsonify({"status": "error", "query_id": None}), 400
 
@@ -182,18 +183,3 @@ def get_query_result_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-
-@queries_bp.route('/session/debug', methods=['GET'])
-def debug_session():
-    """
-    A temporary endpoint to dump the contents of the session.
-    Use this for debugging purposes.
-    """
-    print('SESSION ID /session/debug:', session.sid)
-    
-    # We can't return the entire session object directly as it's not JSON serializable.
-    # Convert it to a dictionary first.
-    session_data = dict(session)
-    
-    # Return the session data as a JSON response
-    return jsonify(session_data), 200
