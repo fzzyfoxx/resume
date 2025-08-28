@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import { Accordion, AccordionSummary, AccordionDetails, Box, Typography, IconButton, Tooltip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useFilterChainState } from '../../hooks/checkChanges';
@@ -6,6 +6,7 @@ import { generateAccordionTitle, getIndicatorColor } from '../../utils/filterCha
 import { renderBottomBar } from '../common/horizontalLoader';
 import FilterChainButtons from './bottomButtons';
 import AccordionSummaryContent from './AccordionSummaryContent';
+import { generateUniqueId } from '../../utils/idGenerator';
 
 function FilterChainAccordion2({ 
     chain, 
@@ -19,15 +20,23 @@ function FilterChainAccordion2({
     labelVariant = "caption",
     accordionLabel = null,
     staticLabel = false,
+    isMain = false,
+    stateId,
+    setStateId
     }) {
-  const [addFilterStatus, setAddFilterStatus] = React.useState('initial');
-  const [implied, setImplied] = React.useState(false);
-  const [marker, setMarker] = React.useState(null);
-  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus);
+  const [addFilterStatus, setAddFilterStatus] = useState('initial');
+  const [implied, setImplied] = useState(false);
+  const [marker, setMarker] = useState(null);
+  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied);
+  const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
+  const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
+  const [isActual, setIsActual] = useState(true);
 
+  console.log('FilterChainAccordion2 staticLabel:', staticLabel);
+  console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
-  const accordionTitle = React.useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
-  const indicatorColor = React.useMemo(() => getIndicatorColor(hasChanges, addFilterStatus), [hasChanges, addFilterStatus]);
+  const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
+  const indicatorColor = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
 
   const handleRestoreValues = () => {
     if (storedFilterValues) {
@@ -40,7 +49,25 @@ function FilterChainAccordion2({
     }
   };
 
-  const memoizedHasChanges = React.useMemo(() => hasChanges, [hasChanges]);
+  useEffect(() => {
+    if (filterStateId && isMain) {
+        const NewId = generateUniqueId();
+        setStoredStateId(NewId);
+        setStateId(NewId);
+    }
+  }, [filterStateId, setStateId, isMain]);
+
+  useEffect(() => {
+    if (stateId && filterStateId) {
+        setIsActual(stateId === storedStateId);
+    }
+    }, [stateId, filterStateId, storedStateId]);
+
+  const memoizedHasChanges = useMemo(() => hasChanges, [hasChanges]);
+
+  const hasNonPassiveFilterWithoutChildren = chain.filters.some(
+    (filter) => !filter.children && !filter.ispassive
+  );
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -56,41 +83,54 @@ function FilterChainAccordion2({
           pointerEvents: 'none',
         }}
       />
-    <Accordion
-      expanded={chain.isExpanded}
-      onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })}
-      disableGutters
-      sx={{
-        mt: 0,
-        mb: 0,
-        boxShadow: 'none',
-        borderTop: chainIndex === 0 ? '1px solid #eee' : 'none',
-        borderBottom: '1px solid #eee',
-        '&.MuiAccordion-root': {
-          '&:before': { display: 'none' },
-        },
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
+      <Accordion
+        expanded={chain.isExpanded}
+        onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })}
+        disableGutters
         sx={{
-          minHeight: '36px !important',
-          alignItems: 'center',
-          '& .MuiAccordionSummary-content': {
-            margin: '0 !important',
-            flexGrow: 1,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0 !important',
-          },
-          '& .MuiAccordionSummary-root': {
-            padding: '0 !important',
-          },
-          pr: 1,
+          ...(staticLabel
+            ? {
+                boxShadow: 'none',
+                '&.MuiAccordion-root': { border: 'none', '&:before': { display: 'none' } },
+              }
+            : {
+                mt: 0,
+                mb: 0,
+                boxShadow: 'none',
+                borderTop: chainIndex === 0 ? '1px solid #eee' : 'none',
+                borderBottom: '1px solid #eee',
+                '&.MuiAccordion-root': { '&:before': { display: 'none' } },
+              }),
         }}
       >
-        <AccordionSummaryContent
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{
+            ...(staticLabel
+              ? {
+                  minHeight: '40px !important',
+                  height: '40px !important',
+                  '& .MuiAccordionSummary-content': { m: '0 !important', flexGrow: 1 },
+                  '& .MuiAccordionSummary-root': { p: '0 !important' },
+                  pr: 1,
+                }
+              : {
+                  minHeight: '36px !important',
+                  alignItems: 'center',
+                  '& .MuiAccordionSummary-content': {
+                    margin: '0 !important',
+                    flexGrow: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0 !important',
+                  },
+                  '& .MuiAccordionSummary-root': { padding: '0 !important' },
+                  pr: 1,
+                }),
+          }}
+        >
+          <AccordionSummaryContent
             accordionTitle={accordionTitle}
             chain={chain}
             marker={marker}
@@ -98,7 +138,7 @@ function FilterChainAccordion2({
             variant={labelVariant}
             label={accordionLabel}
             isStatic={staticLabel}
-        />
+          />
         </AccordionSummary>
         <AccordionDetails sx={{ p: 0 }}>
           {chain.filters.map((filter) => (
@@ -118,7 +158,7 @@ function FilterChainAccordion2({
               </Box>
             </Box>
           ))}
-          {chain.filters.length > 0 && !chain.filters[chain.filters.length - 1].children && (
+          {chain.filters.length > 0 && hasNonPassiveFilterWithoutChildren && (
             <FilterChainButtons
               hasChanges={hasChanges}
               handleRestoreValues={handleRestoreValues}
@@ -134,6 +174,11 @@ function FilterChainAccordion2({
               memoizedHasChanges={memoizedHasChanges}
               calculation_endpoint={calculation_endpoint}
               showDeleteButton={showDeleteButton}
+              isMain={isMain}
+              setFilterStateId={setFilterStateId}
+              stateId={stateId}
+              setStoredStateId={setStoredStateId}
+              isActual={isActual}
             />
           )}
         </AccordionDetails>

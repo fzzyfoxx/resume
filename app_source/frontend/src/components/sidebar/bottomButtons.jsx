@@ -19,6 +19,11 @@ const FilterChainButtons = ({
   memoizedHasChanges,
   calculation_endpoint,
   showDeleteButton = true,
+  isMain,
+  setFilterStateId,
+  stateId,
+  setStoredStateId,
+  isActual
 }) => {
   return (
     <Box
@@ -83,6 +88,11 @@ const FilterChainButtons = ({
         setMarker={setMarker}
         hasChanges={memoizedHasChanges}
         endpoint={calculation_endpoint}
+        isMain={isMain}
+        setFilterStateId={setFilterStateId}
+        stateId={stateId}
+        setStoredStateId={setStoredStateId}
+        isActual={isActual}
       />
     </Box>
   );

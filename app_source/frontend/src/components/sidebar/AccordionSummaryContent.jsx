@@ -3,7 +3,8 @@ import { Box, Typography } from '@mui/material';
 import CircularLoader from '../common/CircularLoader';
 import HideLayer from '../../drawing/HideLayer';
 
-const AccordionSummaryContent = ({ accordionTitle, chain, marker, mapRef, variant, label, static: isStatic = false }) => {
+const AccordionSummaryContent = ({ accordionTitle, chain, marker, mapRef, variant, label, isStatic = false }) => {
+    console.log('AccordionSummaryContent isStatic:', isStatic);
   return (
     <>
       <Box
@@ -20,7 +21,7 @@ const AccordionSummaryContent = ({ accordionTitle, chain, marker, mapRef, varian
           variant={variant}
           color="textSecondary"
           sx={{
-            wordBreak: 'break-word',
+            wordBreak: 'break-word'
           }}
         >
           {isStatic ? label : accordionTitle} {/* Use label if static, otherwise accordionTitle */}

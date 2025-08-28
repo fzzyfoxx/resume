@@ -125,7 +125,7 @@ function SearchAreaAccordion({ mapRef }) {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 1.5, py: 0.75 }}>
-          <Typography variant="h8">Obszar wyszukiwania</Typography>
+          <Typography variant="h8" sx={{fontWeight: 'normal', fontFamily: 'Roboto, Arial, sans-serif'}}>Obszar wyszukiwania</Typography>
         </Box>
       </AccordionSummary>
       <AccordionDetails sx={{ p: 0 }}>

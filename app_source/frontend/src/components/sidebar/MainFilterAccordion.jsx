@@ -49,7 +49,7 @@ function MainFilterAccordion({caption, expanded, onToggle, isLoading, children }
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 1.5, py: 0.75 }}>
-          <Typography variant="h8">{caption}</Typography>
+          <Typography variant="h8" color="textSecondary">{caption}</Typography>
           {isLoading && (
             <CircularLoader size={16} sx={{ ml: 1 }} />
           )}

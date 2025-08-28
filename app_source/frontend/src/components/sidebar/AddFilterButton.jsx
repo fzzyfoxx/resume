@@ -6,8 +6,9 @@ import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
+import { generateUniqueId } from '../../utils/idGenerator';
 
-const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint}) => {
+const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint, setFilterStateId, isMain, stateId, setStoredStateId, isActual}) => {
   const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
   const [queryId, setQueryId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
@@ -45,6 +46,15 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       };
   
       callAddShapes();
+
+      if (setFilterStateId) {
+        const newId = generateUniqueId();
+        setFilterStateId(newId); // Notify parent of state change
+      }
+
+      if (setStoredStateId && stateId) {
+        setStoredStateId(stateId); // Update storedStateId to current stateId
+      }
     }
   }, [status, hasUpdated, queryId, mapRef, accordionSummary]);
   
@@ -163,7 +173,9 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
 
   return (
     <Tooltip title={isFiltersEmpty ? "ustaw wartości"
-    : status === 'add' ? "dodaj" 
+        : (!stateId && !isMain) ? "wybierz obszar wyszukiwania"
+        : !isActual ? "odśwież dla nowego obszaru"
+        : status === 'add' ? "dodaj" 
         : status === 'update' && !hasChanges ? "brak zmian do odświeżenia"
         : status === 'update' ? "odśwież" 
         : status === 'stop' ? "zatrzymaj" : ""}
@@ -171,16 +183,18 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
         <span>
     <IconButton
       onClick={
-        status === 'update' && !hasChanges ? null
+         (!stateId && !isMain) ? null
         : isFiltersEmpty ? null
+        : !isActual ? handleAddOrUpdate
+        : status === 'update' && !hasChanges ? null
         : status === 'add' || status === 'update' ? handleAddOrUpdate
         : status === 'stop' ? handleStop
         : null
       }
       sx={{
-        backgroundColor: (status === 'update' && !hasChanges) || (isFiltersEmpty) ? 'lightgray' : 'gray', // Change color when disabled lightgray
+        backgroundColor: (status === 'update' && !hasChanges && isActual) || (isFiltersEmpty) || (!stateId && !isMain) ? 'lightgray' : 'gray', // Change color when disabled lightgray
         '&:hover': {
-          backgroundColor: (status === 'update' && !hasChanges) || (isFiltersEmpty) ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
+          backgroundColor: (status === 'update' && !hasChanges && isActual) || (isFiltersEmpty) || (!stateId && !isMain) ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
         },
         color: 'white',
         borderRadius: '50%',
