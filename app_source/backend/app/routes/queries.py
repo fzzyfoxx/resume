@@ -72,7 +72,7 @@ def calculate_filters_route():
 @queries_bp.route('/set_search_area', methods=['POST'])
 def set_search_area_route():
 
-    print(request.json)
+    #print(request.json)
     teryts_spec = request.json.get('filters', [])[0].get('values', None)
     if not teryts_spec:
         return jsonify({"status": "error", "query_id": None}), 400
@@ -125,14 +125,14 @@ def check_query_status_route():
         JSON response with the status of the query.
     """
     #print(request.args)
-    print('SESSION ID /check_query_status:', session.sid)
+    #print('SESSION ID /check_query_status:', session.sid)
     query_id = request.args.get('query_id', None)
     
     if not query_id:
         return jsonify({"error": "Query ID is required"}), 400
 
     query_state = session['queries'].get(query_id, None)
-    print(session['queries'])
+    #print(session['queries'])
     if query_state:
         start_time = query_state['start_time']
         elapsed_time = time.time() - start_time
@@ -153,7 +153,7 @@ import shapely.wkt
 @queries_bp.route('/get_query_result', methods=['POST'])
 def get_query_result_route():
     #print(request.json)
-    print('SESSION ID /get_query_result:', session.sid)
+    #print('SESSION ID /get_query_result:', session.sid)
     query_id = request.json.get('query_id', None)
     qualification = request.json.get('qualification', None)
     name = request.json.get('name', None)
