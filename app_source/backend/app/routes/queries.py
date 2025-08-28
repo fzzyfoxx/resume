@@ -1,4 +1,10 @@
-from geodoc_app.search.api_handlers import prepare_query_for_app_filters, prepare_geojson, get_properties_from_qualification
+from geodoc_app.search.api_handlers import (
+    prepare_query_for_app_filters, 
+    prepare_geojson, 
+    get_properties_from_qualification,
+    filter_actual_filters,
+    get_qualification_from_filters
+    )
 from geodoc_app.search.search_queries import prepare_area_table_for_search_query
 from geodoc_config import load_config
 import uuid
@@ -25,8 +31,9 @@ def calculate_filters_route():
     """
     #print(request.json)
     print('SESSION ID /calculate_filters:', session.sid)
-    filters = request.json.get('filters', [])
-    qualification = request.json.get('qualification', None)
+    filters_req = request.json.get('filters', [])
+    filters = filter_actual_filters(filters_req)
+    qualification = get_qualification_from_filters(filters_req)
 
     project_id = load_config("gcp_general")['project_id']
     FILTER_SELECT_COLUMNS = current_app.config.get('FILTER_SELECT_COLUMNS', ['geometry'])
@@ -36,7 +43,7 @@ def calculate_filters_route():
 
     filter_query = prepare_query_for_app_filters(
         filters=filters,
-        qualification=qualification,
+        qualification=qualification.get('values', {'value': None}),
         project_id=project_id,
         FILTER_SELECT_COLUMNS=FILTER_SELECT_COLUMNS,
         SEARCH_AREA_TABLE_NAME=SEARCH_AREA_TABLE_NAME,
@@ -59,7 +66,8 @@ def calculate_filters_route():
 
     session['queries'][query_id] = {
         'start_time': start_time,
-        'status': 'pending'
+        'status': 'pending',
+        'qualification': qualification.get('values', {'option': 'None', 'value': None})
         }
     #session.modified = True
 
@@ -73,7 +81,9 @@ def calculate_filters_route():
 def set_search_area_route():
 
     #print(request.json)
-    teryts_spec = request.json.get('filters', [])[0].get('values', None)
+    filters_req = request.json.get('filters', [])
+    filters = filter_actual_filters(filters_req)
+    teryts_spec = filters[0].get('values', None)
     if not teryts_spec:
         return jsonify({"status": "error", "query_id": None}), 400
 
@@ -106,7 +116,8 @@ def set_search_area_route():
 
     session['queries'][query_id] = {
         'start_time': start_time,
-        'status': 'pending'
+        'status': 'pending',
+        'qualification': {'option': 'SearchArea', 'value': None}  # Default qualification for search area
         }
     #session.modified = True
 
@@ -155,7 +166,6 @@ def get_query_result_route():
     #print(request.json)
     #print('SESSION ID /get_query_result:', session.sid)
     query_id = request.json.get('query_id', None)
-    qualification = request.json.get('qualification', None)
     name = request.json.get('name', None)
     query_state = session['queries'].get(query_id, None)
     try:
@@ -164,6 +174,8 @@ def get_query_result_route():
         if query_state['status'] != 'completed':
             return jsonify({"error": "Query is not completed yet"}), 400
         
+        qualification = query_state.get('qualification', {'option': 'None', 'value': None})
+        print(qualification)
         ## Simulate a random record for demonstration purposes
         data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
         file_path = os.path.join(data_dir, 'example_polygons.csv')
@@ -173,6 +185,7 @@ def get_query_result_route():
         random_record['geometry'] = shapely.wkt.loads(random_record['geometry'])
         #results processing
         style, properties = get_properties_from_qualification(qualification)
+        print(style, properties)
         if name:
             properties['Źródło'] = name
         geojson = prepare_geojson([random_record], additional_attributes=properties)

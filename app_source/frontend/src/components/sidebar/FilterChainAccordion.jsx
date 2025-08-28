@@ -14,71 +14,39 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HistoryIcon from '@mui/icons-material/History';
 import CircularLoader from '../common/CircularLoader';
 import AddFilterButton from './AddFilterButton';
-import Subtitle from '../common/Subtitle';
-import QualificationFilter from '../filters/QualificationFilter';
 import LinearProgress from '@mui/material/LinearProgress';
 import HideLayer from '../../drawing/HideLayer';
 
 function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterComponent, mapRef, onRemove}) {
   const [addFilterStatus, setAddFilterStatus] = useState('initial');
-  const [qualificationValue, setQualificationValue] = useState(chain.qualificationFilterValue || null);
   const [marker, setMarker] = useState(null);
 
-  // New state to store a snapshot of filter values and qualification value
+  // New state to store a snapshot of filter values
   const [storedFilterValues, setStoredFilterValues] = useState(null);
-  const [storedQualificationValue, setStoredQualificationValue] = useState(null);
   const [hasChanges, setHasChanges] = useState(false); // New state to track if changes have been made
   const [implied, setImplied] = useState(false);
-
-  // Effect to update qualificationValue when parent chain object changes
-  useEffect(() => {
-    setQualificationValue(chain.qualificationFilterValue || null);
-  }, [chain.qualificationFilterValue]);
-
-  // Effect to set initial qualification value and reset if children exist
-  useEffect(() => {
-    const resetQualificationValueIfChildrenExist = () => {
-      if (chain.filters[chain.filters.length - 1]?.children) {
-        setQualificationValue(null);
-      }
-    };
-    const SetInitialQualificationValue = () => {
-      if (!qualificationValue && !chain.qualificationFilterValue) {
-        setQualificationValue({option: 'Excluded', label: 'obszar wykluczony', value: ''});
-      }
-    };
-    SetInitialQualificationValue();
-    resetQualificationValueIfChildrenExist();
-  }, [chain.filters]);
 
   // Effect to capture filter values when addFilterStatus turns to 'stop'
   // This establishes the baseline for comparison
   useEffect(() => {
     if (addFilterStatus === 'update' && implied) {
-      // Store the current state of filters and qualification
+      // Store the current state of filters
       const currentFilterSelectedValues = chain.filters.map(f => ({
         id: f.id,
         selectedValue: f.selectedValue,
       }));
       setStoredFilterValues(currentFilterSelectedValues);
-      setStoredQualificationValue(qualificationValue);
-      // setHasChanges(false) is handled by the new effect below
     }
   }, [addFilterStatus, implied]); // Depend on addFilterStatus and current values
 
   // Function to compare current values with stored values
-  const checkChanges = (currentFilters, currentQualification) => {
-    if (!storedFilterValues || !storedQualificationValue) {
+  const checkChanges = (currentFilters) => {
+    if (!storedFilterValues) {
       return false; // No stored values to compare against
     }
 
     if (addFilterStatus !== 'update') {
       return false; // Only check for changes in 'update' mode
-    }
-
-    // Compare qualification value
-    if (JSON.stringify(currentQualification) !== JSON.stringify(storedQualificationValue)) {
-      return true;
     }
 
     // Compare individual filter values
@@ -101,44 +69,13 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
   // NEW EFFECT: To continuously check for changes against the stored state
   useEffect(() => {
     // Only check for changes if a baseline (stored values) exists
-    if (storedFilterValues !== null || storedQualificationValue !== null) {
-      setHasChanges(checkChanges(chain.filters, qualificationValue));
+    if (storedFilterValues !== null) {
+      setHasChanges(checkChanges(chain.filters));
     }
-  }, [chain.filters, qualificationValue, storedFilterValues, storedQualificationValue, checkChanges]); // Depend on all values that can change and the checkChanges function
-
-  const handleFilterValueChange = (filterId, value, symbols, hasChildren, isValueEmpty, filterType) => {
-    let newQualificationValue = qualificationValue;
-    let updatedFilters = chain.filters;
-
-    if (filterType === 'qualification') {
-      newQualificationValue = isValueEmpty ? null : value;
-      setQualificationValue(newQualificationValue);
-    } else {
-      updatedFilters = chain.filters.map((filter) => {
-        if (filter.id === filterId) {
-          return {
-            ...filter,
-            selectedValue: isValueEmpty ? null : value,
-          };
-        }
-        return filter;
-      });
-    }
-
-    const updatedChain = {
-      ...chain,
-      qualificationFilterValue: newQualificationValue,
-      filters: updatedFilters,
-    };
-
-    onToggle(updatedChain.id, updatedChain.isExpanded, updatedChain);
-
-    // The setHasChanges is now handled by the new useEffect above,
-    // which reacts to changes in chain.filters and qualificationValue.
-  };
+  }, [chain.filters, storedFilterValues, checkChanges]); // Depend on all values that can change and the checkChanges function
 
   const handleRestoreValues = () => {
-    if (storedFilterValues && storedQualificationValue) {
+    if (storedFilterValues) {
       // Revert individual filters
       const restoredFilters = chain.filters.map(filter => {
         const stored = storedFilterValues.find(f => f.id === filter.id);
@@ -148,13 +85,9 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
         };
       });
 
-      // Revert qualification filter (local state and prop for parent)
-      setQualificationValue(storedQualificationValue);
-
       const restoredChain = {
         ...chain,
-        filters: restoredFilters,
-        qualificationFilterValue: storedQualificationValue,
+        filters: restoredFilters
       };
 
       onToggle(restoredChain.id, restoredChain.isExpanded, restoredChain);
@@ -174,14 +107,10 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
       })
       .filter(Boolean);
 
-    if (qualificationValue !== null) {
-      selectedFilterParts.push(`${qualificationValue.label}`);
-    }
-
     return selectedFilterParts.length > 0
       ? selectedFilterParts.join(' > ')
       : `NowyFiltr-${chainIndex + 1}`;
-  }, [chain.filters, chainIndex, qualificationValue]);
+  }, [chain.filters, chainIndex]);
 
   const renderBottomBar = () => {
     if (addFilterStatus === 'stop') {
@@ -310,25 +239,6 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
         </Box>
       </AccordionSummary>
       <AccordionDetails sx={{ p: 0 }}>
-        {chain.filters.length > 0 && (
-          <Box
-            sx={{
-              width: '90%',
-              maxWidth: 'calc(100% - 24px)',
-              display: 'flex',
-              justifyContent: 'left',
-              my: 0.5,
-              ml: 2.0,
-              px: 1,
-              paddingLeft: '14px',
-              paddingRight: '12px',
-              marginBottom: '4px',
-              marginTop: '14px',
-            }}
-          >
-            <Subtitle label="Objects definition" />
-          </Box>
-        )}
         {chain.filters.map((filter) => {
           // Calculate disabled state for each filter individually
           
@@ -355,45 +265,6 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
         })}
         {chain.filters.length > 0 && !chain.filters[chain.filters.length - 1].children && (
           <>
-            <Box
-              sx={{
-                width: '90%',
-                maxWidth: 'calc(100% - 24px)',
-                display: 'flex',
-                justifyContent: 'left',
-                my: 0.5,
-                ml: 2.0,
-                px: 1,
-                paddingLeft: '14px',
-                paddingRight: '12px',
-                marginBottom: '4px',
-                marginTop: '24px',
-              }}
-            >
-              <Subtitle label="Qualification" />
-            </Box>
-            <Box
-              sx={{
-                width: '90%',
-                maxWidth: 'calc(100% - 24px)',
-                display: 'flex',
-                justifyContent: 'left',
-                my: 0.5,
-                ml: 2.0,
-                px: 1,
-                paddingLeft: '14px',
-                paddingRight: '12px',
-              }}
-            >
-              <QualificationFilter
-                filterId={`${chain.id}-qualification`}
-                defaultValue={qualificationValue}
-                compact={true}
-                onValueChange={(filterId, value, isValueEmpty) =>
-                  handleFilterValueChange(filterId, value, null, null, isValueEmpty, 'qualification')
-                }
-              />
-            </Box>
             <Box
                 sx={{
                   width: '90%',
@@ -448,7 +319,6 @@ function FilterChainAccordion({ chain, chainIndex, onToggle, renderFilterCompone
                 
                   <AddFilterButton
                     filters={chain.filters}
-                    qualification={qualificationValue}
                     onStatusChange={setAddFilterStatus}
                     onImpliedChange={setImplied}
                     mapRef={mapRef}

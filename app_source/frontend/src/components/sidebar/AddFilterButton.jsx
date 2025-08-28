@@ -7,7 +7,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
 
-const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint}) => {
+const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint}) => {
   const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
   const [queryId, setQueryId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
@@ -15,6 +15,7 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
   //const [marker, setMarker] = useState(null); // Marker for rendering shapes
   const [hasUpdated, setHasUpdated] = useState(false);
   console.log('AddFilterButton - hasChanges:', hasChanges);
+  console.log('AddFilterButton - status:', status);
 
   useEffect(() => {
     if (onStatusChange) {
@@ -34,7 +35,6 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
         try {
           const updatedMarker = await addShapesFromQuery(mapRef, {
             query_id: queryId,
-            qualification,
             name: accordionSummary,
           }, marker);
           setMarker(updatedMarker); // Update the marker with the new shapes
@@ -46,7 +46,7 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
   
       callAddShapes();
     }
-  }, [status, hasUpdated, queryId, mapRef, qualification, accordionSummary]);
+  }, [status, hasUpdated, queryId, mapRef, accordionSummary]);
   
   useEffect(() => {
     if (status !== 'update') {
@@ -68,13 +68,8 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
             selector_type: filter.selector_type,
             symbols: filter.symbolsForNextCall || [],
             values: filter.selectedValue || {},
-          })),
-        qualification: qualification
-          ? {
-              option: qualification.option,
-              value: qualification.value,
-            }
-          : null,
+            ispassive: filter.ispassive || false,
+          }))
       };
 
       // Call the /calculate_filters endpoint
@@ -167,7 +162,7 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
 
 
   return (
-    <Tooltip title={status === 'add' && isFiltersEmpty ? "ustaw wartości"
+    <Tooltip title={isFiltersEmpty ? "ustaw wartości"
     : status === 'add' ? "dodaj" 
         : status === 'update' && !hasChanges ? "brak zmian do odświeżenia"
         : status === 'update' ? "odśwież" 
@@ -177,15 +172,15 @@ const AddFilterButton = ({ filters, qualification, onStatusChange, onImpliedChan
     <IconButton
       onClick={
         status === 'update' && !hasChanges ? null
-        : status === 'add' && isFiltersEmpty ? null
+        : isFiltersEmpty ? null
         : status === 'add' || status === 'update' ? handleAddOrUpdate
         : status === 'stop' ? handleStop
         : null
       }
       sx={{
-        backgroundColor: (status === 'update' && !hasChanges) || (status === 'add' && isFiltersEmpty) ? 'lightgray' : 'gray', // Change color when disabled lightgray
+        backgroundColor: (status === 'update' && !hasChanges) || (isFiltersEmpty) ? 'lightgray' : 'gray', // Change color when disabled lightgray
         '&:hover': {
-          backgroundColor: (status === 'update' && !hasChanges) || (status === 'add' && isFiltersEmpty) ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
+          backgroundColor: (status === 'update' && !hasChanges) || (isFiltersEmpty) ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
         },
         color: 'white',
         borderRadius: '50%',

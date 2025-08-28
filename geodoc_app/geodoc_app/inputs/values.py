@@ -2,6 +2,43 @@ from geodoc_config import load_config, load_config_by_path
 
 COLLECTIONS_CONFIG = load_config('app_collections')
 
+def get_subtitle_config(title):
+    """
+    Get subtitle configuration.
+    Args:
+        title (str): Title of the subtitle.
+    Returns:
+        dict: Subtitle configuration.
+    """
+    return {
+        "title": title,
+        "default": "",
+        "items": [],
+        "children": False,
+        "selector_type": "subtitle",
+        "symbols": [],
+        "ispassive": True
+    }
+
+def get_qualification_config():
+    """
+    Get qualification configuration.
+    Returns:
+        dict: Qualification configuration.
+    """
+    qualification_spec = load_config_by_path('search.utils', 'qualification.json')
+    answer = {
+        "title": qualification_spec['title'],
+        "default": qualification_spec['default'],
+        "items": qualification_spec['options'],
+        "children": False,
+        "selector_type": "qualification",
+        "symbols": [],
+        "ispassive": False
+    }
+
+    return answer
+
 def get_collections_list():
     """
     Get list of collections from config.
@@ -14,7 +51,8 @@ def get_collections_list():
         "items": [v['name'] for v in COLLECTIONS_CONFIG['collections'].values()],
         "children": COLLECTIONS_CONFIG.get('children', False),
         "selector_type": "combo_box",
-        "symbols": ['collections']
+        "symbols": ['collections'],
+        "ispassive": False
     }
 
     return {'filters': [answer]}
@@ -73,7 +111,8 @@ def get_collection_tables_by_name(name, symbols=['collections']):
         "items": get_collection_tables(collection_config),
         "children": collection_config.get('children', False),
         "selector_type": "combo_box",
-        "symbols": symbols + [symbol]
+        "symbols": symbols + [symbol],
+        "ispassive": False
     }
 
     return {"filters": [answer]}
@@ -159,7 +198,8 @@ def get_collection_table_columns_spec_by_name(name, symbols):
             "items": get_items_for_column(column_spec, column, table_spec['table_symbol'], symbols[-1], mappings),
             "children": column_spec.get('children', False),
             "selector_type": get_selector_type(column_spec['type']),
-            "symbols": symbols + [table_spec['table_symbol'], column]
+            "symbols": symbols + [table_spec['table_symbol'], column],
+            "ispassive": False
         })
     
     return {'filters': answer}
@@ -169,13 +209,14 @@ def get_filter_spec(symbols, name=None):
     if symbols is None:
         return None
     
-    if len(symbols) == 0:
+    if len(symbols) == 0 and name == 'collections':
         answer = get_collections_list()
         answer_item = answer['filters'][0]
         if len(answer_item['items']) == 1:
             symbols = answer_item['symbols']
             name = answer_item['items'][0]
         else:
+            answer['filters'] = [get_subtitle_config(title='wybór obiektów')] + answer['filters']
             return answer
     
     if len(symbols) == 1 and symbols[0] == 'collections':
@@ -189,6 +230,10 @@ def get_filter_spec(symbols, name=None):
         
     if len(symbols) == 2 and symbols[0] == 'collections':
         answer = get_collection_table_columns_spec_by_name(name=name, symbols=symbols)
+        answer['filters'].extend([
+            get_subtitle_config(title='kwalifikacja'),
+            get_qualification_config()
+        ])
         return answer
 
     return None
