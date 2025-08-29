@@ -22,7 +22,8 @@ function FilterChainAccordion2({
     staticLabel = false,
     isMain = false,
     stateId,
-    setStateId
+    setStateId,
+    onStateChange
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('initial');
   const [implied, setImplied] = useState(false);
@@ -50,10 +51,19 @@ function FilterChainAccordion2({
   };
 
   useEffect(() => {
+    console.log('STATE UPDATE - filterStateId changed:', filterStateId, storedFilterValues, storedStateId);
+    if (onStateChange) {
+      onStateChange(chain.id, {
+        storedFilterValues,
+        storedStateId
+      });
+    }
+  }, [storedFilterValues]);
+
+  useEffect(() => {
     if (filterStateId && isMain) {
-        const NewId = generateUniqueId();
-        setStoredStateId(NewId);
-        setStateId(NewId);
+        setStoredStateId(filterStateId);
+        setStateId(filterStateId);
     }
   }, [filterStateId, setStateId, isMain]);
 

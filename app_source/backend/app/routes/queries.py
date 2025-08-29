@@ -30,7 +30,7 @@ def calculate_filters_route():
         JSON response with calculated filters.
     """
     #print(request.json)
-    print('SESSION ID /calculate_filters:', session.sid)
+    #print('SESSION ID /calculate_filters:', session.sid)
     filters_req = request.json.get('filters', [])
     filters = filter_actual_filters(filters_req)
     qualification = get_qualification_from_filters(filters_req)
@@ -175,7 +175,7 @@ def get_query_result_route():
             return jsonify({"error": "Query is not completed yet"}), 400
         
         qualification = query_state.get('qualification', {'option': 'None', 'value': None})
-        print(qualification)
+
         ## Simulate a random record for demonstration purposes
         data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
         file_path = os.path.join(data_dir, 'example_polygons.csv')
@@ -185,7 +185,7 @@ def get_query_result_route():
         random_record['geometry'] = shapely.wkt.loads(random_record['geometry'])
         #results processing
         style, properties = get_properties_from_qualification(qualification)
-        print(style, properties)
+        
         if name:
             properties['Źródło'] = name
         geojson = prepare_geojson([random_record], additional_attributes=properties)

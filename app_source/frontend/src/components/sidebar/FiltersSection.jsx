@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Divider,
   Dialog,
@@ -15,7 +15,7 @@ import FilterChainAccordion2 from './FilterChainAccordion2';
 import AddNewFilterChainButton from './AddNewFilterChainButton';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId }) {
+function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange }) {
   const {
     filterChains,
     setFilterChains,
@@ -30,6 +30,25 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [chainToRemove, setChainToRemove] = useState(null);
   const [markerToRemove, setMarkerToRemove] = useState(null);
+  const [childrenState, setChildrenState] = useState({});
+
+  const handleAccordionStateChange = React.useCallback((chainId, state) => {
+    setChildrenState(prevState => {
+       if (JSON.stringify(prevState[chainId]) === JSON.stringify(state)) {
+        return prevState;
+      }
+      return {
+        ...prevState,
+        [chainId]: state
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (onSectionStateChange) {
+      onSectionStateChange(title, childrenState);
+    }
+  }, [childrenState, onSectionStateChange, title]);
 
   const handleOpenDialog = (chainId, marker) => {
     setChainToRemove(chainId);
@@ -46,6 +65,12 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
     if (markerToRemove && mapRef?.current) {
       mapRef.current.removeLayer(markerToRemove);
     }
+
+    setChildrenState(prevState => {
+      const newState = { ...prevState };
+      delete newState[chainToRemove];
+      return newState;
+    });
 
     setFilterChains((prevChains) =>
       prevChains.filter((chain) => chain.id !== chainToRemove)
@@ -80,6 +105,7 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
             isMain={isMain}
             stateId={stateId}
             setStateId={setStateId}
+            onStateChange={handleAccordionStateChange}
           />
         ))}
 

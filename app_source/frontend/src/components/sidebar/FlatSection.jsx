@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import useFilterChains from '../../hooks/useFilterChains';
 import FilterChainAccordion2 from './FilterChainAccordion2';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId }) {
+function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange }) {
   const {
     filterChains,
     setFilterChains,
@@ -15,6 +15,26 @@ function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [],
     handleFilterValueChange,
     handleAddFilterChain,
   } = useFilterChains(initialSymbols, initialName);
+
+  const [childrenState, setChildrenState] = useState({});
+
+  const handleAccordionStateChange = React.useCallback((chainId, state) => {
+    setChildrenState(prevState => {
+       if (JSON.stringify(prevState[chainId]) === JSON.stringify(state)) {
+        return prevState;
+      }
+      return {
+        ...prevState,
+        [chainId]: state
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (onSectionStateChange) {
+      onSectionStateChange(title, childrenState);
+    }
+  }, [childrenState, onSectionStateChange, title]);
 
 
   return (
@@ -38,6 +58,7 @@ function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [],
             isMain={isMain}
             stateId={stateId}
             setStateId={setStateId}
+            onStateChange={handleAccordionStateChange}
           />
         ))}
     </>

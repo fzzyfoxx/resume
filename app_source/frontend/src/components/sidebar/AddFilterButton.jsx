@@ -13,6 +13,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
   const [queryId, setQueryId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [previousStatus, setPreviousStatus] = useState('add'); // Track the previous status
+  const [tempFilterStateId, setTempFilterStateId] = useState(null); // Temporary state ID for internal tracking
   //const [marker, setMarker] = useState(null); // Marker for rendering shapes
   const [hasUpdated, setHasUpdated] = useState(false);
   console.log('AddFilterButton - hasChanges:', hasChanges);
@@ -48,8 +49,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       callAddShapes();
 
       if (setFilterStateId) {
-        const newId = generateUniqueId();
-        setFilterStateId(newId); // Notify parent of state change
+        setFilterStateId(tempFilterStateId); // Notify parent of state change
       }
 
       if (setStoredStateId && stateId) {
@@ -70,10 +70,15 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
     }
     try {
       // Prepare the payload
+      const newId = generateUniqueId();
+      setTempFilterStateId(newId); // Update temporary state ID
+
       const payload = {
         filters: filters
           .filter((filter) => !filter.children)
           .map((filter) => ({
+            stateId: stateId,
+            filterStateId: newId,
             filterId: filter.id,
             selector_type: filter.selector_type,
             symbols: filter.symbolsForNextCall || [],
