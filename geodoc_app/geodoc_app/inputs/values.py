@@ -12,12 +12,12 @@ def get_subtitle_config(title):
     """
     return {
         "title": title,
-        "default": "",
+        "default": title,
         "items": [],
         "children": False,
         "selector_type": "subtitle",
-        "symbols": [],
-        "ispassive": True
+        "symbols": ['subtitle', title],
+        "ispassive": True,
     }
 
 def get_qualification_config():
@@ -33,7 +33,7 @@ def get_qualification_config():
         "items": qualification_spec['options'],
         "children": False,
         "selector_type": "qualification",
-        "symbols": [],
+        "symbols": ['qualification'],
         "ispassive": False
     }
 
@@ -192,7 +192,6 @@ def get_column_items_from_symbols(symbols):
         return load_config_by_path(f'search.{collection_symbol}.columns', f'{table_symbol}_{column_symbol}.json')
     except Exception as e:
         return []
-    
 
 def get_collection_table_columns_spec_by_name(collection_name, name, symbols):
     """
@@ -222,11 +221,49 @@ def get_collection_table_columns_spec_by_name(collection_name, name, symbols):
     
     return {'filters': answer}
 
-def get_filter_spec(symbols, name=None):
-    print(f'symbols: {symbols} | name: {name}')
-    if symbols is None:
-        return None
+def load_collection_filter_from_symbols(symbols):
+    collection_config = get_collection_item_config(*symbols[:2])
+    answer = {
+        "title": collection_config['title'],
+        "default": collection_config.get('default', ''),
+        "items": get_collection_tables(collection_config),
+        "children": collection_config.get('children', False),
+        "selector_type": "combo_box",
+        "symbols": symbols,
+        "ispassive": False
+    }
+
+    return {"filters": [answer]}
+
+def load_column_filter_from_symbols(symbols):
+    collection_config = get_collection_item_config(*symbols[:2])
+    table = symbols[2]
+    table_spec = collection_config['tables'][table]
+    column = symbols[3]
+    column_spec = table_spec['columns'][column]
+    mappings = table_spec.get('mappings', None)
+
+    answer = {
+            "title": column_spec['name'],
+            "default": column_spec.get('default', ''),
+            "items": get_items_for_column(column_spec, column, table, symbols[1], mappings),
+            "children": column_spec.get('children', False),
+            "selector_type": get_selector_type(column_spec['type']),
+            "symbols": symbols,
+            "ispassive": False,
+            "default": column_spec.get('default', None)
+        }
     
+    return {"filters": [answer]}
+
+def is_proper_name(name):
+    if isinstance(name, str):
+        if len(name) > 0:
+            return True
+    return False
+
+def get_casual_filter_spec(symbols, name=None):
+
     collection_name = symbols[0] if len(symbols) > 0 else name
     
     if len(symbols) == 0:
@@ -257,9 +294,45 @@ def get_filter_spec(symbols, name=None):
             ])
         return answer
     
-    if len(symbols) == 3:
+    if len(symbols) == 3 and not is_proper_name(name):
         name = symbols[-1]
         answer = get_collection_table_columns_spec_by_name(collection_name=collection_name, name=name, symbols=symbols[:-1])
         return answer
 
     return None
+
+def handle_filter_spec_reload(symbols):
+    if len(symbols) == 0:
+        return None
+    elif (len(symbols) == 1) | (symbols[0] == 'subtitle'):
+        collection_name = symbols[0]
+        if collection_name not in ['qualification', 'subtitle']:
+            return get_collections_list(collection_name=collection_name)
+        else:
+            if collection_name == 'qualification':
+                return {'filters': [get_qualification_config()]}
+            elif collection_name == 'subtitle':
+                return {'filters': [get_subtitle_config(title=symbols[1])] }
+            else:
+                return None
+    elif len(symbols) == 2:
+        return load_collection_filter_from_symbols(symbols)
+    elif len(symbols) == 4:
+        return load_column_filter_from_symbols(symbols)
+    else:
+        return None
+
+    
+
+def get_filter_spec(symbols, name=None):
+    print(f'symbols: {symbols} | name: {name}')
+    if symbols is None:
+        return None
+    elif name is not None:
+        return get_casual_filter_spec(symbols=symbols, name=name)
+    elif len(symbols) > 0:
+        return handle_filter_spec_reload(symbols=symbols)
+    else:
+        return None
+    
+    

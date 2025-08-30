@@ -13,7 +13,7 @@ def get_filter_spec_route():
         JSON response with filter specification.
     """
     #print(request.args)
-    #print('SESSION ID /get_gilter_spec:', session.sid)
+    print('SESSION ID /get_gilter_spec:', session.sid)
 
     symbols = dict(request.args.lists()).get('symbols', [])
     name = request.args.get('name', None)

@@ -15,7 +15,7 @@ import FilterChainAccordion2 from './FilterChainAccordion2';
 import AddNewFilterChainButton from './AddNewFilterChainButton';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange }) {
+function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false }) {
   const {
     filterChains,
     setFilterChains,
@@ -25,7 +25,7 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
     handleChainAccordionToggle,
     handleFilterValueChange,
     handleAddFilterChain,
-  } = useFilterChains(initialSymbols, initialName);
+  } = useFilterChains(initialSymbols, initialName, disableAutoChaining);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [chainToRemove, setChainToRemove] = useState(null);
