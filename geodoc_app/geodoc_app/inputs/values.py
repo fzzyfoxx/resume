@@ -294,9 +294,12 @@ def get_casual_filter_spec(symbols, name=None):
             ])
         return answer
     
-    if len(symbols) == 3 and not is_proper_name(name):
+    print('Proper Name:', is_proper_name(name), name)
+
+    if len(symbols) == 3:
         name = symbols[-1]
         answer = get_collection_table_columns_spec_by_name(collection_name=collection_name, name=name, symbols=symbols[:-1])
+        print('ANSWER:', answer)
         return answer
 
     return None

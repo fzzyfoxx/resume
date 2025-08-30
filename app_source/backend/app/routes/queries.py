@@ -15,12 +15,28 @@ from flask import Blueprint, jsonify, request, current_app, session
 
 queries_bp = Blueprint('queries', __name__)
 
+target_table_path = 'app.results'
+
 """
 @queries_bp.before_request
 def log_session_id():
     # This will print the session ID before every request to this blueprint
     current_app.logger.debug(f"Request started for {request.path} with Session ID: {session.sid}")
 """
+
+def prepare_artificial_query_result(query_metacolumns):
+
+    # Simulate a random record for demonstration purposes
+    data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
+    file_path = os.path.join(data_dir, 'example_polygons.csv')
+    with open(file_path, "r") as file:
+        reader = list(csv.DictReader(file))  # Read rows as dictionaries
+        random_record = random.choice(reader)  # Select a random row
+    return {
+        **query_metacolumns,
+        'geometry': random_record['geometry']
+    }
+    
 
 @queries_bp.route('/calculate_filters', methods=['POST'])
 def calculate_filters_route():
@@ -29,9 +45,18 @@ def calculate_filters_route():
     Returns:
         JSON response with calculated filters.
     """
-    #print(request.json)
-    #print('SESSION ID /calculate_filters:', session.sid)
-    filters_req = request.json.get('filters', [])
+    print('SESSION ID /calculate_filters:', session.sid)
+    print(request.json)
+    filters_req = request.json.get('filters', None)
+    filterStateId = request.json.get('filterStateId', None)
+    stateId = request.json.get('stateId', None)
+    name = request.json.get('name', None)
+
+    if not filterStateId or not stateId:
+        return jsonify({"error": "filterStateId and stateId are required"}), 400
+    if not filters_req:
+        return jsonify({"error": "No filters provided"}), 400
+    
     filters = filter_actual_filters(filters_req)
     qualification = get_qualification_from_filters(filters_req)
 
@@ -41,12 +66,24 @@ def calculate_filters_route():
     INTERSECTION_BUFFER = current_app.config.get('INTERSECTION_BUFFER', 1000)
     SIMPLIFY_RATE = current_app.config.get('SIMPLIFY_RATE', 100)
 
+    qualification_option = qualification['values']['option']
+    qualification_buffer = float(qualification['values']['value']) if (qualification['values']['value'] != '') and (qualification['values']['value'] is not None) else 0
+
+    query_metacolumns = {
+        'option': qualification_option,
+        'buffer': qualification_buffer,
+        'filterStateId': filterStateId,
+        'stateId': stateId,
+        'name': name
+    }
+
     filter_query = prepare_query_for_app_filters(
         filters=filters,
         qualification=qualification.get('values', {'value': None}),
         project_id=project_id,
+        query_metacolumns=query_metacolumns,
+        target_table_path=target_table_path,
         FILTER_SELECT_COLUMNS=FILTER_SELECT_COLUMNS,
-        SEARCH_AREA_TABLE_NAME=SEARCH_AREA_TABLE_NAME,
         INTERSECTION_BUFFER=INTERSECTION_BUFFER,
         SIMPLIFY_RATE=SIMPLIFY_RATE
     )
@@ -64,12 +101,17 @@ def calculate_filters_route():
         print(line.strip())
     print('-' * 20)
 
+
     session['queries'][query_id] = {
         'start_time': start_time,
         'status': 'pending',
-        'qualification': qualification.get('values', {'option': 'None', 'value': None})
         }
     #session.modified = True
+
+    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
+    artificial_result = prepare_artificial_query_result(query_metacolumns)
+    session['results'].append(artificial_result)
+    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -80,8 +122,18 @@ def calculate_filters_route():
 @queries_bp.route('/set_search_area', methods=['POST'])
 def set_search_area_route():
 
-    #print(request.json)
+    print('SESSION ID /set_search_area:', session.sid)
+    print(request.json)
     filters_req = request.json.get('filters', [])
+    filterStateId = request.json.get('filterStateId', None)
+    stateId = request.json.get('stateId', None)
+    name = request.json.get('name', None)
+
+    if not filterStateId:
+        return jsonify({"error": "filterStateId is required"}), 400
+    if not filters_req:
+        return jsonify({"error": "No filters provided"}), 400
+    
     filters = filter_actual_filters(filters_req)
     teryts_spec = filters[0].get('values', None)
     if not teryts_spec:
@@ -94,9 +146,18 @@ def set_search_area_route():
     adm_config = load_config("administration_units")
     teryt_dataset_id = adm_config['dataset_id']
 
+    query_metacolumns = {
+    'option': 'SearchArea',
+    'buffer': 0,
+    'filterStateId': filterStateId,
+    'stateId': filterStateId,
+    'name': name
+    }
+
     area_table_query = prepare_area_table_for_search_query(
         teryts_spec=teryts_spec,
-        table_name=SEARCH_AREA_TABLE_NAME,
+        target_table_path=target_table_path,
+        query_metacolumns=query_metacolumns,
         project_id=project_id,
         dataset_id=teryt_dataset_id,
         simplify_rate=SIMPLIFY_RATE
@@ -116,14 +177,19 @@ def set_search_area_route():
 
     session['queries'][query_id] = {
         'start_time': start_time,
-        'status': 'pending',
-        'qualification': {'option': 'SearchArea', 'value': None}  # Default qualification for search area
+        'status': 'pending'
         }
     #session.modified = True
+
+    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
+    artificial_result = prepare_artificial_query_result(query_metacolumns)
+    session['results'].append(artificial_result)
+    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
     except Exception as e:
+        print('ERROR:', str(e))
         return jsonify({"error": str(e)}), 400
 
     
@@ -163,36 +229,30 @@ import shapely.wkt
 
 @queries_bp.route('/get_query_result', methods=['POST'])
 def get_query_result_route():
-    #print(request.json)
-    #print('SESSION ID /get_query_result:', session.sid)
-    query_id = request.json.get('query_id', None)
-    name = request.json.get('name', None)
-    query_state = session['queries'].get(query_id, None)
+    print('SESSION ID /get_query_result:', session.sid)
+    print(request.json)
+    filterStateId = request.json.get('filterStateId', None)
     try:
-        if not query_id or not query_state:
-            return jsonify({"error": "Query ID is required or query not found"}), 400
-        if query_state['status'] != 'completed':
-            return jsonify({"error": "Query is not completed yet"}), 400
-        
-        qualification = query_state.get('qualification', {'option': 'None', 'value': None})
-
-        ## Simulate a random record for demonstration purposes
-        data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
-        file_path = os.path.join(data_dir, 'example_polygons.csv')
-        with open(file_path, "r") as file:
-            reader = list(csv.DictReader(file))  # Read rows as dictionaries
-            random_record = random.choice(reader)  # Select a random row
-        random_record['geometry'] = shapely.wkt.loads(random_record['geometry'])
-        #results processing
+        filter_data = [item for item in session['results'] if item.get('filterStateId', None) == filterStateId][0]
+        qualification = {
+            'option': filter_data.get('option'),
+            'value': filter_data.get('buffer')
+        }
         style, properties = get_properties_from_qualification(qualification)
         
+        name = filter_data.get('name', None)
         if name:
             properties['Źródło'] = name
-        geojson = prepare_geojson([random_record], additional_attributes=properties)
+        
+        geometry = shapely.wkt.loads(filter_data.get('geometry'))
+        geojson = prepare_geojson([{'geometry': geometry}], additional_attributes=properties)
         return jsonify({
             "geojson": geojson,
             "style": style
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+
     

@@ -34,7 +34,7 @@ def create_app():
         if not session.get('queries'):
             session['queries'] = {'abc': 'xyz'}
         if not session.get('results'):
-            session['results'] = {}
+            session['results'] = []
         if not session.get('states'):
             session['states'] = {}
             app.logger.debug("Initializing new session data.")

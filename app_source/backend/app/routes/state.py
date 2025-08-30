@@ -53,3 +53,4 @@ def load_state_route():
         return jsonify(state), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    

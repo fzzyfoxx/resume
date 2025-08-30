@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import useFilterChains from '../../hooks/useFilterChains';
 import FilterChainAccordion2 from './FilterChainAccordion2';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false }) {
+function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState }) {
   const {
     filterChains,
     setFilterChains,
@@ -14,9 +14,29 @@ function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [],
     handleChainAccordionToggle,
     handleFilterValueChange,
     handleAddFilterChain,
+    restoreChainsFromState,
   } = useFilterChains(initialSymbols, initialName, disableAutoChaining);
 
   const [childrenState, setChildrenState] = useState({});
+  const loadedStateRef = useRef(null);
+
+  useEffect(() => {
+    // Only proceed if loadedState has changed and is different from what we've already processed.
+    if (loadedState && loadedStateRef.current !== loadedState) {
+      loadedStateRef.current = loadedState; // Mark as processed
+      const isEffectivelyEmpty = !Object.values(loadedState).some(
+        chain => chain.storedFilterValues && chain.storedFilterValues.length > 0
+      );
+
+      if (!isEffectivelyEmpty) {
+        restoreChainsFromState(loadedState);
+      } else {
+        // If loaded state for this section is empty, clear any existing chains and then load the initial one.
+        setFilterChains([]);
+        handleAddFilterChain(true);
+      }
+    }
+  }, [loadedState, restoreChainsFromState, handleAddFilterChain, setFilterChains]);
 
   const handleAccordionStateChange = React.useCallback((chainId, state) => {
     setChildrenState(prevState => {

@@ -36,8 +36,8 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       const callAddShapes = async () => {
         try {
           const updatedMarker = await addShapesFromQuery(mapRef, {
-            query_id: queryId,
-            name: accordionSummary,
+            filterStateId: tempFilterStateId,
+            stateId: stateId,
           }, marker);
           setMarker(updatedMarker); // Update the marker with the new shapes
           setHasUpdated(true); // Mark as updated after calling addShapesFromQuery
@@ -77,14 +77,15 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
         filters: filters
           .filter((filter) => !filter.children)
           .map((filter) => ({
-            stateId: stateId,
-            filterStateId: newId,
             filterId: filter.id,
             selector_type: filter.selector_type,
             symbols: filter.symbolsForNextCall || [],
             values: filter.selectedValue || {},
             ispassive: filter.ispassive || false,
-          }))
+          })),
+        name: accordionSummary || 'brak',
+        stateId: stateId,
+        filterStateId: newId,
       };
 
       // Call the /calculate_filters endpoint

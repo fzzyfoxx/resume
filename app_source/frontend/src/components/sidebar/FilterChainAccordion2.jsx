@@ -55,7 +55,7 @@ function FilterChainAccordion2({
     if (onStateChange) {
       onStateChange(chain.id, {
         storedFilterValues,
-        storedStateId
+        filterStateId
       });
     }
   }, [storedFilterValues]);
