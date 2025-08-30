@@ -11,6 +11,7 @@ const FilterChainButtons = ({
   chainId,
   marker,
   filters,
+  addFilterStatus,
   setAddFilterStatus,
   setImplied,
   mapRef,
@@ -20,6 +21,7 @@ const FilterChainButtons = ({
   calculation_endpoint,
   showDeleteButton = true,
   isMain,
+  filterStateId,
   setFilterStateId,
   stateId,
   setStoredStateId,
@@ -80,6 +82,7 @@ const FilterChainButtons = ({
 
       <AddFilterButton
         filters={filters}
+        status={addFilterStatus}
         onStatusChange={setAddFilterStatus}
         onImpliedChange={setImplied}
         mapRef={mapRef}
@@ -89,6 +92,7 @@ const FilterChainButtons = ({
         hasChanges={memoizedHasChanges}
         endpoint={calculation_endpoint}
         isMain={isMain}
+        filterStateId={filterStateId}
         setFilterStateId={setFilterStateId}
         stateId={stateId}
         setStoredStateId={setStoredStateId}

@@ -7,6 +7,7 @@ import { renderBottomBar } from '../common/horizontalLoader';
 import FilterChainButtons from './bottomButtons';
 import AccordionSummaryContent from './AccordionSummaryContent';
 import { generateUniqueId } from '../../utils/idGenerator';
+import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the function
 
 function FilterChainAccordion2({ 
     chain, 
@@ -25,19 +26,32 @@ function FilterChainAccordion2({
     setStateId,
     onStateChange
     }) {
-  const [addFilterStatus, setAddFilterStatus] = useState('initial');
+  const [addFilterStatus, setAddFilterStatus] = useState('add');
   const [implied, setImplied] = useState(false);
   const [marker, setMarker] = useState(null);
   const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied);
   const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
   const [isActual, setIsActual] = useState(true);
+  const loadedStateIdRef = React.useRef(null);
 
   console.log('FilterChainAccordion2 staticLabel:', staticLabel);
   console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
   const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
   const indicatorColor = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
+
+  useEffect(() => {
+    const loadedId = chain.loadedFilterStateId;
+    const loadedStateId = chain.loadedStateId;
+    console.log('Loaded filterStateId:', loadedId, 'Current ref:', loadedStateIdRef.current);
+    if (loadedId && loadedId !== loadedStateIdRef.current) {
+      loadedStateIdRef.current = loadedId;
+      setFilterStateId(loadedId);
+      setAddFilterStatus('update');
+      setStoredStateId(loadedStateId)
+    }
+  }, [chain.loadedFilterStateId, mapRef, marker]);
 
   const handleRestoreValues = () => {
     if (storedFilterValues) {
@@ -55,7 +69,8 @@ function FilterChainAccordion2({
     if (onStateChange) {
       onStateChange(chain.id, {
         storedFilterValues,
-        filterStateId
+        filterStateId,
+        storedStateId
       });
     }
   }, [storedFilterValues]);
@@ -176,6 +191,7 @@ function FilterChainAccordion2({
               chainId={chain.id}
               marker={marker}
               filters={chain.filters}
+              addFilterStatus={addFilterStatus}
               setAddFilterStatus={setAddFilterStatus}
               setImplied={setImplied}
               mapRef={mapRef}
@@ -185,6 +201,7 @@ function FilterChainAccordion2({
               calculation_endpoint={calculation_endpoint}
               showDeleteButton={showDeleteButton}
               isMain={isMain}
+              filterStateId={filterStateId}
               setFilterStateId={setFilterStateId}
               stateId={stateId}
               setStoredStateId={setStoredStateId}

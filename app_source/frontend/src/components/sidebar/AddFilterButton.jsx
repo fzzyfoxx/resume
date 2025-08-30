@@ -8,14 +8,16 @@ import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
 import { generateUniqueId } from '../../utils/idGenerator';
 
-const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint, setFilterStateId, isMain, stateId, setStoredStateId, isActual}) => {
-  const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
+const AddFilterButton = ({ filters, status, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint, filterStateId, setFilterStateId, isMain, stateId, setStoredStateId, isActual}) => {
+  //const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
   const [queryId, setQueryId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [previousStatus, setPreviousStatus] = useState('add'); // Track the previous status
   const [tempFilterStateId, setTempFilterStateId] = useState(null); // Temporary state ID for internal tracking
   //const [marker, setMarker] = useState(null); // Marker for rendering shapes
   const [hasUpdated, setHasUpdated] = useState(false);
+  const [loadRender, setLoadRender] = useState(false);
+
   console.log('AddFilterButton - hasChanges:', hasChanges);
   console.log('AddFilterButton - status:', status);
 
@@ -32,7 +34,15 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
   }, [hasUpdated, onImpliedChange]);
 
   useEffect(() => {
-    if (status === 'update' && !hasUpdated && queryId) {
+    if (filterStateId) {
+      setTempFilterStateId(filterStateId);
+      setLoadRender(true);
+    }
+  }, [filterStateId]);
+
+  useEffect(() => {
+    console.log('Add shapes effect - status:', status, 'hasUpdated:', hasUpdated, 'tempFilterStateId:', tempFilterStateId);
+    if (status === 'update' && !hasUpdated && tempFilterStateId) {
       const callAddShapes = async () => {
         try {
           const updatedMarker = await addShapesFromQuery(mapRef, {
@@ -52,11 +62,11 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
         setFilterStateId(tempFilterStateId); // Notify parent of state change
       }
 
-      if (setStoredStateId && stateId) {
+      if (setStoredStateId && stateId && !loadRender) {
         setStoredStateId(stateId); // Update storedStateId to current stateId
       }
     }
-  }, [status, hasUpdated, queryId, mapRef, accordionSummary]);
+  }, [status, hasUpdated, queryId, mapRef, accordionSummary, tempFilterStateId]);
   
   useEffect(() => {
     if (status !== 'update') {
@@ -72,6 +82,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       // Prepare the payload
       const newId = generateUniqueId();
       setTempFilterStateId(newId); // Update temporary state ID
+      setLoadRender(false);
 
       const payload = {
         filters: filters
@@ -94,7 +105,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       if (response.data && response.data.query_id) {
         setPreviousStatus(status); // Save the current status before transitioning to 'stop'
         setQueryId(response.data.query_id);
-        setStatus('stop'); // Change status to 'stop' to start polling
+        onStatusChange('stop'); // Change status to 'stop' to start polling
       }
     } catch (error) {
       console.error('Error calculating filters:', error);
@@ -105,7 +116,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
     clearPolling();
     setQueryId(null); // Clear the queryId
     setHasUpdated(false); // Reset the hasUpdated flag
-    setStatus(previousStatus); // Restore the previous status
+    onStatusChange(previousStatus); // Restore the previous status
   };
 
   const checkQueryStatus = async () => {
@@ -118,7 +129,7 @@ const AddFilterButton = ({ filters, onStatusChange, onImpliedChange, mapRef, acc
       });
 
       if (response.data && response.data.status === 'completed') {
-        setStatus('update'); // Change status to 'update' when query is completed
+        onStatusChange('update'); // Change status to 'update' when query is completed
         clearPolling(); // Stop polling once the query is completed
       }
     } catch (error) {
