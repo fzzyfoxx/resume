@@ -9,6 +9,7 @@ import AccordionSummaryContent from './AccordionSummaryContent';
 import { generateUniqueId } from '../../utils/idGenerator';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the function
 import AccordionStatusButton from './AccordionStatusButton';
+import { useFilterQuery } from '../../hooks/useFilterQuery';
 
 function FilterChainAccordion2({ 
     chain, 
@@ -30,7 +31,7 @@ function FilterChainAccordion2({
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const [implied, setImplied] = useState(false);
   const [marker, setMarker] = useState(null);
-  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied);
+  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied, setImplied);
   const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
   const [isActual, setIsActual] = useState(true);
@@ -40,9 +41,31 @@ function FilterChainAccordion2({
   console.log('FilterChainAccordion2 staticLabel:', staticLabel);
   console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
+  console.log('LoadCheck - ', 'isActual', isActual, 'hasChanges', hasChanges, 'addFilterStatus', addFilterStatus, 'implied', implied);
+
   const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
   const summaryParts = useMemo(() => getAccordionSummaryParts(chain.filters), [chain.filters]);
   const indicator = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
+
+  const { handleAddOrUpdate, handleStop } = useFilterQuery({
+    filters: chain.filters,
+    status: addFilterStatus,
+    onStatusChange: setAddFilterStatus,
+    onImpliedChange: setImplied,
+    mapRef,
+    accordionSummary: title,
+    marker,
+    setMarker,
+    endpoint: calculation_endpoint,
+    filterStateId,
+    setFilterStateId,
+    stateId,
+    setStoredStateId,
+  });
+
+  useEffect(() => {
+    console.log('TempFilter - filter status', addFilterStatus);
+  }, [addFilterStatus]);
 
   useEffect(() => {
     const loadedId = chain.loadedFilterStateId;
@@ -51,11 +74,11 @@ function FilterChainAccordion2({
     if (loadedId && loadedId !== loadedStateIdRef.current) {
       loadedStateIdRef.current = loadedId;
       setFilterStateId(loadedId);
-      setAddFilterStatus('update');
       setStoredStateId(loadedStateId);
+      setAddFilterStatus('update');
       setTitle(chain.loadedTitle || title);
     }
-  }, [chain.loadedFilterStateId, mapRef, marker]);
+  }, [chain.loadedFilterStateId]);
 
   const handleRestoreValues = () => {
     if (storedFilterValues) {
@@ -164,19 +187,8 @@ function FilterChainAccordion2({
             statusButton={
               <AccordionStatusButton
                 indicator={indicator}
-                filters={chain.filters}
-                status={addFilterStatus}
-                onStatusChange={setAddFilterStatus}
-                onImpliedChange={setImplied}
-                mapRef={mapRef}
-                accordionSummary={title}
-                marker={marker}
-                setMarker={setMarker}
-                endpoint={calculation_endpoint}
-                filterStateId={filterStateId}
-                setFilterStateId={setFilterStateId}
-                stateId={stateId}
-                setStoredStateId={setStoredStateId}
+                handleAddOrUpdate={handleAddOrUpdate}
+                handleStop={handleStop}
               />
             }
           />
@@ -206,22 +218,14 @@ function FilterChainAccordion2({
               onRemove={onRemove}
               chainId={chain.id}
               marker={marker}
-              filters={chain.filters}
-              addFilterStatus={addFilterStatus}
-              setAddFilterStatus={setAddFilterStatus}
-              setImplied={setImplied}
-              mapRef={mapRef}
-              accordionSummary={accordionTitle}
-              setMarker={setMarker}
-              memoizedHasChanges={memoizedHasChanges}
-              calculation_endpoint={calculation_endpoint}
               showDeleteButton={showDeleteButton}
-              isMain={isMain}
-              filterStateId={filterStateId}
-              setFilterStateId={setFilterStateId}
-              stateId={stateId}
-              setStoredStateId={setStoredStateId}
+              handleAddOrUpdate={handleAddOrUpdate}
+              handleStop={handleStop}
+              filters={chain.filters}
+              status={addFilterStatus}
               isActual={isActual}
+              isMain={isMain}
+              stateId={stateId}
             />
           )}
         </AccordionDetails>

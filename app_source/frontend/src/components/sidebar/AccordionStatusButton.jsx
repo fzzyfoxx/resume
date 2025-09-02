@@ -8,6 +8,8 @@ import EditIcon from '@mui/icons-material/Edit';
 
 const AccordionStatusButton = ({
   indicator,
+  handleAddOrUpdate,
+  handleStop,
 }) => {
 
   const handleClick = (event) => {
@@ -18,11 +20,11 @@ const AccordionStatusButton = ({
 
     switch (indicator.status) {
       case 'warning':
-        //handleAddOrUpdate();
-        break;
+        handleAddOrUpdate();
+        //break;
       case 'loading':
-        //handleStop();
-        break;
+        handleStop();
+        //break;
       default:
         // No action for 'ok' or 'default'
         break;
@@ -62,8 +64,9 @@ const AccordionStatusButton = ({
             color: 'white',
             '&:hover': indicator.active
               ? {
-                  backgroundColor: 'transparent',
-                  color: 'rgb(88, 88, 88)',
+                backgroundColor: indicator.color,
+                color: 'white',
+                  border: `1px solid rgb(88, 88, 88)`
                 }
               : {},
             '&.Mui-disabled': {

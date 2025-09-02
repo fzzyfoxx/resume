@@ -13,36 +13,13 @@ import { useFilterQuery } from '../../hooks/useFilterQuery';
 const AddFilterButton = ({ 
   filters, 
   status, 
-  onStatusChange, 
-  onImpliedChange, 
-  mapRef, 
-  accordionSummary, 
-  marker, 
-  setMarker, 
   hasChanges, 
-  endpoint, 
-  filterStateId, 
-  setFilterStateId, 
   isMain, 
+  isActual,
   stateId, 
-  setStoredStateId, 
-  isActual}) => {
-
-    const { handleAddOrUpdate, handleStop } = useFilterQuery({
-      filters,
-      status,
-      onStatusChange,
-      onImpliedChange,
-      mapRef,
-      accordionSummary,
-      marker,
-      setMarker,
-      endpoint,
-      filterStateId,
-      setFilterStateId,
-      stateId,
-      setStoredStateId,
-    });
+  handleAddOrUpdate,
+  handleStop,
+  }) => {
 
   const getIcon = () => {
     switch (status) {

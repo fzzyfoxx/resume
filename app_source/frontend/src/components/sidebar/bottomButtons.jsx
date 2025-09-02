@@ -14,22 +14,14 @@ const FilterChainButtons = ({
   onRemove,
   chainId,
   marker,
-  filters,
-  addFilterStatus,
-  setAddFilterStatus,
-  setImplied,
-  mapRef,
-  accordionSummary,
-  setMarker,
-  memoizedHasChanges,
-  calculation_endpoint,
   showDeleteButton = true,
+  handleAddOrUpdate,
+  handleStop,
+  filters,
+  status,
   isMain,
-  filterStateId,
-  setFilterStateId,
-  stateId,
-  setStoredStateId,
   isActual,
+  stateId,
 }) => {
   return (
     <Box
@@ -69,21 +61,13 @@ const FilterChainButtons = ({
 
       <AddFilterButton
         filters={filters}
-        status={addFilterStatus}
-        onStatusChange={setAddFilterStatus}
-        onImpliedChange={setImplied}
-        mapRef={mapRef}
-        accordionSummary={accordionSummary}
-        marker={marker}
-        setMarker={setMarker}
-        hasChanges={memoizedHasChanges}
-        endpoint={calculation_endpoint}
+        status={status}
+        hasChanges={hasChanges}
         isMain={isMain}
-        filterStateId={filterStateId}
-        setFilterStateId={setFilterStateId}
-        stateId={stateId}
-        setStoredStateId={setStoredStateId}
         isActual={isActual}
+        stateId={stateId}
+        handleAddOrUpdate={handleAddOrUpdate}
+        handleStop={handleStop}
       />
     </Box>
   );
