@@ -31,8 +31,8 @@ function FilterChainAccordion2({
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const [implied, setImplied] = useState(false);
   const [marker, setMarker] = useState(null);
-  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied, setImplied);
   const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
+  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied, setImplied, isMain, filterStateId);
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
   const [isActual, setIsActual] = useState(true);
   const loadedStateIdRef = useRef(null);
@@ -41,7 +41,7 @@ function FilterChainAccordion2({
   console.log('FilterChainAccordion2 staticLabel:', staticLabel);
   console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
-  console.log('LoadCheck - ', 'isActual', isActual, 'hasChanges', hasChanges, 'addFilterStatus', addFilterStatus, 'implied', implied);
+  //console.log('LoadCheck - ', 'isActual', isActual, 'hasChanges', hasChanges, 'addFilterStatus', addFilterStatus, 'implied', implied);
 
   const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
   const summaryParts = useMemo(() => getAccordionSummaryParts(chain.filters), [chain.filters]);
@@ -51,6 +51,7 @@ function FilterChainAccordion2({
     filters: chain.filters,
     status: addFilterStatus,
     onStatusChange: setAddFilterStatus,
+    implied,
     onImpliedChange: setImplied,
     mapRef,
     accordionSummary: title,
@@ -75,6 +76,8 @@ function FilterChainAccordion2({
       loadedStateIdRef.current = loadedId;
       setFilterStateId(loadedId);
       setStoredStateId(loadedStateId);
+      setStoredFilterValues(null); // Clear stored values to force re-check
+      setImplied(false);
       setAddFilterStatus('update');
       setTitle(chain.loadedTitle || title);
     }
