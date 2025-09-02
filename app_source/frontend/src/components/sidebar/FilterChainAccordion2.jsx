@@ -1,13 +1,14 @@
-import React, {useState, useMemo, useEffect} from 'react';
+import React, {useState, useMemo, useEffect, useRef} from 'react';
 import { Accordion, AccordionSummary, AccordionDetails, Box, Typography, IconButton, Tooltip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useFilterChainState } from '../../hooks/checkChanges';
-import { generateAccordionTitle, getIndicatorColor } from '../../utils/filterChainUtils';
+import { generateAccordionTitle, getIndicatorColor, getAccordionSummaryParts } from '../../utils/filterChainUtils';
 import { renderBottomBar } from '../common/horizontalLoader';
 import FilterChainButtons from './bottomButtons';
 import AccordionSummaryContent from './AccordionSummaryContent';
 import { generateUniqueId } from '../../utils/idGenerator';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the function
+import AccordionStatusButton from './AccordionStatusButton';
 
 function FilterChainAccordion2({ 
     chain, 
@@ -33,13 +34,15 @@ function FilterChainAccordion2({
   const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
   const [isActual, setIsActual] = useState(true);
-  const loadedStateIdRef = React.useRef(null);
+  const loadedStateIdRef = useRef(null);
+  const [title, setTitle] = useState(staticLabel ? accordionLabel : `NowyFiltr-${chainIndex + 1}`);
 
   console.log('FilterChainAccordion2 staticLabel:', staticLabel);
   console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
   const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
-  const indicatorColor = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
+  const summaryParts = useMemo(() => getAccordionSummaryParts(chain.filters), [chain.filters]);
+  const indicator = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
 
   useEffect(() => {
     const loadedId = chain.loadedFilterStateId;
@@ -49,7 +52,8 @@ function FilterChainAccordion2({
       loadedStateIdRef.current = loadedId;
       setFilterStateId(loadedId);
       setAddFilterStatus('update');
-      setStoredStateId(loadedStateId)
+      setStoredStateId(loadedStateId);
+      setTitle(chain.loadedTitle || title);
     }
   }, [chain.loadedFilterStateId, mapRef, marker]);
 
@@ -70,10 +74,11 @@ function FilterChainAccordion2({
       onStateChange(chain.id, {
         storedFilterValues,
         filterStateId,
-        storedStateId
+        storedStateId,
+        title
       });
     }
-  }, [storedFilterValues]);
+  }, [storedFilterValues, title]);
 
   useEffect(() => {
     if (filterStateId && isMain) {
@@ -96,18 +101,6 @@ function FilterChainAccordion2({
 
   return (
     <Box sx={{ position: 'relative' }}>
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          width: '4px',
-          backgroundColor: indicatorColor,
-          zIndex: 1,
-          pointerEvents: 'none',
-        }}
-      />
       <Accordion
         expanded={chain.isExpanded}
         onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })}
@@ -129,7 +122,6 @@ function FilterChainAccordion2({
         }}
       >
         <AccordionSummary
-          expandIcon={<ExpandMoreIcon />}
           sx={{
             ...(staticLabel
               ? {
@@ -137,7 +129,7 @@ function FilterChainAccordion2({
                   height: '40px !important',
                   '& .MuiAccordionSummary-content': { m: '0 !important', flexGrow: 1 },
                   '& .MuiAccordionSummary-root': { p: '0 !important' },
-                  pr: 1,
+                  pr: '4px',
                 }
               : {
                   minHeight: '36px !important',
@@ -151,18 +143,42 @@ function FilterChainAccordion2({
                     padding: '0 !important',
                   },
                   '& .MuiAccordionSummary-root': { padding: '0 !important' },
-                  pr: 1,
+                  pr: '4px',
                 }),
           }}
         >
           <AccordionSummaryContent
-            accordionTitle={accordionTitle}
+            summaryParts={summaryParts}
             chain={chain}
             marker={marker}
             mapRef={mapRef}
             variant={labelVariant}
-            label={accordionLabel}
             isStatic={staticLabel}
+            title={title}
+            setTitle={setTitle}
+            onToggle={(e) => {
+              e.stopPropagation();
+              onToggle(chain.id, !chain.isExpanded, { ...chain, isExpanded: !chain.isExpanded });
+            }}
+            isExpanded={chain.isExpanded}
+            statusButton={
+              <AccordionStatusButton
+                indicator={indicator}
+                filters={chain.filters}
+                status={addFilterStatus}
+                onStatusChange={setAddFilterStatus}
+                onImpliedChange={setImplied}
+                mapRef={mapRef}
+                accordionSummary={title}
+                marker={marker}
+                setMarker={setMarker}
+                endpoint={calculation_endpoint}
+                filterStateId={filterStateId}
+                setFilterStateId={setFilterStateId}
+                stateId={stateId}
+                setStoredStateId={setStoredStateId}
+              />
+            }
           />
         </AccordionSummary>
         <AccordionDetails sx={{ p: 0 }}>

@@ -1,8 +1,12 @@
 import React from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Box, IconButton, Tooltip, Divider } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddFilterButton from './AddFilterButton';
+import { getDynamicButtonStyle, buttonDividerSx } from '../../styles/ButtonStyles';
+
+
+
 
 const FilterChainButtons = ({
   hasChanges,
@@ -25,7 +29,7 @@ const FilterChainButtons = ({
   setFilterStateId,
   stateId,
   setStoredStateId,
-  isActual
+  isActual,
 }) => {
   return (
     <Box
@@ -40,45 +44,28 @@ const FilterChainButtons = ({
         mr: 2.0,
       }}
     >
-      {hasChanges && (
-        <Tooltip title="Cofnij zmiany">
-          <IconButton
-            onClick={handleRestoreValues}
-            sx={{
-              backgroundColor: 'gray',
-              '&:hover': {
-                backgroundColor: 'darkgray',
-              },
-              color: 'white',
-              borderRadius: '50%',
-              width: 32,
-              height: 32,
-            }}
-          >
-            <HistoryIcon />
-          </IconButton>
-        </Tooltip>
-      )}
-
-      {showDeleteButton && ( // Conditionally render the delete button
-        <Tooltip title="Usuń filtr">
+      {showDeleteButton && (
+        <>
+        <Tooltip title="usuń filtr">
           <IconButton
             onClick={() => onRemove(chainId, marker)}
-            sx={{
-              backgroundColor: 'gray',
-              '&:hover': {
-                backgroundColor: 'darkgray',
-              },
-              color: 'white',
-              borderRadius: '50%',
-              width: 32,
-              height: 32,
-            }}
+            sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}
           >
             <DeleteIcon />
           </IconButton>
         </Tooltip>
+        <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
+        </>
       )}
+        <Tooltip title={hasChanges ? "cofnij zmiany" : "brak zmian do cofnięcia"}>
+          <IconButton
+            onClick={handleRestoreValues}
+            sx={getDynamicButtonStyle({disabled: !hasChanges, isMainButton: false})}
+          >
+            <HistoryIcon />
+          </IconButton>
+        </Tooltip>
+        <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
 
       <AddFilterButton
         filters={filters}

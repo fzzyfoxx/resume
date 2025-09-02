@@ -7,176 +7,53 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
 import { generateUniqueId } from '../../utils/idGenerator';
+import { getDynamicButtonStyle } from '../../styles/ButtonStyles';
+import { useFilterQuery } from '../../hooks/useFilterQuery';
 
-const AddFilterButton = ({ filters, status, onStatusChange, onImpliedChange, mapRef, accordionSummary, marker, setMarker, hasChanges, endpoint, filterStateId, setFilterStateId, isMain, stateId, setStoredStateId, isActual}) => {
-  //const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
-  const [queryId, setQueryId] = useState(null);
-  const [pollingInterval, setPollingInterval] = useState(null);
-  const [previousStatus, setPreviousStatus] = useState('add'); // Track the previous status
-  const [tempFilterStateId, setTempFilterStateId] = useState(null); // Temporary state ID for internal tracking
-  //const [marker, setMarker] = useState(null); // Marker for rendering shapes
-  const [hasUpdated, setHasUpdated] = useState(false);
-  const [loadRender, setLoadRender] = useState(false);
+const AddFilterButton = ({ 
+  filters, 
+  status, 
+  onStatusChange, 
+  onImpliedChange, 
+  mapRef, 
+  accordionSummary, 
+  marker, 
+  setMarker, 
+  hasChanges, 
+  endpoint, 
+  filterStateId, 
+  setFilterStateId, 
+  isMain, 
+  stateId, 
+  setStoredStateId, 
+  isActual}) => {
 
-  console.log('AddFilterButton - hasChanges:', hasChanges);
-  console.log('AddFilterButton - status:', status);
-
-  useEffect(() => {
-    if (onStatusChange) {
-      onStatusChange(status);
-    }
-  }, [status, onStatusChange]);
-
-  useEffect(() => {
-    if (onImpliedChange) {
-      onImpliedChange(hasUpdated);
-    }
-  }, [hasUpdated, onImpliedChange]);
-
-  useEffect(() => {
-    if (filterStateId) {
-      setTempFilterStateId(filterStateId);
-      setLoadRender(true);
-    }
-  }, [filterStateId]);
-
-  useEffect(() => {
-    console.log('Add shapes effect - status:', status, 'hasUpdated:', hasUpdated, 'tempFilterStateId:', tempFilterStateId);
-    if (status === 'update' && !hasUpdated && tempFilterStateId) {
-      const callAddShapes = async () => {
-        try {
-          const updatedMarker = await addShapesFromQuery(mapRef, {
-            filterStateId: tempFilterStateId,
-            stateId: stateId,
-          }, marker);
-          setMarker(updatedMarker); // Update the marker with the new shapes
-          setHasUpdated(true); // Mark as updated after calling addShapesFromQuery
-        } catch (error) {
-          console.error('Error adding shapes from query:', error);
-        }
-      };
-  
-      callAddShapes();
-
-      if (setFilterStateId) {
-        setFilterStateId(tempFilterStateId); // Notify parent of state change
-      }
-
-      if (setStoredStateId && stateId && !loadRender) {
-        setStoredStateId(stateId); // Update storedStateId to current stateId
-      }
-    }
-  }, [status, hasUpdated, queryId, mapRef, accordionSummary, tempFilterStateId]);
-  
-  useEffect(() => {
-    if (status !== 'update') {
-      setHasUpdated(false); // Reset the flag when status changes away from "update"
-    }
-  }, [status]);
-
-  const handleAddOrUpdate = async () => {
-    if (status === 'stop') {
-      return; // Prevent API call if status is 'stop'
-    }
-    try {
-      // Prepare the payload
-      const newId = generateUniqueId();
-      setTempFilterStateId(newId); // Update temporary state ID
-      setLoadRender(false);
-
-      const payload = {
-        filters: filters
-          .filter((filter) => !filter.children)
-          .map((filter) => ({
-            filterId: filter.id,
-            selector_type: filter.selector_type,
-            symbols: filter.symbolsForNextCall || [],
-            values: filter.selectedValue || {},
-            ispassive: filter.ispassive || false,
-          })),
-        name: accordionSummary || 'brak',
-        stateId: stateId,
-        filterStateId: newId,
-      };
-
-      // Call the /calculate_filters endpoint
-      const response = await axios.post(`http://127.0.0.1:5000/api/queries/${endpoint}`, payload, { withCredentials: true });
-
-      if (response.data && response.data.query_id) {
-        setPreviousStatus(status); // Save the current status before transitioning to 'stop'
-        setQueryId(response.data.query_id);
-        onStatusChange('stop'); // Change status to 'stop' to start polling
-      }
-    } catch (error) {
-      console.error('Error calculating filters:', error);
-    }
-  };
-
-  const handleStop = () => {
-    clearPolling();
-    setQueryId(null); // Clear the queryId
-    setHasUpdated(false); // Reset the hasUpdated flag
-    onStatusChange(previousStatus); // Restore the previous status
-  };
-
-  const checkQueryStatus = async () => {
-    if (!queryId) return;
-
-    try {
-      // Call the /check_query_status endpoint
-      const response = await axios.get('http://127.0.0.1:5000/api/queries/check_query_status', {
-        params: { query_id: queryId }, withCredentials: true
-      });
-
-      if (response.data && response.data.status === 'completed') {
-        onStatusChange('update'); // Change status to 'update' when query is completed
-        clearPolling(); // Stop polling once the query is completed
-      }
-    } catch (error) {
-      console.error('Error checking query status:', error);
-    }
-  };
-
-  const clearPolling = () => {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
-    }
-  };
-
-  const startPolling = (interval = 2000) => {
-    const timeoutId = setTimeout(async () => {
-      await checkQueryStatus();
-      const nextInterval = Math.min(interval + 1000, 10000); // Increase interval up to 10 seconds
-      startPolling(nextInterval); // Recursively call startPolling with the updated interval
-    }, interval);
-    setPollingInterval(timeoutId);
-  };
-
-  useEffect(() => {
-    if (status === 'stop' && !pollingInterval) {
-      startPolling(); // Start polling with the initial interval
-    }
-
-    if (status !== 'stop' && pollingInterval) {
-      clearPolling(); // Stop polling if status changes from 'stop'
-    }
-
-    return () => {
-      clearPolling(); // Cleanup on component unmount or status change
-    };
-  }, [status, queryId]);
+    const { handleAddOrUpdate, handleStop } = useFilterQuery({
+      filters,
+      status,
+      onStatusChange,
+      onImpliedChange,
+      mapRef,
+      accordionSummary,
+      marker,
+      setMarker,
+      endpoint,
+      filterStateId,
+      setFilterStateId,
+      stateId,
+      setStoredStateId,
+    });
 
   const getIcon = () => {
     switch (status) {
       case 'add':
-        return <AddIcon sx={{ color: 'white' }} />;
+        return <AddIcon/>;
       case 'stop':
-        return <StopIcon sx={{ color: 'white' }} />;
+        return <StopIcon/>;
       case 'update':
-        return <RefreshIcon sx={{ color: 'white' }} />;
+        return <RefreshIcon/>;
       default:
-        return <AddIcon sx={{ color: 'white' }} />;
+        return <AddIcon/>;
     }
   };
 
@@ -186,6 +63,10 @@ const AddFilterButton = ({ filters, status, onStatusChange, onImpliedChange, map
   
   const isFiltersEmpty = useMemo(() => isEmpty(filters), [filters]);
 
+  const isDisabled = useMemo(() => 
+    (status === 'update' && !hasChanges && isActual) || isFiltersEmpty || (!stateId && !isMain),
+    [status, hasChanges, isActual, isFiltersEmpty, stateId, isMain]
+  );
 
 
   return (
@@ -201,23 +82,14 @@ const AddFilterButton = ({ filters, status, onStatusChange, onImpliedChange, map
     <IconButton
       onClick={
          (!stateId && !isMain) ? null
+         : status === 'stop' ? handleStop
         : isFiltersEmpty ? null
         : !isActual ? handleAddOrUpdate
         : status === 'update' && !hasChanges ? null
         : status === 'add' || status === 'update' ? handleAddOrUpdate
-        : status === 'stop' ? handleStop
         : null
       }
-      sx={{
-        backgroundColor: (status === 'update' && !hasChanges && isActual) || (isFiltersEmpty) || (!stateId && !isMain) ? 'lightgray' : 'gray', // Change color when disabled lightgray
-        '&:hover': {
-          backgroundColor: (status === 'update' && !hasChanges && isActual) || (isFiltersEmpty) || (!stateId && !isMain) ? 'lightgray' : 'darkgray', // Prevent hover effect when disabled
-        },
-        color: 'white',
-        borderRadius: '50%',
-        width: 32,
-        height: 32,
-      }}
+      sx={getDynamicButtonStyle({disabled: isDisabled, isMainButton: true})}
     >
       {getIcon()}
     </IconButton>

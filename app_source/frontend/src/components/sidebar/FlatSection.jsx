@@ -23,6 +23,7 @@ function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [],
   useEffect(() => {
     // Only proceed if loadedState has changed and is different from what we've already processed.
     if (loadedState && loadedStateRef.current !== loadedState) {
+      setChildrenState({}); // Reset state when a new state is loaded
       loadedStateRef.current = loadedState; // Mark as processed
       const isEffectivelyEmpty = !Object.values(loadedState).some(
         chain => chain.storedFilterValues && chain.storedFilterValues.length > 0
