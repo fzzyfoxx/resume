@@ -73,5 +73,10 @@
         "folder": "search.mappings",
         "file": "collections.json",
         "description": "Mappings for add filter initial options in geodoc-app"
+    },
+    "app_setup": {
+        "folder": "app",
+        "file": "app_setup_config.json",
+        "description": "Setup configuration for geodoc-app"
     }
 }

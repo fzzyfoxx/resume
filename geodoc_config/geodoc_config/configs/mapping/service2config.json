@@ -25,5 +25,8 @@
     },
     "grid": {
         "worker": "grid_config"
+    },
+    "app": {
+        "setup": "app_setup"
     }
 }

@@ -15,7 +15,7 @@ from flask import Blueprint, jsonify, request, current_app, session
 
 queries_bp = Blueprint('queries', __name__)
 
-target_table_path = 'app.results'
+target_table_path = 'app.filters'
 
 """
 @queries_bp.before_request

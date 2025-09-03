@@ -18,9 +18,10 @@ def single_table_setup(config):
     bq_client = bigquery.Client()
     project_id = bq_client.project
 
-    bucket_name = f"{project_id}-{config['bucket_name']}"
+    if 'bucket_name' in config:
+        bucket_name = f"{project_id}-{config['bucket_name']}"
 
-    create_gcs_bucket(project_id=project_id, bucket_name=bucket_name)
+        create_gcs_bucket(project_id=project_id, bucket_name=bucket_name)
     create_bigquery_dataset(project_id=project_id, dataset_name=config['dataset_id'], location=config['location'])
 
     for table in config['tables']:
