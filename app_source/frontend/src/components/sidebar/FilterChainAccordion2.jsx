@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useEffect, useRef} from 'react';
+import React, {useState, useMemo, useEffect, useRef, useCallback} from 'react';
 import { Accordion, AccordionSummary, AccordionDetails, Box, Typography, IconButton, Tooltip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useFilterChainState } from '../../hooks/checkChanges';
@@ -10,6 +10,7 @@ import { generateUniqueId } from '../../utils/idGenerator';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the function
 import AccordionStatusButton from './AccordionStatusButton';
 import { useFilterQuery } from '../../hooks/useFilterQuery';
+import { useDebounce } from '../../hooks/useDebounce';
 
 function FilterChainAccordion2({ 
     chain, 
@@ -26,30 +27,45 @@ function FilterChainAccordion2({
     isMain = false,
     stateId,
     setStateId,
-    onStateChange
+    onStateChange,
+    fitBounds,
+    loadedChainName,
+    onMarkerCreated,
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('add');
+  const debouncedAddFilterStatus = useDebounce(addFilterStatus, 300);
+
   const [implied, setImplied] = useState(false);
   const [marker, setMarker] = useState(null);
   const [filterStateId, setFilterStateId] = useState(null); // Unique ID to track filter state changes
-  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(chain, addFilterStatus, implied, setImplied, isMain, filterStateId);
+
+  const debouncedFilters = useDebounce(chain.filters, 300); // Debounce filters
+  const { hasChanges, storedFilterValues, setStoredFilterValues } = useFilterChainState(
+    { ...chain, filters: debouncedFilters }, // Use debounced filters for change detection
+    addFilterStatus, 
+    implied, 
+    setImplied, 
+    isMain, 
+    filterStateId
+  );
+
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
   const [isActual, setIsActual] = useState(true);
   const loadedStateIdRef = useRef(null);
-  const [title, setTitle] = useState(staticLabel ? accordionLabel : `NowyFiltr-${chainIndex + 1}`);
+  const [title, setTitle] = useState(loadedChainName || (staticLabel ? accordionLabel : `NowyFiltr-${chainIndex + 1}`));
 
-  console.log('FilterChainAccordion2 staticLabel:', staticLabel);
-  console.log('filterStateId', filterStateId,'IsActual:', isActual);
+  //console.log('FilterChainAccordion2 staticLabel:', staticLabel);
+  //console.log('filterStateId', filterStateId,'IsActual:', isActual);
 
   //console.log('LoadCheck - ', 'isActual', isActual, 'hasChanges', hasChanges, 'addFilterStatus', addFilterStatus, 'implied', implied);
 
-  const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
+  //const accordionTitle = useMemo(() => generateAccordionTitle(chain.filters, chainIndex), [chain.filters, chainIndex]);
   const summaryParts = useMemo(() => getAccordionSummaryParts(chain.filters), [chain.filters]);
   const indicator = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
 
   const { handleAddOrUpdate, handleStop } = useFilterQuery({
     filters: chain.filters,
-    status: addFilterStatus,
+    status: debouncedAddFilterStatus,
     onStatusChange: setAddFilterStatus,
     implied,
     onImpliedChange: setImplied,
@@ -62,16 +78,20 @@ function FilterChainAccordion2({
     setFilterStateId,
     stateId,
     setStoredStateId,
+    fitBounds,
   });
 
   useEffect(() => {
-    console.log('TempFilter - filter status', addFilterStatus);
-  }, [addFilterStatus]);
+    if (onMarkerCreated && marker) {
+      onMarkerCreated(chain.id, marker);
+    }
+  }, [marker, onMarkerCreated, chain.id]);
+
 
   useEffect(() => {
     const loadedId = chain.loadedFilterStateId;
     const loadedStateId = chain.loadedStateId;
-    console.log('Loaded filterStateId:', loadedId, 'Current ref:', loadedStateIdRef.current);
+    //console.log('Loaded filterStateId:', loadedId, 'Current ref:', loadedStateIdRef.current);
     if (loadedId && loadedId !== loadedStateIdRef.current) {
       loadedStateIdRef.current = loadedId;
       setFilterStateId(loadedId);
@@ -95,7 +115,7 @@ function FilterChainAccordion2({
   };
 
   useEffect(() => {
-    console.log('STATE UPDATE - filterStateId changed:', filterStateId, storedFilterValues, storedStateId);
+    //console.log('STATE UPDATE - filterStateId changed:', filterStateId, storedFilterValues, storedStateId);
     if (onStateChange) {
       onStateChange(chain.id, {
         storedFilterValues,
@@ -104,7 +124,7 @@ function FilterChainAccordion2({
         title
       });
     }
-  }, [storedFilterValues, title]);
+  }, [chain.id, storedFilterValues, filterStateId, storedStateId, title, onStateChange]);
 
   useEffect(() => {
     if (filterStateId && isMain) {
@@ -125,11 +145,20 @@ function FilterChainAccordion2({
     (filter) => !filter.children && !filter.ispassive
   );
 
+  const handleAccordionToggle = useCallback((event, expanded) => {
+    onToggle(chain.id, expanded, { ...chain, isExpanded: expanded });
+  }, [onToggle, chain]);
+
+  const handleSummaryToggle = useCallback((e) => {
+    e.stopPropagation();
+    onToggle(chain.id, !chain.isExpanded, { ...chain, isExpanded: !chain.isExpanded });
+  }, [onToggle, chain]);
+
   return (
     <Box sx={{ position: 'relative' }}>
       <Accordion
         expanded={chain.isExpanded}
-        onChange={(event, expanded) => onToggle(chain.id, expanded, { ...chain, isExpanded: expanded })}
+        onChange={handleAccordionToggle}
         disableGutters
         sx={{
           ...(staticLabel
@@ -182,10 +211,7 @@ function FilterChainAccordion2({
             isStatic={staticLabel}
             title={title}
             setTitle={setTitle}
-            onToggle={(e) => {
-              e.stopPropagation();
-              onToggle(chain.id, !chain.isExpanded, { ...chain, isExpanded: !chain.isExpanded });
-            }}
+            onToggle={handleSummaryToggle}
             isExpanded={chain.isExpanded}
             statusButton={
               <AccordionStatusButton
@@ -210,7 +236,7 @@ function FilterChainAccordion2({
                 }}
               >
                 <Box sx={{ width: '90%', maxWidth: 'calc(100% - 24px)' }}>
-                  {renderFilterComponent(chain.id, { ...filter, type: filter.type, addFilterStatus })}
+                  {renderFilterComponent(chain.id, { ...filter, type: filter.type, addFilterStatus, disabled: addFilterStatus === 'stop'  })}
                 </Box>
               </Box>
             </Box>
@@ -239,4 +265,4 @@ function FilterChainAccordion2({
   );
 }
 
-export default FilterChainAccordion2;
+export default React.memo(FilterChainAccordion2);

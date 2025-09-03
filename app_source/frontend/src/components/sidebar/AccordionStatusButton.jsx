@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { IconButton, Tooltip, CircularProgress, Box  } from '@mui/material';
 import { useFilterQuery } from '../../hooks/useFilterQuery';
 import CheckIcon from '@mui/icons-material/Check';
@@ -14,7 +14,7 @@ const AccordionStatusButton = ({
   isExpanded
 }) => {
 
-  const handleClick = (event) => {
+  const handleClick = useCallback((event) => {
     event.stopPropagation();
     if (!indicator.active) {
       return;
@@ -23,15 +23,15 @@ const AccordionStatusButton = ({
     switch (indicator.status) {
       case 'warning':
         handleAddOrUpdate();
-        //break;
+        break; // Added break for correctness
       case 'loading':
         handleStop();
-        //break;
+        break; // Added break for correctness
       default:
         // No action for 'ok' or 'default'
         break;
     }
-  };
+  }, [indicator.active, indicator.status, handleAddOrUpdate, handleStop]);
 
   const getIcon = () => {
     switch (indicator.status) {

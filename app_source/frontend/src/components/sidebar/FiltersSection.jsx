@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback  } from 'react';
 import {
   Divider,
   Dialog,
@@ -15,7 +15,7 @@ import FilterChainAccordion2 from './FilterChainAccordion2';
 import AddNewFilterChainButton from './AddNewFilterChainButton';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState }) {
+function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState, fitBounds, onMarkersChange }) {
   const {
     filterChains,
     setFilterChains,
@@ -32,12 +32,20 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
   const [chainToRemove, setChainToRemove] = useState(null);
   const [markerToRemove, setMarkerToRemove] = useState(null);
   const [childrenState, setChildrenState] = useState({});
+  const [chainMarkers, setChainMarkers] = useState({});
   const loadedStateRef = useRef(null);
+
+  useEffect(() => {
+    if (onMarkersChange) {
+      onMarkersChange(title, chainMarkers);
+    }
+  }, [chainMarkers, title, onMarkersChange]);
 
 
   useEffect(() => {
     // Only proceed if loadedState has changed and is different from what we've already processed.
     if (loadedState && loadedStateRef.current !== loadedState) {
+      setChainMarkers({}); // Reset the local marker tracking state
       setChildrenState({}); // Reset state when a new state is loaded
       loadedStateRef.current = loadedState; // Mark as processed
       const isEffectivelyEmpty = !Object.values(loadedState).some(
@@ -50,10 +58,23 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
         // If loaded state for filters is empty or has no values, clear existing chains
         setFilterChains([]);
       }
+    } else if (loadedState === null && loadedStateRef.current !== null) {
+      // Handle "New Project" case where loadedState becomes null
+      setFilterChains([]);
+      setChainMarkers({});
+      setChildrenState({});
+      loadedStateRef.current = null;
     }
   }, [loadedState, restoreChainsFromState, setFilterChains]);
 
-  const handleAccordionStateChange = React.useCallback((chainId, state) => {
+  const handleMarkerCreated = useCallback((chainId, marker) => {
+    setChainMarkers(prevMarkers => ({
+      ...prevMarkers,
+      [chainId]: marker
+    }));
+  }, []);
+
+  const handleAccordionStateChange = useCallback((chainId, state) => {
     setChildrenState(prevState => {
        if (JSON.stringify(prevState[chainId]) === JSON.stringify(state)) {
         return prevState;
@@ -93,11 +114,22 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
       return newState;
     });
 
+    setChainMarkers(prevMarkers => {
+      const newMarkers = { ...prevMarkers };
+      delete newMarkers[chainToRemove];
+      return newMarkers;
+    });
+
     setFilterChains((prevChains) =>
       prevChains.filter((chain) => chain.id !== chainToRemove)
     );
     handleCloseDialog();
   };
+
+  const memoizedRenderFilterComponent = useCallback((chainId, filterSpec) =>
+    renderFilterComponent(chainId, filterSpec, handleFilterValueChange),
+    [handleFilterValueChange]
+  );
 
   return (
     <>
@@ -113,9 +145,7 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
             chain={chain}
             chainIndex={chainIndex}
             onToggle={handleChainAccordionToggle}
-            renderFilterComponent={(chainId, filterSpec) =>
-              renderFilterComponent(chainId, filterSpec, handleFilterValueChange)
-            }
+            renderFilterComponent={memoizedRenderFilterComponent}
             mapRef={mapRef}
             onRemove={handleOpenDialog}
             calculation_endpoint={calculation_endpoint}
@@ -127,6 +157,9 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
             stateId={stateId}
             setStateId={setStateId}
             onStateChange={handleAccordionStateChange}
+            onMarkerCreated={handleMarkerCreated}
+            fitBounds={fitBounds}
+            loadedChainName={chain.chainName} 
           />
         ))}
 

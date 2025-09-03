@@ -3,6 +3,7 @@ import { Box, Typography, Input, IconButton } from '@mui/material';
 import CircularLoader from '../common/CircularLoader';
 import HideLayer from '../../drawing/HideLayer';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const AccordionSummaryContent = ({
   summaryParts,
@@ -18,7 +19,21 @@ const AccordionSummaryContent = ({
   statusButton,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [localTitle, setLocalTitle] = useState(title); // Local state for the input
+  const debouncedTitle = useDebounce(localTitle, 500); // Debounce the local title (500ms delay)
   const inputRef = useRef(null);
+
+  // Effect to propagate the debounced title change upwards
+  useEffect(() => {
+    if (debouncedTitle !== title) {
+      setTitle(debouncedTitle);
+    }
+  }, [debouncedTitle, setTitle, title]);
+
+  // When the parent title changes (e.g., on load), update the local title
+  useEffect(() => {
+    setLocalTitle(title);
+  }, [title]);
 
   const handleDoubleClick = (event) => {
     if (!isStatic) {
@@ -33,7 +48,7 @@ const AccordionSummaryContent = ({
   };
 
   const handleTitleChange = (event) => {
-    setTitle(event.target.value);
+    setLocalTitle(event.target.value);
   };
 
   const handleTitleBlur = () => {
@@ -61,7 +76,7 @@ const AccordionSummaryContent = ({
           {isEditing ? (
             <Input
             inputRef={inputRef} // Attach the ref to the Input
-            value={title}
+            value={localTitle}
             onChange={handleTitleChange}
             onBlur={handleTitleBlur}
             onKeyDown={handleInputKeyDown}

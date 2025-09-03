@@ -58,7 +58,6 @@ const FilterChainButtons = ({
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
-
       <AddFilterButton
         filters={filters}
         status={status}
@@ -73,4 +72,4 @@ const FilterChainButtons = ({
   );
 };
 
-export default FilterChainButtons;
+export default React.memo(FilterChainButtons);

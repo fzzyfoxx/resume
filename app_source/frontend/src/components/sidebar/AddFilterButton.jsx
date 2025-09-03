@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
@@ -47,6 +47,18 @@ const AddFilterButton = ({
     [status, hasChanges, isActual, isFiltersEmpty, stateId, isMain]
   );
 
+  const handleClick = useCallback(() =>{
+    if (isDisabled) return;
+
+    if (isFiltersEmpty || (!stateId && !isMain) || (status === 'update' && !hasChanges && isActual)) {
+      return;
+    } else if (status === 'stop') {
+      handleStop();
+    } else if (status === 'add' || (status === 'update' && hasChanges) || !isActual) {
+      handleAddOrUpdate();
+    }
+  }, [isDisabled, status, handleStop, handleAddOrUpdate]);
+
 
   return (
     <Tooltip title={isFiltersEmpty ? "ustaw wartości"
@@ -59,15 +71,7 @@ const AddFilterButton = ({
         >
         <span>
     <IconButton
-      onClick={
-         (!stateId && !isMain) ? null
-         : status === 'stop' ? handleStop
-        : isFiltersEmpty ? null
-        : !isActual ? handleAddOrUpdate
-        : status === 'update' && !hasChanges ? null
-        : status === 'add' || status === 'update' ? handleAddOrUpdate
-        : null
-      }
+      onClick={handleClick}
       sx={getDynamicButtonStyle({disabled: isDisabled, isMainButton: true})}
     >
       {getIcon()}
@@ -77,4 +81,4 @@ const AddFilterButton = ({
   );
 };
 
-export default AddFilterButton;
+export default React.memo(AddFilterButton);
