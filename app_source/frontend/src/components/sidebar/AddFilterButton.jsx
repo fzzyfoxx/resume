@@ -21,16 +21,18 @@ const AddFilterButton = ({
   handleStop,
   }) => {
 
+  const iconSize = 20;
+
   const getIcon = () => {
     switch (status) {
       case 'add':
-        return <AddIcon/>;
+        return <AddIcon sx={{ fontSize: iconSize }} />;
       case 'stop':
-        return <StopIcon/>;
+        return <StopIcon sx={{ fontSize: iconSize }} />;
       case 'update':
-        return <RefreshIcon/>;
+        return <RefreshIcon sx={{ fontSize: iconSize }} />;
       default:
-        return <AddIcon/>;
+        return <AddIcon sx={{ fontSize: iconSize }} />;
     }
   };
 

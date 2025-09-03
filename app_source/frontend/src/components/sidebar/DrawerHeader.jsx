@@ -17,6 +17,8 @@ const StyledDrawerHeader = styled('div')(({ theme }) => ({
   justifyContent: 'space-between', // Changed to space-between
 }));
 
+const iconSize = 20;
+
 /**
  * Renders the header for the sidebar drawer.
  * @param {object} props - Component props.
@@ -43,25 +45,25 @@ function DrawerHeader({ handleDrawerClose, onSaveState, onLoadState, onSaveAs, o
       >
         <Tooltip title="nowy projekt"> {/* Add New Project button */}
           <IconButton onClick={onNewProject} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
-            <NoteAddIcon />
+            <NoteAddIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
         <Tooltip title="zapisz">
           <IconButton onClick={onSaveState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
-            <SaveIcon />
+            <SaveIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
         <Tooltip title="zapisz jako"> {/* Add Save As button */}
           <IconButton onClick={onSaveAs} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
-            <SaveAsIcon />
+            <SaveAsIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
         <Tooltip title="wczytaj projekt">
           <IconButton onClick={onLoadState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
-            <FileOpenIcon />
+            <FileOpenIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
       </Box>

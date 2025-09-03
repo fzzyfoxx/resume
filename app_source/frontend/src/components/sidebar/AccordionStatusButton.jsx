@@ -1,15 +1,17 @@
 import React from 'react';
-import { IconButton, Tooltip } from '@mui/material';
+import { IconButton, Tooltip, CircularProgress, Box  } from '@mui/material';
 import { useFilterQuery } from '../../hooks/useFilterQuery';
 import CheckIcon from '@mui/icons-material/Check';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import StopIcon from '@mui/icons-material/Stop';
 import EditIcon from '@mui/icons-material/Edit';
+import { smallIconSize, defaultIconColor, disabledIconColor } from '../../styles/ButtonStyles';
 
 const AccordionStatusButton = ({
   indicator,
   handleAddOrUpdate,
   handleStop,
+  isExpanded
 }) => {
 
   const handleClick = (event) => {
@@ -31,18 +33,16 @@ const AccordionStatusButton = ({
     }
   };
 
-  const iconSize = 14;
-
   const getIcon = () => {
     switch (indicator.status) {
       case 'ok':
-        return <CheckIcon sx={{ fontSize: iconSize }} />;
+        return <CheckIcon sx={{ fontSize: smallIconSize }} />;
       case 'warning':
-        return <RefreshIcon sx={{ fontSize: iconSize }} />;
+        return <RefreshIcon sx={{ fontSize: smallIconSize }} />;
       case 'loading':
-        return <StopIcon sx={{ fontSize: iconSize }} />;
+        return <StopIcon sx={{ fontSize: smallIconSize }} />;
       case 'default':
-        return <EditIcon sx={{ fontSize: iconSize }} />;
+        return <EditIcon sx={{ fontSize: smallIconSize }} />;
       default:
         return null;
     }
@@ -50,7 +50,7 @@ const AccordionStatusButton = ({
 
   return (
     <Tooltip title={indicator.caption}>
-      <span style={{ display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
         <IconButton
           onClick={handleClick}
           size='small'
@@ -64,9 +64,9 @@ const AccordionStatusButton = ({
             color: 'white',
             '&:hover': indicator.active
               ? {
-                backgroundColor: indicator.color,
-                color: 'white',
-                  border: `1px solid rgb(88, 88, 88)`
+                  backgroundColor: indicator.color,
+                  color: 'white',
+                  border: `1px solid rgb(88, 88, 88)`,
                 }
               : {},
             '&.Mui-disabled': {
@@ -78,7 +78,19 @@ const AccordionStatusButton = ({
         >
           {getIcon()}
         </IconButton>
-      </span>
+        {indicator.status === 'loading' && !isExpanded && (
+          <CircularProgress
+            size={26}
+            sx={{
+              color: defaultIconColor,
+              position: 'absolute',
+              top: -3,
+              left: 1,
+              zIndex: 1,
+            }}
+          />
+        )}
+      </Box>
     </Tooltip>
   );
 };

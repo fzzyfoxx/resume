@@ -213,7 +213,7 @@ def check_query_status_route():
     if query_state:
         start_time = query_state['start_time']
         elapsed_time = time.time() - start_time
-        if elapsed_time > 2:
+        if elapsed_time > 30:
             query_state['status'] = 'completed'
             #session['queries'][query_id] = query_state
             #session.modified = True

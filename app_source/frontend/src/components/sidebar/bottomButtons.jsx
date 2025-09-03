@@ -6,7 +6,7 @@ import AddFilterButton from './AddFilterButton';
 import { getDynamicButtonStyle, buttonDividerSx } from '../../styles/ButtonStyles';
 
 
-
+const iconSize = 20;
 
 const FilterChainButtons = ({
   hasChanges,
@@ -43,7 +43,7 @@ const FilterChainButtons = ({
             onClick={() => onRemove(chainId, marker)}
             sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}
           >
-            <DeleteIcon />
+            <DeleteIcon sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
@@ -54,7 +54,7 @@ const FilterChainButtons = ({
             onClick={handleRestoreValues}
             sx={getDynamicButtonStyle({disabled: !hasChanges, isMainButton: false})}
           >
-            <HistoryIcon />
+            <HistoryIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
         <Divider orientation="vertical" flexItem sx={buttonDividerSx} />

@@ -192,6 +192,7 @@ function FilterChainAccordion2({
                 indicator={indicator}
                 handleAddOrUpdate={handleAddOrUpdate}
                 handleStop={handleStop}
+                isExpanded={chain.isExpanded}
               />
             }
           />
