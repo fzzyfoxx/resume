@@ -31,6 +31,7 @@ function FilterChainAccordion2({
     fitBounds,
     loadedChainName,
     onMarkerCreated,
+    allFilterStateIds,
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const debouncedAddFilterStatus = useDebounce(addFilterStatus, 300);
@@ -79,6 +80,7 @@ function FilterChainAccordion2({
     stateId,
     setStoredStateId,
     fitBounds,
+    allFilterStateIds
   });
 
   useEffect(() => {

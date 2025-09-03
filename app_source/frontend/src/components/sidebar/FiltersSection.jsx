@@ -15,7 +15,7 @@ import FilterChainAccordion2 from './FilterChainAccordion2';
 import AddNewFilterChainButton from './AddNewFilterChainButton';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState, fitBounds, onMarkersChange }) {
+function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState, fitBounds, onMarkersChange, allFilterStateIds  }) {
   const {
     filterChains,
     setFilterChains,
@@ -160,6 +160,7 @@ function FiltersSection({ mapRef, title, calculation_endpoint, initialSymbols = 
             onMarkerCreated={handleMarkerCreated}
             fitBounds={fitBounds}
             loadedChainName={chain.chainName} 
+            allFilterStateIds={allFilterStateIds}
           />
         ))}
 

@@ -191,8 +191,45 @@ def set_search_area_route():
     except Exception as e:
         print('ERROR:', str(e))
         return jsonify({"error": str(e)}), 400
-
     
+@queries_bp.route('/set_search_target', methods=['POST'])
+def set_search_target_route():
+
+    print('SESSION ID /set_search_target:', session.sid)
+    print(request.json)
+    filters_req = request.json.get('filters', [])
+    filterStateId = request.json.get('filterStateId', None)
+    stateId = request.json.get('stateId', None)
+    name = request.json.get('name', None)
+    allFilterStateIds = request.json.get('allFilterStateIds', [])
+
+    print('\nALL FILTER STATE IDS:', allFilterStateIds, '\n')
+
+    query_id = str(uuid.uuid4())
+    start_time = time.time()
+
+    session['queries'][query_id] = {
+        'start_time': start_time,
+        'status': 'pending'
+        }
+    #session.modified = True
+
+    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
+    query_metacolumns = {
+    'option': 'TargetObject',
+    'filterStateId': filterStateId,
+    'stateId': stateId,
+    'name': name
+    }
+    artificial_result = prepare_artificial_query_result(query_metacolumns)
+    session['results'].append(artificial_result)
+    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+
+    try:
+        return jsonify({"status": 'ok', "query_id": query_id}), 200
+    except Exception as e:
+        print('ERROR:', str(e))
+        return jsonify({"error": str(e)}), 400
 
 @queries_bp.route('/check_query_status', methods=['GET'])
 def check_query_status_route():

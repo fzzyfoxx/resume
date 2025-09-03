@@ -4,7 +4,7 @@ import useFilterChains from '../../hooks/useFilterChains';
 import FilterChainAccordion2 from './FilterChainAccordion2';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
 
-function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState, fitBounds, onMarkersChange }) {
+function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [], initialName = '', isMain = false, stateId, setStateId, onSectionStateChange, disableAutoChaining = false, loadedState, fitBounds, onMarkersChange, allFilterStateIds }) {
   const {
     filterChains,
     setFilterChains,
@@ -100,6 +100,7 @@ function FlatSection({ mapRef, title, calculation_endpoint, initialSymbols = [],
             onMarkerCreated={handleMarkerCreated}
             onStateChange={handleAccordionStateChange}
             fitBounds={fitBounds}
+            allFilterStateIds={allFilterStateIds}
           />
         ))}
     </>
