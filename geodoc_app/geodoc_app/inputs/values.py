@@ -304,6 +304,19 @@ def get_casual_filter_spec(symbols, name=None):
 
     return None
 
+def handle_symbols_special_cases(symbols):
+    collection_name = symbols[0]
+    collection_symbol = symbols[1]
+    table_name = symbols[2]
+
+    if (collection_name=='target') & (collection_symbol=='parcels') & (table_name=='łączenie działek ewidencyjnych'):
+        print('\nSpecial case symbols', symbols[:2] + ['P', 'lacz_dz'])
+        filter =  load_column_filter_from_symbols(symbols[:2] + ['P', 'lacz_dz'])
+        filter['filters'][0]['symbols'] = symbols
+        print('Special case filter', filter)
+        return filter
+    return None
+
 def handle_filter_spec_reload(symbols):
     if len(symbols) == 0:
         return None
@@ -320,6 +333,8 @@ def handle_filter_spec_reload(symbols):
                 return None
     elif len(symbols) == 2:
         return load_collection_filter_from_symbols(symbols)
+    elif len(symbols) == 3:
+        return handle_symbols_special_cases(symbols)
     elif len(symbols) == 4:
         return load_column_filter_from_symbols(symbols)
     else:
@@ -337,5 +352,6 @@ def get_filter_spec(symbols, name=None):
         return handle_filter_spec_reload(symbols=symbols)
     else:
         return None
+    
     
     
