@@ -1,12 +1,16 @@
 from geodoc_app.search.api_handlers import (
     prepare_query_for_app_filters, 
     prepare_geojson, 
+    prepare_geojson_with_attributes,
     get_properties_from_qualification,
     filter_actual_filters,
     get_qualification_from_filters
     )
-from geodoc_app.search.search_queries import prepare_area_table_for_search_query
-from geodoc_config import load_config
+from geodoc_app.search.search_queries import prepare_area_table_for_search_query, get_prepared_results_query
+from geodoc_app.search.parcels_results import get_parcels_result_query
+from geodoc_config import load_config, load_config_by_path
+from geodoc_app.search.utils import get_query_result
+from geodoc_app.search.artificial_results import prepare_artificial_query_result, prepare_artificial_target_result, prepare_artificial_result_output
 import uuid
 import time
 import os
@@ -16,6 +20,11 @@ from flask import Blueprint, jsonify, request, current_app, session
 queries_bp = Blueprint('queries', __name__)
 
 target_table_path = 'app.filters'
+RESULTS_METADATA = load_config_by_path('app', 'app_results_metadata.json')
+
+PROJECT_ID = load_config("gcp_general")['project_id']
+from google.cloud import bigquery
+BQ_CLIENT = bigquery.Client()
 
 """
 @queries_bp.before_request
@@ -24,19 +33,40 @@ def log_session_id():
     current_app.logger.debug(f"Request started for {request.path} with Session ID: {session.sid}")
 """
 
-def prepare_artificial_query_result(query_metacolumns):
-
-    # Simulate a random record for demonstration purposes
-    data_dir = os.path.join(current_app.root_path, 'data')  # Path to the data directory
-    file_path = os.path.join(data_dir, 'example_polygons.csv')
-    with open(file_path, "r") as file:
-        reader = list(csv.DictReader(file))  # Read rows as dictionaries
-        random_record = random.choice(reader)  # Select a random row
-    return {
-        **query_metacolumns,
-        'geometry': random_record['geometry']
-    }
+def save_result_metadata(filterStateId, filter_type, query_metacolumns):
+    is_dev = current_app.config.get('DEV', True)
     
+    if not is_dev:
+        session['results'][filterStateId] = {
+            'query_metacolumns': query_metacolumns,
+            'type': filter_type
+        }
+    else:
+        # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
+        metadata = RESULTS_METADATA[filter_type]['metadata']
+        res_func = prepare_artificial_query_result if filter_type in ['FilterResult', 'SearchArea'] else prepare_artificial_target_result
+        artificial_result = res_func({**query_metacolumns, **metadata, 'type': filter_type})
+        session['results'][filterStateId] = artificial_result
+        # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+
+def send_query(query):
+
+    is_dev = current_app.config.get('DEV', True)
+
+    if not is_dev:
+        query_job = BQ_CLIENT.query(query)
+        query_id = query_job.job_id
+        print('BQ QUERY ID:', query_id)
+    else:
+        query_id = str(uuid.uuid4())
+
+    start_time = time.time()
+    session['queries'][query_id] = {
+        'start_time': start_time,
+        'status': 'pending'
+        }
+    
+    return query_id
 
 @queries_bp.route('/calculate_filters', methods=['POST'])
 def calculate_filters_route():
@@ -62,7 +92,6 @@ def calculate_filters_route():
 
     project_id = load_config("gcp_general")['project_id']
     FILTER_SELECT_COLUMNS = current_app.config.get('FILTER_SELECT_COLUMNS', ['geometry'])
-    SEARCH_AREA_TABLE_NAME = current_app.config.get('SEARCH_AREA_TABLE_NAME', 'search_area')
     INTERSECTION_BUFFER = current_app.config.get('INTERSECTION_BUFFER', 1000)
     SIMPLIFY_RATE = current_app.config.get('SIMPLIFY_RATE', 100)
 
@@ -87,12 +116,12 @@ def calculate_filters_route():
         INTERSECTION_BUFFER=INTERSECTION_BUFFER,
         SIMPLIFY_RATE=SIMPLIFY_RATE
     )
-    
-    query_id = str(uuid.uuid4())
-    start_time = time.time()
+
+    query_id = send_query(filter_query)
 
     print('-' * 20)
-    print(f"Query ID: {query_id} | Start Time: {start_time}")
+    print('FilterResult')
+    print(f"Query ID: {query_id}")
     for filter in filters:
         print(filter)
     print(qualification)
@@ -101,17 +130,7 @@ def calculate_filters_route():
         print(line.strip())
     print('-' * 20)
 
-
-    session['queries'][query_id] = {
-        'start_time': start_time,
-        'status': 'pending',
-        }
-    #session.modified = True
-
-    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
-    artificial_result = prepare_artificial_query_result(query_metacolumns)
-    session['results'].append(artificial_result)
-    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+    save_result_metadata(filterStateId, 'FilterResult', query_metacolumns)
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -163,11 +182,11 @@ def set_search_area_route():
         simplify_rate=SIMPLIFY_RATE
     )
 
-    query_id = str(uuid.uuid4())
-    start_time = time.time()
+    query_id = send_query(area_table_query)
 
     print('-' * 20)
-    print(f"Query ID: {query_id} | Start Time: {start_time}")
+    print('SearchArea')
+    print(f"Query ID: {query_id}")
     for filter in teryts_spec:
         print(filter)
     print('\nQuery:')
@@ -175,16 +194,7 @@ def set_search_area_route():
         print(line.strip())
     print('-' * 20)
 
-    session['queries'][query_id] = {
-        'start_time': start_time,
-        'status': 'pending'
-        }
-    #session.modified = True
-
-    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
-    artificial_result = prepare_artificial_query_result(query_metacolumns)
-    session['results'].append(artificial_result)
-    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+    save_result_metadata(filterStateId, 'SearchArea', query_metacolumns)
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -205,25 +215,39 @@ def set_search_target_route():
 
     print('\nALL FILTER STATE IDS:', allFilterStateIds, '\n')
 
-    query_id = str(uuid.uuid4())
-    start_time = time.time()
-
-    session['queries'][query_id] = {
-        'start_time': start_time,
-        'status': 'pending'
-        }
-    #session.modified = True
-
-    # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
     query_metacolumns = {
     'option': 'TargetObject',
     'filterStateId': filterStateId,
     'stateId': stateId,
     'name': name
     }
-    artificial_result = prepare_artificial_query_result(query_metacolumns)
-    session['results'].append(artificial_result)
-    # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+
+    SIMPLIFY_RATE = current_app.config.get('SIMPLIFY_RATE', 100)
+    results_table_path = current_app.config.get('RESULTS_TABLE_PATH', 'app.parcel_results')
+    filters_table_path = current_app.config.get('FILTERS_TABLE_PATH', 'app.filters')
+    parcels_table_path = current_app.config.get('PARCELS_TABLE_PATH', 'parcels.parcels')
+
+    results_query = get_parcels_result_query(
+            filters_req=filters_req,
+            filterStateId=filterStateId,
+            allFilterStateIds=allFilterStateIds,
+            simplify_rate=SIMPLIFY_RATE,
+            results_table_path=results_table_path,
+            filters_table_path=filters_table_path,
+            parcels_table_path=parcels_table_path
+        )
+    
+    query_id = send_query(results_query)
+
+    print('-' * 20)
+    print('ParcelTarget')
+    print(f"Query ID: {query_id}")
+    print('\nQuery:')
+    for line in results_query.split('\n'):
+        print(line.strip())
+    print('-' * 20)
+
+    save_result_metadata(filterStateId, 'ParcelTarget', query_metacolumns)
 
     try:
         return jsonify({"status": 'ok', "query_id": query_id}), 200
@@ -250,44 +274,83 @@ def check_query_status_route():
     if query_state:
         start_time = query_state['start_time']
         elapsed_time = time.time() - start_time
-        if elapsed_time > 2:
-            query_state['status'] = 'completed'
-            #session['queries'][query_id] = query_state
-            #session.modified = True
+        is_dev = current_app.config.get('DEV', True)
+        if not is_dev:
+            job = BQ_CLIENT.get_job(query_id)
+            if job.state == "DONE":
+                query_state['status'] = 'completed'               
+        else:
+            if elapsed_time > 2:
+                query_state['status'] = 'completed'
         print(f"Query ID: {query_id} | Status: {query_state['status']} | Elapsed Time: {elapsed_time:.2f} seconds")
         return jsonify({"status": query_state['status']}), 200
 
     return jsonify({"error": "Query not found"}), 404
 
 
-import csv
-import random
-import shapely.wkt
-
 @queries_bp.route('/get_query_result', methods=['POST'])
 def get_query_result_route():
     print('SESSION ID /get_query_result:', session.sid)
     print(request.json)
-    filterStateId = request.json.get('filterStateId', None)
     try:
-        filter_data = [item for item in session['results'] if item.get('filterStateId', None) == filterStateId][0]
-        qualification = {
-            'option': filter_data.get('option'),
-            'value': filter_data.get('buffer')
-        }
-        style, properties = get_properties_from_qualification(qualification)
-        
-        name = filter_data.get('name', None)
-        if name:
-            properties['Źródło'] = name
-        
-        geometry = shapely.wkt.loads(filter_data.get('geometry'))
-        geojson = prepare_geojson([{'geometry': geometry}], additional_attributes=properties)
+        is_dev = current_app.config.get('DEV', True)
+        if not is_dev:
+            filterStateId = request.json.get('filterStateId', None)
+            filter_data = session['results'][filterStateId]
+
+            filter_config = RESULTS_METADATA[filter_data['type']]
+            results_table_path = filter_config['result_table_path']
+            geometry_key = filter_config['geometry_key']
+            attributes_keys = filter_config['attributes_keys']
+            metadata = filter_config.get('metadata', {})
+
+            query_metacolumns = filter_data.get('query_metacolumns', {})
+
+
+            qualification = {
+                'option': query_metacolumns.get('option'),
+                'value': query_metacolumns.get('buffer')
+            }
+            style, properties = get_properties_from_qualification(qualification)
+            print('STYLE', qualification)
+            properties = {**properties, **metadata, **query_metacolumns}
+
+            query = get_prepared_results_query(
+                    filterStateId=filterStateId, 
+                    project_id=PROJECT_ID, 
+                    results_table_path=results_table_path)
+            
+            print('-' * 20)
+            print(f"FilterStateId: {filterStateId}")
+            print(f"Results Table Path: {results_table_path}")
+            print('\nFinal Query:')
+            for line in query.split('\n'):
+                print(line.strip())
+            print('-' * 20)
+
+            gathered_results = get_query_result(
+                client=BQ_CLIENT,
+                query=query
+            )
+
+            geojson = prepare_geojson_with_attributes(
+                gathered_results, 
+                geometry_key=geometry_key,
+                attributes_keys=attributes_keys, 
+                additional_attributes=properties)
+
+        else:
+            geojson, style = prepare_artificial_result_output(request.json)
+
+        if len(geojson['features']) > 0:
+            print(geojson['features'][0]['properties'])
+
         return jsonify({
             "geojson": geojson,
             "style": style
         }), 200
     except Exception as e:
+        print('ERROR:', str(e))
         return jsonify({"error": str(e)}), 500
     
 

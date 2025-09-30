@@ -45,11 +45,13 @@ function MainFilterAccordion({caption, expanded, onToggle, isLoading, children }
           '& .MuiAccordionSummary-root': {
             padding: '0 !important',
           },
-          pr: 1
+          pr: 1,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', ml: 1.5, py: 0.75 }}>
-          <Typography variant="h8" color="textSecondary">{caption}</Typography>
+          <Typography variant='caption' color="textSecondary" sx={{ wordBreak: 'break-word', fontWeight: '600',fontSize: '0.875rem' }}>
+            {caption}
+          </Typography>
           {isLoading && (
             <CircularLoader size={16} sx={{ ml: 1 }} />
           )}

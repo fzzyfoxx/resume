@@ -158,26 +158,54 @@ function FilterChainAccordion2({
 
   return (
     <Box sx={{ position: 'relative' }}>
-      <Accordion
-        expanded={chain.isExpanded}
-        onChange={handleAccordionToggle}
-        disableGutters
+    {/* Top border for first accordion as a separate element */}
+    {chainIndex === 0 && !staticLabel && (
+      <Box
         sx={{
-          ...(staticLabel
-            ? {
-                boxShadow: 'none',
-                '&.MuiAccordion-root': { border: 'none', '&:before': { display: 'none' } },
-              }
-            : {
-                mt: 0,
-                mb: 0,
-                boxShadow: 'none',
-                borderTop: chainIndex === 0 ? '1px solid #eee' : 'none',
-                borderBottom: '1px solid #eee',
-                '&.MuiAccordion-root': { '&:before': { display: 'none' } },
-              }),
+          position: 'absolute',
+          top: 0,
+          left: '20px',
+          right: '20px',
+          height: '0.5px',
+          backgroundColor: 'rgb(160, 160, 160)',
+          zIndex: 1,
         }}
-      >
+      />
+    )}
+    <Accordion
+      expanded={chain.isExpanded}
+      onChange={handleAccordionToggle}
+      disableGutters
+      sx={{
+        ...(staticLabel
+          ? {
+              boxShadow: 'none',
+              '&.MuiAccordion-root': { border: 'none', '&:before': { display: 'none' } },
+            }
+          : {
+              mt: 0,
+              mb: 0,
+              boxShadow: 'none',
+              position: 'relative',
+              borderRadius: 0,
+              // Hide MUI's default :before for all accordions
+              '&.MuiAccordion-root:before': {
+                display: 'none',
+              },
+              // Bottom border for all accordions using :after
+              '&:after': {
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: '20px',
+                right: '20px',
+                height: '0.5px',
+                backgroundColor: 'rgb(160, 160, 160)',
+                zIndex: 1,
+              },
+            }),
+      }}
+    >
         <AccordionSummary
           sx={{
             ...(staticLabel

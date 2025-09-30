@@ -63,7 +63,7 @@ const AccordionSummaryContent = ({
   };
 
   return (
-    <Box sx={{ width: '100%', ml: 1.5, py: 0.5, mb: 0.75 }}>
+    <Box sx={{ width: '100%', ml: 1.5, py: 0.5, mb: 0 }}>
       {/* Top Box: Title and Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* Title Box */}
@@ -98,7 +98,7 @@ const AccordionSummaryContent = ({
               }}
             />
           ) : (
-            <Typography variant={variant} color="textSecondary" sx={{ wordBreak: 'break-word', fontSize: variant === 'caption' ? '0.875rem' : '1rem' }}>
+            <Typography variant={variant} color="textSecondary" sx={{ wordBreak: 'break-word', fontWeight: '600',fontSize: variant === 'caption' ? '0.7rem' : '0.875rem' }}>
               {title}
             </Typography>
           )}
@@ -124,7 +124,7 @@ const AccordionSummaryContent = ({
 
       {/* Bottom Box: Summary Chain */}
       {!isStatic && summaryParts.length > 0 && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.3, pr: '32px' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.3, mt: 0.0, mb: '8px', pr: '32px' }}>
           {summaryParts.map((part, index) => (
             <Box
               key={index}
