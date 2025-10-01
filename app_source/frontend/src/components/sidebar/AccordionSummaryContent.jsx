@@ -17,6 +17,8 @@ const AccordionSummaryContent = ({
   onToggle,
   isExpanded,
   statusButton,
+  isLayerVisible,
+  setLayerVisible
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title); // Local state for the input
@@ -107,7 +109,14 @@ const AccordionSummaryContent = ({
         {/* Buttons Box */}
         <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           {statusButton}
-          {marker && <HideLayer marker={marker} mapRef={mapRef} />}
+          {marker && (
+            <HideLayer
+              marker={marker}
+              mapRef={mapRef}
+              isVisible={isLayerVisible}
+              setIsVisible={setLayerVisible}
+            />
+          )}
           {onToggle && (
             <IconButton onClick={onToggle} size="small" sx={{ ml: 0.5 }} disableRipple>
               <ExpandMoreIcon

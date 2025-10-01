@@ -19,6 +19,17 @@ from flask import Blueprint, jsonify, request, current_app, session
 
 queries_bp = Blueprint('queries', __name__)
 
+# --- NEW: Ensure base structures exist every request ---
+@queries_bp.before_request
+def ensure_session_structures():
+    if 'queries' not in session:
+        session['queries'] = {}
+    if 'results' not in session:
+        session['results'] = {}
+    # Mark as modified so Flask writes cookie if needed
+    session.modified = True
+# --- END NEW ---
+
 target_table_path = 'app.filters'
 RESULTS_METADATA = load_config_by_path('app', 'app_results_metadata.json')
 
@@ -35,9 +46,10 @@ def log_session_id():
 
 def save_result_metadata(filterStateId, filter_type, query_metacolumns):
     is_dev = current_app.config.get('DEV', True)
-    
+    results = session.get('results', {}).copy()
+
     if not is_dev:
-        session['results'][filterStateId] = {
+        results[filterStateId] = {
             'query_metacolumns': query_metacolumns,
             'type': filter_type
         }
@@ -46,8 +58,11 @@ def save_result_metadata(filterStateId, filter_type, query_metacolumns):
         metadata = RESULTS_METADATA[filter_type]['metadata']
         res_func = prepare_artificial_query_result if filter_type in ['FilterResult', 'SearchArea'] else prepare_artificial_target_result
         artificial_result = res_func({**query_metacolumns, **metadata, 'type': filter_type})
-        session['results'][filterStateId] = artificial_result
+        results[filterStateId] = artificial_result
         # -- END SAVING QUERY RESULTS FOR TEST PURPOSES --
+
+    session['results'] = results
+    session.modified = True  # IMPORTANT
 
 def send_query(query):
 
@@ -61,11 +76,15 @@ def send_query(query):
         query_id = str(uuid.uuid4())
 
     start_time = time.time()
-    session['queries'][query_id] = {
+    # Copy–modify–assign pattern to avoid lost updates
+    queries = session.get('queries', {}).copy()
+    queries[query_id] = {
         'start_time': start_time,
         'status': 'pending'
-        }
-    
+    }
+    session['queries'] = queries
+    session.modified = True   # Ensure persistence
+
     return query_id
 
 @queries_bp.route('/calculate_filters', methods=['POST'])
@@ -262,15 +281,13 @@ def check_query_status_route():
     Returns:
         JSON response with the status of the query.
     """
-    #print(request.args)
-    #print('SESSION ID /check_query_status:', session.sid)
     query_id = request.args.get('query_id', None)
-    
     if not query_id:
         return jsonify({"error": "Query ID is required"}), 400
 
-    query_state = session['queries'].get(query_id, None)
-    #print(session['queries'])
+    queries = session.get('queries', {})
+    query_state = queries.get(query_id)
+
     if query_state:
         start_time = query_state['start_time']
         elapsed_time = time.time() - start_time
@@ -278,13 +295,20 @@ def check_query_status_route():
         if not is_dev:
             job = BQ_CLIENT.get_job(query_id)
             if job.state == "DONE":
-                query_state['status'] = 'completed'               
+                query_state['status'] = 'completed'
         else:
             if elapsed_time > 2:
                 query_state['status'] = 'completed'
-        print(f"Query ID: {query_id} | Status: {query_state['status']} | Elapsed Time: {elapsed_time:.2f} seconds")
+
+        # Reassign (even if unchanged) to keep deterministic writes
+        queries[query_id] = query_state
+        session['queries'] = queries
+        session.modified = True
+
+        #print(f"[check_query_status] Keys={list(queries.keys())} Returning {query_id} -> {query_state['status']}")
         return jsonify({"status": query_state['status']}), 200
 
+    #print(f"[check_query_status] Missing {query_id}. Existing keys: {list(queries.keys())}")
     return jsonify({"error": "Query not found"}), 404
 
 
@@ -352,7 +376,6 @@ def get_query_result_route():
     except Exception as e:
         print('ERROR:', str(e))
         return jsonify({"error": str(e)}), 500
-    
 
 
-    
+

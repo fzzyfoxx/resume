@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback  } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo  } from 'react';
 import {
   Divider,
   Dialog,
@@ -14,6 +14,7 @@ import MainFilterAccordion from './MainFilterAccordion';
 import FilterChainAccordion2 from './FilterChainAccordion2';
 import AddNewFilterChainButton from './AddNewFilterChainButton';
 import renderFilterComponent from '../../hooks/renderFilterComponent';
+import { getIndicatorColor } from '../../utils/filterChainUtils';
 
 function FiltersSection({ 
   mapRef, 
@@ -52,6 +53,92 @@ function FiltersSection({
   const [childrenState, setChildrenState] = useState({});
   const [chainMarkers, setChainMarkers] = useState({});
   const loadedStateRef = useRef(null);
+  const [bulkUpdate, setBulkUpdate] = useState(0);
+  const [bulkStop, setBulkStop] = useState(0);
+  const bulkCountersRef = useRef({ update: 0, stop: 0 });
+  const [areAllVisible, setAreAllVisible] = useState(true);
+  const [chainVisibility, setChainVisibility] = useState({}); // per-chain visibility
+
+  const allMarkers = useMemo(() => Object.values(chainMarkers).filter(Boolean), [chainMarkers]);
+
+  const handleToggleAllLayers = (isVisible) => {
+    if (!mapRef.current) return;
+    allMarkers.forEach(marker => {
+      if (isVisible) {
+        if (!mapRef.current.hasLayer(marker)) mapRef.current.addLayer(marker);
+      } else {
+        if (mapRef.current.hasLayer(marker)) mapRef.current.removeLayer(marker);
+      }
+    });
+    setAreAllVisible(isVisible);
+    // Sync all child visibility states
+    setChainVisibility(prev => {
+      const updated = { ...prev };
+      filterChains.forEach(c => { updated[c.id] = isVisible; });
+      return updated;
+    });
+  };
+
+  const handleSingleLayerVisibility = useCallback((chainId, visible, marker) => {
+    // Toggle the specific marker(s) on map (HideLayer already handles actual layer ops)
+    setChainVisibility(prev => {
+      const updated = { ...prev, [chainId]: visible };
+      // Update global flag if all true or any false
+      const values = Object.values(updated);
+      if (values.length > 0) {
+        setAreAllVisible(values.every(v => v === true));
+      } else {
+        setAreAllVisible(true);
+      }
+      return updated;
+    });
+  }, []);
+
+  const mainIndicator = useMemo(() => {
+    const childStateValues = Object.values(childrenState);
+    if (childStateValues.length === 0) {
+      return getIndicatorColor(false, 'add', true);
+    }
+
+    const visualStatuses = childStateValues.map(c => c.visualStatus || 'default');
+
+    let mainVisual;
+    if (visualStatuses.some(s => s === 'loading')) {
+      mainVisual = 'loading';
+    } else if (visualStatuses.some(s => s === 'warning')) {
+      mainVisual = 'warning';
+    } else if (visualStatuses.every(s => s === 'default')) {
+      mainVisual = 'default';
+    } else if (visualStatuses.some(s => s === 'ok')) {
+      mainVisual = 'ok';
+    } else {
+      mainVisual = 'default';
+    }
+
+    switch (mainVisual) {
+      case 'loading':
+        return getIndicatorColor(false, 'stop', true);
+      case 'warning':
+        return getIndicatorColor(true, 'update', true);
+      case 'ok':
+        return getIndicatorColor(false, 'update', true);
+      case 'default':
+      default:
+        return getIndicatorColor(false, 'add', true);
+    }
+  }, [childrenState]);
+
+  const handleMainAddOrUpdate = useCallback(() => {
+    bulkCountersRef.current.update += 1;
+    setBulkUpdate({ id: bulkCountersRef.current.update });
+  }, []);
+
+  const handleMainStop = useCallback(() => {
+    bulkCountersRef.current.stop += 1;
+    const id = bulkCountersRef.current.stop;
+    console.log(`[FiltersSection] Main STOP clicked -> bulkStop id=${id}`);
+    setBulkStop({ id });
+  }, []);
 
   useEffect(() => {
     if (onMarkersChange) {
@@ -90,9 +177,14 @@ function FiltersSection({
       ...prevMarkers,
       [chainId]: marker
     }));
+    setChainVisibility(prev => (
+      prev.hasOwnProperty(chainId) ? prev : { ...prev, [chainId]: true }
+    ));
   }, []);
 
   const handleAccordionStateChange = useCallback((chainId, state) => {
+        // LOG: Check if the parent is receiving the state change
+        console.log(`[FiltersSection] Received state update from child: ${chainId}`, state);
     setChildrenState(prevState => {
        if (JSON.stringify(prevState[chainId]) === JSON.stringify(state)) {
         return prevState;
@@ -138,6 +230,12 @@ function FiltersSection({
       return newMarkers;
     });
 
+    setChainVisibility(prev => {
+      const nv = { ...prev };
+      delete nv[chainToRemove];
+      return nv;
+    });
+
     setFilterChains((prevChains) =>
       prevChains.filter((chain) => chain.id !== chainToRemove)
     );
@@ -156,6 +254,14 @@ function FiltersSection({
         expanded={mainFiltersAccordionExpanded}
         onToggle={handleMainFiltersAccordionToggle}
         isLoading={initialLoadingMainAccordion}
+        mainIndicator={mainIndicator}
+        onMainAddOrUpdate={handleMainAddOrUpdate}
+        onMainStop={handleMainStop}
+        allMarkers={allMarkers}
+        mapRef={mapRef}
+        areAllVisible={areAllVisible}
+        onToggleAllLayers={handleToggleAllLayers}
+        hasChildren={filterChains.length > 0}
       >
         {filterChains.map((chain, chainIndex) => (
           <FilterChainAccordion2
@@ -182,6 +288,10 @@ function FiltersSection({
             sourceStateId={sourceStateId}
             setSourceStateId={setSourceStateId}
             isTarget={isTarget}
+            onBulkUpdate={bulkUpdate}
+            onBulkStop={bulkStop}
+            isLayerVisible={chainVisibility[chain.id] ?? true}
+            setLayerVisible={(v) => handleSingleLayerVisibility(chain.id, v, chainMarkers[chain.id])}
           />
         ))}
 

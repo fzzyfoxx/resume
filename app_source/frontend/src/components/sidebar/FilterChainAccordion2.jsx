@@ -34,10 +34,21 @@ function FilterChainAccordion2({
     allFilterStateIds,
     sourceStateId,
     setSourceStateId,
-    isTarget = false
+    isTarget = false,
+    onBulkUpdate,
+    onBulkStop,
+    isLayerVisible,
+    setLayerVisible
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const debouncedAddFilterStatus = useDebounce(addFilterStatus, 300);
+  const [lastProcessedBulkUpdate, setLastProcessedBulkUpdate] = useState(null);
+  const [lastProcessedBulkStop, setLastProcessedBulkStop] = useState(null);
+
+    // LOG: Track status changes within the child accordion
+    useEffect(() => {
+      console.log(`[FilterChain ${chain.id}] Status is now: ${addFilterStatus}`);
+    }, [addFilterStatus, chain.id]);
 
   const [implied, setImplied] = useState(false);
   const [marker, setMarker] = useState(null);
@@ -68,7 +79,7 @@ function FilterChainAccordion2({
   const summaryParts = useMemo(() => getAccordionSummaryParts(chain.filters), [chain.filters]);
   const indicator = useMemo(() => getIndicatorColor(hasChanges, addFilterStatus, isActual), [hasChanges, addFilterStatus, isActual]);
 
-  const { handleAddOrUpdate, handleStop } = useFilterQuery({
+  const { handleAddOrUpdate, handleStop, setIsStopped } = useFilterQuery({
     filters: chain.filters,
     status: debouncedAddFilterStatus,
     onStatusChange: setAddFilterStatus,
@@ -86,6 +97,54 @@ function FilterChainAccordion2({
     fitBounds,
     allFilterStateIds
   });
+
+  const bulkUpdateTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (onBulkUpdate && onBulkUpdate.id !== undefined && onBulkUpdate.id !== lastProcessedBulkUpdate) {
+      if (indicator.status === 'warning') {
+        // Stagger to avoid simultaneous session writes (race causing lost query_ids)
+        const delayMs = chainIndex * 250; // tune (e.g. 150–300)
+        bulkUpdateTimeoutRef.current = setTimeout(() => {
+          handleAddOrUpdate();
+        }, delayMs);
+      }
+      setLastProcessedBulkUpdate(onBulkUpdate.id);
+    }
+  }, [
+    onBulkUpdate,
+    lastProcessedBulkUpdate,
+    indicator.status,
+    handleAddOrUpdate,
+    chainIndex
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (bulkUpdateTimeoutRef.current) {
+        clearTimeout(bulkUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (onBulkStop && onBulkStop.id !== undefined && onBulkStop.id !== lastProcessedBulkStop) {
+      // Use internal status to ensure we catch real in-flight queries
+      if (addFilterStatus === 'stop') {
+        console.log(`[FilterChain ${chain.id}] Bulk stop received (id=${onBulkStop.id}). Stopping.`);
+        handleStop(true);
+      } else {
+        console.log(`[FilterChain ${chain.id}] Bulk stop ignored; current status=${addFilterStatus}, visual=${indicator.status}`);
+      }
+      setLastProcessedBulkStop(onBulkStop.id);
+    }
+  }, [
+    onBulkStop,
+    lastProcessedBulkStop,
+    addFilterStatus,
+    indicator.status,
+    handleStop
+  ]);
 
   useEffect(() => {
     if (onMarkerCreated && marker) {
@@ -123,18 +182,31 @@ function FilterChainAccordion2({
   };
 
   useEffect(() => {
-    //console.log('STATE UPDATE - filterStateId changed:', filterStateId, storedFilterValues, storedStateId);
     if (onStateChange) {
+      console.log(`[FilterChain ${chain.id}] Firing onStateChange. Status: ${addFilterStatus} (visual: ${indicator.status})`);
       onStateChange(chain.id, {
         storedFilterValues,
         filterStateId,
         storedStateId,
         title,
         sourceStateId,
-        storedSourceStateId
+        storedSourceStateId,
+        status: addFilterStatus,        // internal machine status
+        visualStatus: indicator.status, // outward UI status
       });
     }
-  }, [chain.id, storedFilterValues, filterStateId, storedStateId, title, onStateChange]);
+  }, [
+    chain.id,
+    storedFilterValues,
+    filterStateId,
+    storedStateId,
+    title,
+    onStateChange,
+    sourceStateId,
+    storedSourceStateId,
+    addFilterStatus,
+    indicator.status
+  ]);
 
   useEffect(() => {
     if (filterStateId && isMain) {
@@ -266,6 +338,8 @@ function FilterChainAccordion2({
             setTitle={setTitle}
             onToggle={handleSummaryToggle}
             isExpanded={chain.isExpanded}
+            isLayerVisible={isLayerVisible}
+            setLayerVisible={setLayerVisible}
             statusButton={
               <AccordionStatusButton
                 indicator={indicator}

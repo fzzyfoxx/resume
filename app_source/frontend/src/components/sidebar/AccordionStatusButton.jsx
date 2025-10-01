@@ -11,7 +11,8 @@ const AccordionStatusButton = ({
   indicator,
   handleAddOrUpdate,
   handleStop,
-  isExpanded
+  isExpanded,
+  isMain = false
 }) => {
 
   const handleClick = useCallback((event) => {
@@ -78,7 +79,7 @@ const AccordionStatusButton = ({
         >
           {getIcon()}
         </IconButton>
-        {indicator.status === 'loading' && !isExpanded && (
+        {indicator.status === 'loading' && (!isExpanded || isMain)  && (
           <CircularProgress
             size={26}
             sx={{
@@ -87,6 +88,7 @@ const AccordionStatusButton = ({
               top: -3,
               left: 1,
               zIndex: 1,
+              pointerEvents: 'none',
             }}
           />
         )}

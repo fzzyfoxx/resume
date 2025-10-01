@@ -17,7 +17,6 @@ def save_state_route():
         JSON response with saved state ID.
     """
     state = request.json.get('state', {})
-    print(state)
     project_name = request.json.get('projectName', None)  # Get project name from request
     project_id = request.json.get('projectId') # Get project ID from request or generate a new one
     now = datetime.now().isoformat()

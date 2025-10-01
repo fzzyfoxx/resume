@@ -15,7 +15,7 @@ const StyledDrawerHeader = styled('div')(({ theme }) => ({
   minHeight: '42px',
   height: '42px',
   justifyContent: 'space-between', // Changed to space-between
-  backgroundColor: 'rgb(16, 175, 111)',
+  backgroundColor: 'rgb(0, 135, 133)',
   boxShadow: theme.shadows[4],
   position: 'relative', // Ensure the header can be layered
   zIndex: theme.zIndex.drawer + 1, // Lift it above other drawer content
