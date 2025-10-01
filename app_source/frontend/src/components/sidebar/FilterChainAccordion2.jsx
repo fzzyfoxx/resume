@@ -32,6 +32,9 @@ function FilterChainAccordion2({
     loadedChainName,
     onMarkerCreated,
     allFilterStateIds,
+    sourceStateId,
+    setSourceStateId,
+    isTarget = false
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const debouncedAddFilterStatus = useDebounce(addFilterStatus, 300);
@@ -51,6 +54,7 @@ function FilterChainAccordion2({
   );
 
   const [storedStateId, setStoredStateId] = useState(null); // Stored ID to compare changes
+  const [storedSourceStateId, setStoredSourceStateId] = useState(null); // Stored source ID to compare changes
   const [isActual, setIsActual] = useState(true);
   const loadedStateIdRef = useRef(null);
   const [title, setTitle] = useState(loadedChainName || (staticLabel ? accordionLabel : `NowyFiltr-${chainIndex + 1}`));
@@ -102,6 +106,8 @@ function FilterChainAccordion2({
       setImplied(false);
       setAddFilterStatus('update');
       setTitle(chain.loadedTitle || title);
+      setStoredSourceStateId(chain.loadedSourceStateId || null);
+      setSourceStateId(chain.loadedSourceStateId || null);
     }
   }, [chain.loadedFilterStateId]);
 
@@ -123,7 +129,9 @@ function FilterChainAccordion2({
         storedFilterValues,
         filterStateId,
         storedStateId,
-        title
+        title,
+        sourceStateId,
+        storedSourceStateId
       });
     }
   }, [chain.id, storedFilterValues, filterStateId, storedStateId, title, onStateChange]);
@@ -134,12 +142,27 @@ function FilterChainAccordion2({
         setStateId(filterStateId);
     }
   }, [filterStateId, setStateId, isMain]);
-
+  
   useEffect(() => {
     if (stateId && filterStateId) {
-        setIsActual(stateId === storedStateId);
+      setIsActual(stateId === storedStateId);
     }
-    }, [stateId, filterStateId, storedStateId]);
+  }, [stateId, filterStateId, storedStateId]);
+  
+  useEffect(() => {
+    if (filterStateId && !isTarget) {
+        setSourceStateId(filterStateId);
+    }
+    if (filterStateId && isTarget) {
+        setStoredSourceStateId(sourceStateId);
+    }
+  }, [filterStateId, setSourceStateId, isTarget]);
+
+  useEffect(() => {
+    if (isTarget && sourceStateId && filterStateId) {
+      setIsActual(sourceStateId === storedSourceStateId);
+    }
+  }, [sourceStateId, filterStateId, storedSourceStateId, isTarget]);
 
   const memoizedHasChanges = useMemo(() => hasChanges, [hasChanges]);
 
