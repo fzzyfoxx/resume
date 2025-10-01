@@ -6,15 +6,20 @@ import FileOpenIcon from '@mui/icons-material/FileOpen';
 import { styled } from '@mui/material/styles';
 import SaveAsIcon from '@mui/icons-material/SaveAs';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
-import { getDynamicButtonStyle, buttonDividerSx } from '../../styles/ButtonStyles';
+import { getDynamicButtonStyle, lightButtonDividerSx } from '../../styles/ButtonStyles';
 
 const StyledDrawerHeader = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   padding: theme.spacing(0, 1),
-  minHeight: '36px',
-  height: '36px',
+  minHeight: '42px',
+  height: '42px',
   justifyContent: 'space-between', // Changed to space-between
+  backgroundColor: 'rgb(16, 175, 111)',
+  boxShadow: theme.shadows[4],
+  position: 'relative', // Ensure the header can be layered
+  zIndex: theme.zIndex.drawer + 1, // Lift it above other drawer content
+  marginBottom: '8px',
 }));
 
 const iconSize = 20;
@@ -44,25 +49,25 @@ function DrawerHeader({ handleDrawerClose, onSaveState, onLoadState, onSaveAs, o
       }}
       >
         <Tooltip title="nowy projekt"> {/* Add New Project button */}
-          <IconButton onClick={onNewProject} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
+          <IconButton onClick={onNewProject} sx={getDynamicButtonStyle({disabled: false, isMainButton: false, light: true})}>
             <NoteAddIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
-        <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
+        <Divider orientation="vertical" flexItem sx={lightButtonDividerSx} />
         <Tooltip title="zapisz">
-          <IconButton onClick={onSaveState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
+          <IconButton onClick={onSaveState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false, light: true})}>
             <SaveIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
-        <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
+        <Divider orientation="vertical" flexItem sx={lightButtonDividerSx} />
         <Tooltip title="zapisz jako"> {/* Add Save As button */}
-          <IconButton onClick={onSaveAs} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
+          <IconButton onClick={onSaveAs} sx={getDynamicButtonStyle({disabled: false, isMainButton: false, light: true})}>
             <SaveAsIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
-        <Divider orientation="vertical" flexItem sx={buttonDividerSx} />
+        <Divider orientation="vertical" flexItem sx={lightButtonDividerSx} />
         <Tooltip title="wczytaj projekt">
-          <IconButton onClick={onLoadState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false})}>
+          <IconButton onClick={onLoadState} sx={getDynamicButtonStyle({disabled: false, isMainButton: false, light: true})}>
             <FileOpenIcon  sx={{ fontSize: iconSize }} />
           </IconButton>
         </Tooltip>
