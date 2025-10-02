@@ -104,3 +104,19 @@ def load_state_route():
         return jsonify(state_data['state']), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@state_bp.route('/delete_state', methods=['DELETE'])
+def delete_state_route():
+    """
+    Deletes the saved state for a given project ID.
+    """
+    project_id = request.args.get('projectId')
+    print(f"Received request to delete state for project ID: {project_id}")
+    if not project_id:
+        return jsonify({"error": "No project ID provided"}), 400
+    if project_id in session['states']:
+        del session['states'][project_id]
+        print(f"Deleted state for project ID: {project_id}")
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"error": "No state found for the given project ID"}), 404

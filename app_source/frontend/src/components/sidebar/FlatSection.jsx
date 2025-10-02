@@ -21,7 +21,8 @@ function FlatSection({
   allFilterStateIds,
   sourceStateId,
   setSourceStateId,
-  isTarget = false
+  isTarget = false,
+  onResultsChange
   }) {
   const {
     filterChains,
@@ -95,6 +96,12 @@ function FlatSection({
       }));
     }, []);
 
+  const handleResults = useCallback((chainId, geojson) => {
+    if (onResultsChange) {
+      onResultsChange(title, geojson);
+    }
+  }, [onResultsChange, title]);
+
 
   return (
     <>
@@ -122,6 +129,7 @@ function FlatSection({
             sourceStateId={sourceStateId}
             setSourceStateId={setSourceStateId}
             isTarget={isTarget}
+            onQueryResult={(geojson) => handleResults(chain.id, geojson)}
           />
         ))}
     </>

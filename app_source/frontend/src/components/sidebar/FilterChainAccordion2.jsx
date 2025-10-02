@@ -38,7 +38,8 @@ function FilterChainAccordion2({
     onBulkUpdate,
     onBulkStop,
     isLayerVisible,
-    setLayerVisible
+    setLayerVisible,
+    onQueryResult // <-- Add this prop
     }) {
   const [addFilterStatus, setAddFilterStatus] = useState('add');
   const debouncedAddFilterStatus = useDebounce(addFilterStatus, 300);
@@ -95,7 +96,8 @@ function FilterChainAccordion2({
     stateId,
     setStoredStateId,
     fitBounds,
-    allFilterStateIds
+    allFilterStateIds,
+    onQueryResult // <-- Pass it here
   });
 
   const bulkUpdateTimeoutRef = useRef(null);

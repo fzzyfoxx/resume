@@ -6,8 +6,10 @@ import {
   TextField,
   Button,
   Divider,
+  IconButton,
 } from '@mui/material';
-import { mainColor, highlightColor, buttonDividerSx } from '../../styles/ButtonStyles';
+import CloseIcon from '@mui/icons-material/Close';
+import { mainColor, highlightColor, buttonDividerSx, defaultIconColor, neutralGray } from '../../styles/ButtonStyles';
 
 function SaveProjectAsModal({ open, onClose, projectName, onProjectNameChange, onSave }) {
   return (
@@ -25,9 +27,22 @@ function SaveProjectAsModal({ open, onClose, projectName, onProjectNameChange, o
         bgcolor: 'background.paper',
         border: '0px solid #000',
         boxShadow: 24,
-        p: 2,
+        p: 3,
         borderRadius: '8px',
       }}>
+        <IconButton
+          aria-label="close"
+          onClick={onClose}
+          sx={{
+            position: 'absolute',
+            right: 16,
+            top: 16,
+            color: neutralGray,
+            '&:hover': { color: defaultIconColor },
+          }}
+        >
+          <CloseIcon sx={{ fontSize: '20px' }} />
+        </IconButton>
         <Typography id="save-as-modal-title" variant='caption' color="textSecondary" sx={{ wordBreak: 'break-word', fontWeight: '600', fontSize: '0.875rem' }}>
           Zapisz projekt
         </Typography>
@@ -67,7 +82,7 @@ function SaveProjectAsModal({ open, onClose, projectName, onProjectNameChange, o
             }
           }}
         />
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'right', gap: 1 }}>
+        <Box sx={{ mt: 2.5, display: 'flex', justifyContent: 'right', gap: 1 }}>
           <Button
             onClick={onClose}
             sx={{
