@@ -11,9 +11,17 @@ from geodoc_app.search.parcels_results import get_parcels_result_query
 from geodoc_config import load_config, load_config_by_path
 from geodoc_app.search.utils import get_query_result
 from geodoc_app.search.artificial_results import prepare_artificial_query_result, prepare_artificial_target_result, prepare_artificial_result_output
+from geodoc_app.export.features import extract_features
+from geodoc_app.export.formats import export_to_csv
 import uuid
 import time
 import os
+
+from flask import Blueprint, jsonify, request, current_app, session, Response
+import csv
+import io
+from shapely.geometry import shape as shapely_shape
+import json
 
 from flask import Blueprint, jsonify, request, current_app, session
 
@@ -377,5 +385,33 @@ def get_query_result_route():
         print('ERROR:', str(e))
         return jsonify({"error": str(e)}), 500
 
+@queries_bp.route('/download_feature_csv', methods=['POST'])
+def download_feature_csv():
+    """
+    Accepts a single GeoJSON feature (as sent from the map sidebar) and returns a CSV file.
+    Body JSON:
+    {
+      "feature": {
+         "type": "Feature",
+         "geometry": {...},
+         "properties": {...}
+      }
+    }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        feature = payload.get('feature')
+        if not feature:
+            return jsonify({"error": "Missing feature in request body"}), 400
 
+        geometry = feature.get('geometry', {})
+        properties = feature.get('properties', {}) or {}
+
+        rows, columns, filename_base = extract_features(feature, geometry)
+        csv_content, headers = export_to_csv(rows, columns, filename_base)
+
+        return Response(csv_content, headers=headers)
+    except Exception as e:
+        current_app.logger.exception("Failed to export feature CSV")
+        return jsonify({"error": str(e)}), 500
 

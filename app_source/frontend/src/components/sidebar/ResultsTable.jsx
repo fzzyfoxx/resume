@@ -25,41 +25,38 @@ import L from 'leaflet';
 import { mainColor, lightIconColor, disabledIconColor, defaultIconColor } from '../../styles/ButtonStyles';
 
 const headCellSx = {
-    fontWeight: 600,
-    backgroundColor: mainColor,
-    whiteSpace: 'normal', // allow wrapping
-    fontSize: '0.6rem',
-    color: 'white',
-    padding: '12px 6px',
+  fontWeight: 600,
+  backgroundColor: mainColor,
+  whiteSpace: 'normal',
+  fontSize: '0.6rem',
+  color: 'white',
+  padding: '12px 6px',
+  lineHeight: 1.1,
+  textAlign: 'right',
+  verticalAlign: 'bottom',
+  '& .MuiTableSortLabel-root': {
+    display: 'inline-flex',
+    flexDirection: 'row-reverse',   // keep arrow on the left
+    alignItems: 'bottom',           // was flex-start -> now centers arrow vertically
+    whiteSpace: 'normal',
     lineHeight: 1.1,
-    textAlign: 'left', // changed from center
-    verticalAlign: 'bottom',
-    // Sorting label adjustments
-    '& .MuiTableSortLabel-root': {
-      display: 'inline-flex',
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      whiteSpace: 'normal',
-      lineHeight: 1.1,
-    },
-    '& .MuiTableSortLabel-root:hover, & .MuiTableSortLabel-root.Mui-active': {
-      color: 'inherit',
-    },
+  },
+  '& .MuiTableSortLabel-root:hover, & .MuiTableSortLabel-root.Mui-active': {
+    color: 'inherit',
+  },
+  '& .MuiTableSortLabel-icon': {
+    fontSize: '0.85rem',
+    marginRight: 1.5,
+    marginLeft: 0,
+    alignSelf: 'bottom',            // was flex-start
+    color: 'white !important',
+  },
+  '&:hover': {
+    color: lightIconColor,
     '& .MuiTableSortLabel-icon': {
-      fontSize: '0.75rem',
-      marginLeft: 2,
-      marginTop: 0,
-      alignSelf: 'flex-start',
+      color: `${lightIconColor} !important`,
     },
-    '&:hover': {
-      color: lightIconColor,
-      '& .MuiTableSortLabel-icon': {
-        color: `${lightIconColor} !important`,
-      },
-    },
-    '& .MuiTableSortLabel-icon': {
-      color: 'white !important',
-    },
+  },
 };
 
 const bodyCellSx = {
@@ -69,8 +66,20 @@ const bodyCellSx = {
     padding: '4px 6px',
     lineHeight: 1.2,
     verticalAlign: 'center',
+    textAlign: 'right',
     maxWidth: 240,
 };
+
+const integerFormatter = new Intl.NumberFormat('en-US', {
+  useGrouping: true,
+  maximumFractionDigits: 0,
+});
+
+const numericFormatter = new Intl.NumberFormat('en-US', {
+  useGrouping: true,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 function descendingComparator(a, b, orderBy, isNumeric) {
   let valA = a[orderBy];
@@ -142,9 +151,14 @@ const ResultsTable = ({ results, onSelectFeature, onShowInfo, mapRef }) => {
   };
 
   const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+    // If switching to a new column, start with descending
+    if (orderBy !== property) {
+      setOrder('desc');
+      setOrderBy(property);
+      return;
+    }
+    // Same column: just toggle
+    setOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
   };
 
   const handleChangePage = (event, newPage) => {
@@ -194,12 +208,24 @@ const ResultsTable = ({ results, onSelectFeature, onShowInfo, mapRef }) => {
       return '';
     }
     if (type === 'numeric') {
-      const numValue = parseFloat(value);
-      return isNaN(numValue) ? String(value) : numValue.toFixed(2);
+      const numValue = parseFloat(
+        (typeof value === 'string')
+          ? value.replace(/\s/g, '').replace(/,/g, '.')
+          : value
+      );
+      if (isNaN(numValue)) return String(value);
+      // en-US gives: 12,345.67 -> change commas to spaces => 12 345.67
+      return numericFormatter.format(numValue).replace(/,/g, ' ');
     }
     if (type === 'integer') {
-      const intValue = parseInt(value, 10);
-      return isNaN(intValue) ? String(value) : intValue;
+      const intValue = parseInt(
+        (typeof value === 'string')
+          ? value.replace(/\s/g, '').replace(/,/g, '.')
+          : value,
+        10
+      );
+      if (isNaN(intValue)) return String(value);
+      return integerFormatter.format(intValue).replace(/,/g, ' ');
     }
     if (type === 'multiBox') {
       let arrayValue = value;
@@ -434,7 +460,7 @@ const ResultsTable = ({ results, onSelectFeature, onShowInfo, mapRef }) => {
         </Box>
       </AccordionSummary>
       <AccordionDetails sx={{ p: 0, pt: 1 }}>
-        <Box sx={{ px: 1.5 }}>
+        <Box sx={{ paddingLeft: '18px', paddingRight: '22px' }}>
           <Paper
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
