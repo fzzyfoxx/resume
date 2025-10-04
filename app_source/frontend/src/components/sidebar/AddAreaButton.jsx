@@ -6,6 +6,7 @@ import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { addShapesFromQuery } from '../../drawing/addShapesFromQuery'; // Import the addShapesFromQuery function
+import API_BASE_URL from '../../constants/config';
 
 const AddAreaButton = ({ filters, qualification, onStatusChange, mapRef, marker, setMarker, hasChanges}) => {
   const [status, setStatus] = useState('add'); // Possible values: 'add', 'stop', 'update'
@@ -69,7 +70,7 @@ const AddAreaButton = ({ filters, qualification, onStatusChange, mapRef, marker,
       };
 
       // Call the /calculate_filters endpoint
-      const response = await axios.post('http://127.0.0.1:5000/api/queries/calculate_filters', payload, { withCredentials: true });
+      const response = await axios.post(`${API_BASE_URL}/queries/calculate_filters`, payload, { withCredentials: true });
 
       if (response.data && response.data.query_id) {
         setPreviousStatus(status); // Save the current status before transitioning to 'stop'
@@ -92,7 +93,7 @@ const AddAreaButton = ({ filters, qualification, onStatusChange, mapRef, marker,
 
     try {
       // Call the /check_query_status endpoint
-      const response = await axios.get('http://127.0.0.1:5000/api/queries/check_query_status', {
+      const response = await axios.get(`${API_BASE_URL}/queries/check_query_status`, {
         params: { query_id: queryId }, withCredentials: true
       });
 

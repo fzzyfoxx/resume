@@ -1,5 +1,8 @@
+import os
+
 DEBUG = False
-DEV = True
+DEV = os.getenv('FLASK_ENV') == 'development'
+REDIS_URL = 'redis://127.0.0.1:6379' if not DEV else 'redis://'
 SECRET_KEY = 'X2M89ALp1majWQAaa09b'
 SEARCH_FILTER_HINTS_LIMIT = 20
 SEARCH_FILTER_HINTS_THRESHOLD = 50
