@@ -1,29 +1,13 @@
-from geodoc_app.search.api_handlers import (
-    prepare_query_for_app_filters, 
-    prepare_geojson, 
-    prepare_geojson_with_attributes,
-    get_properties_from_qualification,
-    filter_actual_filters,
-    get_qualification_from_filters
-    )
-from geodoc_app.search.search_queries import prepare_area_table_for_search_query, get_prepared_results_query
-from geodoc_app.search.parcels_results import get_parcels_result_query
-from geodoc_config import load_config, load_config_by_path
-from geodoc_app.search.utils import get_query_result
-from geodoc_app.search.artificial_results import prepare_artificial_query_result, prepare_artificial_target_result, prepare_artificial_result_output
-from geodoc_app.export.features import extract_features
-from geodoc_app.export.formats import export_to_csv
+import sys
+print("IMPORT_LOG: Loading queries.py", file=sys.stderr); sys.stderr.flush()
+
 import uuid
 import time
 import os
-
 from flask import Blueprint, jsonify, request, current_app, session, Response
-import csv
-import io
-from shapely.geometry import shape as shapely_shape
-import json
+from werkzeug.local import LocalProxy
 
-from flask import Blueprint, jsonify, request, current_app, session
+print("IMPORT_LOG: queries.py - imports done, executing module-level code", file=sys.stderr); sys.stderr.flush()
 
 queries_bp = Blueprint('queries', __name__)
 
@@ -39,18 +23,32 @@ def ensure_session_structures():
 # --- END NEW ---
 
 target_table_path = 'app.filters'
-RESULTS_METADATA = load_config_by_path('app', 'app_results_metadata.json')
 
-PROJECT_ID = load_config("gcp_general")['project_id']
-from google.cloud import bigquery
-BQ_CLIENT = bigquery.Client()
+# Lazy-loaded globals
+RESULTS_METADATA = None
+PROJECT_ID = None
+def _ensure_metadata():
+    global RESULTS_METADATA
+    if RESULTS_METADATA is None:
+        print("IMPORT_LOG: queries.py - loading RESULTS_METADATA", file=sys.stderr); sys.stderr.flush()
+        from geodoc_config import load_config_by_path as _load_by_path
+        RESULTS_METADATA = _load_by_path('app', 'app_results_metadata.json')
+    return RESULTS_METADATA
+def _ensure_project_id():
+    global PROJECT_ID
+    if PROJECT_ID is None:
+        print("IMPORT_LOG: queries.py - loading PROJECT_ID", file=sys.stderr); sys.stderr.flush()
+        from geodoc_config import load_config as _load_config
+        PROJECT_ID = _load_config("gcp_general")['project_id']
+    return PROJECT_ID
 
-"""
-@queries_bp.before_request
-def log_session_id():
-    # This will print the session ID before every request to this blueprint
-    current_app.logger.debug(f"Request started for {request.path} with Session ID: {session.sid}")
-"""
+print("IMPORT_LOG: queries.py - creating BQ_CLIENT proxy", file=sys.stderr); sys.stderr.flush()
+def _get_bq_client():
+    # Import heavy libs only when first used
+    from geodoc_app.utils.gcp import get_bq_client as _get
+    return _get()
+BQ_CLIENT = LocalProxy(_get_bq_client)
+print("IMPORT_LOG: queries.py - BQ_CLIENT proxy created", file=sys.stderr); sys.stderr.flush()
 
 def save_result_metadata(filterStateId, filter_type, query_metacolumns):
     is_dev = current_app.config.get('DEV', True)
@@ -62,8 +60,10 @@ def save_result_metadata(filterStateId, filter_type, query_metacolumns):
             'type': filter_type
         }
     else:
-        # -- SAVING QUERY RESULTS FOR TEST PURPOSES --
-        metadata = RESULTS_METADATA[filter_type]['metadata']
+        from geodoc_app.search.artificial_results import (
+            prepare_artificial_query_result, prepare_artificial_target_result
+        )
+        metadata = _ensure_metadata()[filter_type]['metadata']
         res_func = prepare_artificial_query_result if filter_type in ['FilterResult', 'SearchArea'] else prepare_artificial_target_result
         artificial_result = res_func({**query_metacolumns, **metadata, 'type': filter_type})
         results[filterStateId] = artificial_result
@@ -102,6 +102,9 @@ def calculate_filters_route():
     Returns:
         JSON response with calculated filters.
     """
+    from geodoc_app.search.api_handlers import (
+        prepare_query_for_app_filters, filter_actual_filters, get_qualification_from_filters
+    )
     print('SESSION ID /calculate_filters:', session.sid)
     print(request.json)
     filters_req = request.json.get('filters', None)
@@ -117,7 +120,7 @@ def calculate_filters_route():
     filters = filter_actual_filters(filters_req)
     qualification = get_qualification_from_filters(filters_req)
 
-    project_id = load_config("gcp_general")['project_id']
+    project_id = _ensure_project_id()
     FILTER_SELECT_COLUMNS = current_app.config.get('FILTER_SELECT_COLUMNS', ['geometry'])
     INTERSECTION_BUFFER = current_app.config.get('INTERSECTION_BUFFER', 1000)
     SIMPLIFY_RATE = current_app.config.get('SIMPLIFY_RATE', 100)
@@ -167,7 +170,10 @@ def calculate_filters_route():
 
 @queries_bp.route('/set_search_area', methods=['POST'])
 def set_search_area_route():
-
+    from geodoc_app.search.search_queries import prepare_area_table_for_search_query
+    from geodoc_config import load_config as _load_config, load_config as _load_cfg
+    from geodoc_app.search.api_handlers import filter_actual_filters
+    
     print('SESSION ID /set_search_area:', session.sid)
     print(request.json)
     filters_req = request.json.get('filters', [])
@@ -187,9 +193,9 @@ def set_search_area_route():
 
     SEARCH_AREA_TABLE_NAME = 'search_area'
     SIMPLIFY_RATE = 100
-    project_id = load_config("gcp_general")['project_id']
+    project_id = _ensure_project_id()
 
-    adm_config = load_config("administration_units")
+    adm_config = _load_config("administration_units")
     teryt_dataset_id = adm_config['dataset_id']
 
     query_metacolumns = {
@@ -231,7 +237,7 @@ def set_search_area_route():
     
 @queries_bp.route('/set_search_target', methods=['POST'])
 def set_search_target_route():
-
+    from geodoc_app.search.parcels_results import get_parcels_result_query
     print('SESSION ID /set_search_target:', session.sid)
     print(request.json)
     filters_req = request.json.get('filters', [])
@@ -322,6 +328,10 @@ def check_query_status_route():
 
 @queries_bp.route('/get_query_result', methods=['POST'])
 def get_query_result_route():
+    from geodoc_app.search.api_handlers import prepare_geojson_with_attributes, get_properties_from_qualification
+    from geodoc_app.search.utils import get_query_result
+    from geodoc_app.search.artificial_results import prepare_artificial_result_output
+    from geodoc_app.search.search_queries import get_prepared_results_query
     print('SESSION ID /get_query_result:', session.sid)
     print(request.json)
     try:
@@ -330,7 +340,7 @@ def get_query_result_route():
             filterStateId = request.json.get('filterStateId', None)
             filter_data = session['results'][filterStateId]
 
-            filter_config = RESULTS_METADATA[filter_data['type']]
+            filter_config = _ensure_metadata()[filter_data['type']]
             results_table_path = filter_config['result_table_path']
             geometry_key = filter_config['geometry_key']
             attributes_keys = filter_config['attributes_keys']
@@ -349,7 +359,7 @@ def get_query_result_route():
 
             query = get_prepared_results_query(
                     filterStateId=filterStateId, 
-                    project_id=PROJECT_ID, 
+                    project_id=_ensure_project_id(), 
                     results_table_path=results_table_path)
             
             print('-' * 20)
@@ -398,6 +408,8 @@ def download_feature_csv():
       }
     }
     """
+    from geodoc_app.export.features import extract_features
+    from geodoc_app.export.formats import export_to_csv
     try:
         payload = request.get_json(silent=True) or {}
         feature = payload.get('feature')
@@ -414,4 +426,6 @@ def download_feature_csv():
     except Exception as e:
         current_app.logger.exception("Failed to export feature CSV")
         return jsonify({"error": str(e)}), 500
+
+print("IMPORT_LOG: Finished loading queries.py", file=sys.stderr); sys.stderr.flush()
 

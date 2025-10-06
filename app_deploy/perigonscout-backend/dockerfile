@@ -1,0 +1,29 @@
+# Use an official Python runtime as a parent image
+FROM python:3.10-slim
+
+# Set the working directory for copying files
+WORKDIR /app_build
+
+# Copy the requirements file and install dependencies
+COPY app_deploy/perigonscout-backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install local packages
+COPY app_deploy/source_packages /tmp/wheels/
+RUN pip install --no-cache-dir --find-links=/tmp/wheels/ geodoc_config geodoc_app
+RUN rm -rf /tmp/wheels/
+
+# Copy the backend application source code into a subdirectory
+# This creates a clean, non-conflicting structure: /app_build/backend
+COPY app_source/backend/ ./backend
+
+# Set the final working directory for running the app
+WORKDIR /app_build/backend
+
+# Expose the port the app runs on
+EXPOSE 8080
+
+# --- FINAL COMMAND ---
+# Use the default 'sync' worker for maximum compatibility.
+# Increase the worker timeout to match the startup probe.
+CMD ["gunicorn", "--worker-class", "sync", "--workers", "1", "--timeout", "240", "--bind", "0.0.0.0:8080", "wsgi:app"]

@@ -1,0 +1,1 @@
+docker build -t perigonscout-backend:latest -f app_deploy/perigonscout-backend/dockerfile .

@@ -1,4 +1,6 @@
-from geodoc_config import load_config
+import sys
+print("IMPORT_LOG: Loading state.py", file=sys.stderr); sys.stderr.flush()
+
 import uuid
 import time
 import os
@@ -8,6 +10,12 @@ from datetime import datetime
 
 state_bp = Blueprint('state', __name__)
 
+@state_bp.before_request
+def ensure_states_bucket():
+    # Ensure the 'states' bucket exists only for state routes
+    if 'states' not in session:
+        session['states'] = {}
+        session.modified = True
 
 @state_bp.route('/save_state', methods=['POST'])
 def save_state_route():
@@ -26,7 +34,7 @@ def save_state_route():
         created_at = now
     else:
         # Existing project, preserve created_at
-        existing_data = session['states'].get(project_id)
+        existing_data = session.get('states', {}).get(project_id)
         if existing_data and 'metadata' in existing_data and 'created_at' in existing_data['metadata']:
             created_at = existing_data['metadata']['created_at']
         else:
@@ -39,7 +47,8 @@ def save_state_route():
     if not project_name:
         return jsonify({"error": "No project name provided"}), 400
     
-    session['states'][project_id] = {
+    states = session.get('states', {})
+    states[project_id] = {
         'state': state,
         'metadata': {
             'name': project_name,
@@ -48,6 +57,8 @@ def save_state_route():
             'last_edition': now
         }
     }
+    session['states'] = states
+    session.modified = True
 
     try:
         return jsonify({"status": "ok", "projectId": project_id}), 200
@@ -63,7 +74,7 @@ def list_states_route():
         return jsonify([]), 200
 
     projects = []
-    for project_id, data in session['states'].items():
+    for project_id, data in session.get('states', {}).items():
         metadata = data.get('metadata')
         if not metadata:
             continue
@@ -96,7 +107,7 @@ def load_state_route():
     if not project_id:
         return jsonify({"error": "No project ID provided"}), 400
 
-    state_data = session['states'].get(project_id, None)
+    state_data = session.get('states', {}).get(project_id, None)
     if not state_data:
         return jsonify({"error": "No state found for the given project ID"}), 404
 
@@ -114,9 +125,14 @@ def delete_state_route():
     print(f"Received request to delete state for project ID: {project_id}")
     if not project_id:
         return jsonify({"error": "No project ID provided"}), 400
-    if project_id in session['states']:
-        del session['states'][project_id]
+    states = session.get('states', {})
+    if project_id in states:
+        del states[project_id]
+        session['states'] = states
+        session.modified = True
         print(f"Deleted state for project ID: {project_id}")
         return jsonify({"status": "ok"}), 200
     else:
         return jsonify({"error": "No state found for the given project ID"}), 404
+
+print("IMPORT_LOG: Finished loading state.py", file=sys.stderr); sys.stderr.flush()

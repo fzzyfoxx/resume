@@ -1,0 +1,11 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '-t'
+  - 'europe-west1-docker.pkg.dev/$PROJECT_ID/geodoc-backend/geodoc-backend:latest'
+  - '-f'
+  - 'app_deploy/perigonscout-backend/dockerfile' # Explicit path to your dockerfile
+  - '.' # The build context is the project root directory
+images:
+- 'europe-west1-docker.pkg.dev/$PROJECT_ID/geodoc-backend/geodoc-backend:latest'

@@ -1,0 +1,1 @@
+docker run --rm -p 8080:8080 -e REDIS_HOST=host.docker.internal -v ~/.config/gcloud:/root/.config/gcloud perigonscout-backend

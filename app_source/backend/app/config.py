@@ -2,7 +2,9 @@ import os
 
 DEBUG = False
 DEV = os.getenv('FLASK_ENV') == 'development'
-REDIS_URL = 'redis://127.0.0.1:6379' if not DEV else 'redis://'
+REDIS_URL = 'redis://127.0.0.1:6379' if not DEV else 'redis://10.36.201.211:6379'
+REDIS_HOST = '127.0.0.1' if not DEV else '10.36.201.211'
+REDIS_PORT = 6379
 SECRET_KEY = 'X2M89ALp1majWQAaa09b'
 SEARCH_FILTER_HINTS_LIMIT = 20
 SEARCH_FILTER_HINTS_THRESHOLD = 50

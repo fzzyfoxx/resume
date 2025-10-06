@@ -1,9 +1,14 @@
-from geodoc_app.inputs.values import get_filter_spec, get_column_items_from_symbols
-from geodoc_app.inputs.utils import filter_strings_by_search, filter_strings_set_by_search
+import sys
+print("IMPORT_LOG: Loading filters_routes.py", file=sys.stderr); sys.stderr.flush()
 
+print("IMPORT_LOG: filters_routes.py - Importing Flask...", file=sys.stderr); sys.stderr.flush()
 from flask import Blueprint, jsonify, request, current_app, session
+print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
 
+print("IMPORT_LOG: filters_routes.py - Creating Blueprint...", file=sys.stderr); sys.stderr.flush()
 filters_bp = Blueprint('filters', __name__)
+print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
+
 
 @filters_bp.route('/get_filter_spec', methods=['GET'])
 def get_filter_spec_route():
@@ -12,8 +17,10 @@ def get_filter_spec_route():
     Returns:
         JSON response with filter specification.
     """
+    # Lazily import heavy deps
+    from geodoc_app.inputs.values import get_filter_spec
     print(request.args)
-    print('SESSION ID /get_gilter_spec:', session.sid)
+    print('SESSION ID /get_gilter_spec:', getattr(session, "sid", None))
 
     symbols = dict(request.args.lists()).get('symbols', [])
     name = request.args.get('name', None)
@@ -33,6 +40,9 @@ def get_filter_search_hints_route():
     Returns:
         JSON response with search hints.
     """
+    # Lazily import heavy deps
+    from geodoc_app.inputs.values import get_column_items_from_symbols
+    from geodoc_app.inputs.utils import filter_strings_by_search, filter_strings_set_by_search
     #print(request.args)
     #print('SESSION ID /get_filter_search_hints:', session.sid)
 
@@ -70,4 +80,5 @@ def get_filter_search_hints_route():
         return jsonify({"items": hints}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-    
+
+print("IMPORT_LOG: Finished loading filters_routes.py", file=sys.stderr); sys.stderr.flush()

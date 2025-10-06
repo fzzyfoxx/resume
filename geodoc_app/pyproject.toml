@@ -22,7 +22,13 @@ classifiers = [
 dependencies = [
     "importlib-resources>=5.12.0,<7.0.0",
     "levenshtein",
-    "fuzzywuzzy"
+    "fuzzywuzzy",
+    "shapely>=2.0.1,<3.0.0",
+    "pyproj>=3.6.0,<4.0.0",
+    "geodoc_config>=0.1.0",
+    "google-cloud-bigquery>=3.35.1,<4.0.0",
+    "google-cloud-storage>=2.10.0,<3.0.0",
+    "flask>=3.0.0,<4.0.0",
 ]
 
 [tool.setuptools]
