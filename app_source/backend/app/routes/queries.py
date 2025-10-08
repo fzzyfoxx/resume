@@ -1,5 +1,5 @@
 import sys
-print("IMPORT_LOG: Loading queries.py", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: Loading queries.py", file=sys.stderr); sys.stderr.flush()
 
 import uuid
 import time
@@ -7,7 +7,7 @@ import os
 from flask import Blueprint, jsonify, request, current_app, session, Response
 from werkzeug.local import LocalProxy
 
-print("IMPORT_LOG: queries.py - imports done, executing module-level code", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: queries.py - imports done, executing module-level code", file=sys.stderr); sys.stderr.flush()
 
 queries_bp = Blueprint('queries', __name__)
 
@@ -30,25 +30,25 @@ PROJECT_ID = None
 def _ensure_metadata():
     global RESULTS_METADATA
     if RESULTS_METADATA is None:
-        print("IMPORT_LOG: queries.py - loading RESULTS_METADATA", file=sys.stderr); sys.stderr.flush()
+        #print("IMPORT_LOG: queries.py - loading RESULTS_METADATA", file=sys.stderr); sys.stderr.flush()
         from geodoc_config import load_config_by_path as _load_by_path
         RESULTS_METADATA = _load_by_path('app', 'app_results_metadata.json')
     return RESULTS_METADATA
 def _ensure_project_id():
     global PROJECT_ID
     if PROJECT_ID is None:
-        print("IMPORT_LOG: queries.py - loading PROJECT_ID", file=sys.stderr); sys.stderr.flush()
+        #print("IMPORT_LOG: queries.py - loading PROJECT_ID", file=sys.stderr); sys.stderr.flush()
         from geodoc_config import load_config as _load_config
         PROJECT_ID = _load_config("gcp_general")['project_id']
     return PROJECT_ID
 
-print("IMPORT_LOG: queries.py - creating BQ_CLIENT proxy", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: queries.py - creating BQ_CLIENT proxy", file=sys.stderr); sys.stderr.flush()
 def _get_bq_client():
     # Import heavy libs only when first used
     from geodoc_app.utils.gcp import get_bq_client as _get
     return _get()
 BQ_CLIENT = LocalProxy(_get_bq_client)
-print("IMPORT_LOG: queries.py - BQ_CLIENT proxy created", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: queries.py - BQ_CLIENT proxy created", file=sys.stderr); sys.stderr.flush()
 
 def save_result_metadata(filterStateId, filter_type, query_metacolumns):
     is_dev = current_app.config.get('DEV', True)

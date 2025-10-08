@@ -1,13 +1,13 @@
 import sys
-print("IMPORT_LOG: Loading filters_routes.py", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: Loading filters_routes.py", file=sys.stderr); sys.stderr.flush()
 
-print("IMPORT_LOG: filters_routes.py - Importing Flask...", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: filters_routes.py - Importing Flask...", file=sys.stderr); sys.stderr.flush()
 from flask import Blueprint, jsonify, request, current_app, session
-print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
 
-print("IMPORT_LOG: filters_routes.py - Creating Blueprint...", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: filters_routes.py - Creating Blueprint...", file=sys.stderr); sys.stderr.flush()
 filters_bp = Blueprint('filters', __name__)
-print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: filters_routes.py - DONE", file=sys.stderr); sys.stderr.flush()
 
 
 @filters_bp.route('/get_filter_spec', methods=['GET'])
@@ -81,4 +81,4 @@ def get_filter_search_hints_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-print("IMPORT_LOG: Finished loading filters_routes.py", file=sys.stderr); sys.stderr.flush()
+#print("IMPORT_LOG: Finished loading filters_routes.py", file=sys.stderr); sys.stderr.flush()
