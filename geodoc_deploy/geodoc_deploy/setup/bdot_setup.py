@@ -12,7 +12,7 @@ def bdot_setup(config):
     location = config['location']
 
     # prepare GCS bucket for BDOT data
-    bucket_name = f"{project_id}-bdot"
+    bucket_name = f"{project_id}-{config['bucket_name']}"
     bucket = create_gcs_bucket(project_id, bucket_name)
 
     # create BigQuery dataset for BDOT data

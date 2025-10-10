@@ -44,6 +44,21 @@
         "file": "teryts.json",
         "description": "Teryt administrative units configuration"
     },
+    "ejournals_config": {
+        "folder": "ejournals",
+        "file": "ejournals_config.json",
+        "description": "Configuration for e-journals processing"
+    },
+    "ejournals_setup_config": {
+        "folder": "ejournals",
+        "file": "ejournals_setup_config.json",
+        "description": "Setup configuration for e-journals processing"
+    },
+    "ejournals_service_config": {
+        "folder": "ejournals",
+        "file": "ejournals_service_config.json",
+        "description": "CloudRun job configuration for e-journals service"
+    },
     "service_reports_service": {
         "folder": "service_reports",
         "file": "service_reports_service_config.json",

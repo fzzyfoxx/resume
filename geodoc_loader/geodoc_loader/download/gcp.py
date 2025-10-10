@@ -4,7 +4,7 @@ import os
 from geodoc_loader.download.core import delete_local_temp_files
 from geodoc_loader.handlers.core import save_geojson
 
-def create_gcs_bucket(project_id, bucket_name):
+def create_gcs_bucket(project_id, bucket_name, location='EU'):
     """Creates a GCS bucket if it doesn't already exist."""
     storage_client = storage.Client(project=project_id)
     try:
@@ -13,7 +13,7 @@ def create_gcs_bucket(project_id, bucket_name):
     except NotFound:
         print(f"Bucket '{bucket_name}' does not exist. Creating it...")
         try:
-            bucket = storage_client.create_bucket(bucket_name, project=project_id)
+            bucket = storage_client.create_bucket(bucket_name, project=project_id, location=location)
             print(f"Bucket '{bucket_name}' created successfully.")
         except Conflict:
             # This can happen if another process creates it concurrently
