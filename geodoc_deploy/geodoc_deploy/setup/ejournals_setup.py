@@ -28,7 +28,7 @@ def gen_ejournals_queue_input(provinces, starting_year, starting_month):
                     'month': month,
                     'completed': False,
                     'last_call': None,
-                    'acts_founded': None,
+                    'acts_found': None,
                     'acts_downloaded': None,
                     'priority': priority
                 })

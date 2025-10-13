@@ -55,7 +55,7 @@ class EJournalCrawler:
                  browser_size_y, 
                  browser_timeout,
                  dataset_id,
-                 document_bucket_name,
+                 documents_bucket_name,
                  images_bucket_name,
                  firestore_collection_name,
                  status_table,
@@ -82,7 +82,7 @@ class EJournalCrawler:
 
         # assign gcp locations
         self.dataset_id = dataset_id
-        self.document_bucket_name = document_bucket_name
+        self.documents_bucket_name = documents_bucket_name
         self.images_bucket_name = images_bucket_name
         self.firestore_collection_name = firestore_collection_name
         self.status_table = status_table
@@ -140,8 +140,8 @@ class EJournalCrawler:
         
         # get buckets for saving files to Cloud Storage
         self.storage_client = storage.Client(project=self.project_id)
-        self.pdf_bucket = self.storage_client.bucket(self.project_id + '-' + 'pdfs')
-        self.img_bucket = self.storage_client.bucket(self.project_id + '-' + 'page_imgs')
+        self.pdf_bucket = self.storage_client.bucket(self.project_id + '-' + documents_bucket_name)
+        self.img_bucket = self.storage_client.bucket(self.project_id + '-' + images_bucket_name)
         
         self.dpi = image_dpi
     
@@ -209,7 +209,7 @@ class EJournalCrawler:
             SET 
                 completed = {cr['completed']},
                 last_call = '{cr['last_call']}',
-                acts_founded = {cr['acts_founded']},
+                acts_found = {cr['acts_found']},
                 acts_downloaded = {cr['acts_downloaded']}
             WHERE
                 id = '{cr['id']}'
@@ -257,15 +257,16 @@ class EJournalCrawler:
         errors = []
         parsed_rows = []
         
-        if year_name not in self.years_list:
-            return None
-        elif month_name not in self.months_list:
-            return None
+        if (year_name not in self.years_list) or (month_name not in self.months_list):
+            acts_founded = 0
+            rows = []
         else:
 
             # Get downloaded documents for queue_id
             try:
-                fs_doc_resp = self.db.collection('acts').where('queue_id', '==', queue_id).get()
+                fs_doc_resp = self.db.collection(self.firestore_collection_name).where('queue_id', '==', queue_id).get()
+                if len(fs_doc_resp)>0:
+                    print(f'Found {len(fs_doc_resp)} existing documents in Firestore for {self.province_id} [y-m] {year}-{month}')
                 existing_docs = {doc.id: doc.to_dict() for doc in fs_doc_resp}
                 self.acts_downloaded = len(existing_docs)
             except Exception as e:
@@ -307,6 +308,7 @@ class EJournalCrawler:
                 body = soup.find('tbody')
                 rows = body.find_all("tr", class_="pointer ng-scope")
                 acts_founded = len(rows)
+                print(f'Acts found on page: {acts_founded}')
             except Exception as e:
                 err_msg = f'Error parsing page for {self.province_id} [y-m] {year}-{month}: {str(e)}'
                 print(err_msg)
@@ -321,83 +323,83 @@ class EJournalCrawler:
                     continue
                 parsed_rows.append(parsed_row)
 
-            print('Acts founded: %d' % (acts_founded) | ' Acts downloaded: %d' % (self.acts_downloaded))
+            print(f'Acts founded: {acts_founded} | Acts downloaded: {self.acts_downloaded}')
 
-            ## Update status table in BigQuery
-            # Check if query month is finished
-            completed = self.is_month_finished(year, month)
+        ## Update status table in BigQuery
+        # Check if query month is finished
+        completed = self.is_month_finished(year, month)
 
-            if acts_founded>self.acts_downloaded:
-                completed = False
+        if acts_founded>self.acts_downloaded:
+            completed = False
 
-            update_info = {'completed': completed,
-                           'last_call': str(datetime.now()),
-                           'acts_founded': acts_founded,
-                           'acts_downloaded': self.acts_downloaded,
-                           'id': queue_id}
-            
-            update_result = self.update_record(update_info)
+        update_info = {'completed': completed,
+                        'last_call': str(datetime.now()),
+                        'acts_found': acts_founded,
+                        'acts_downloaded': self.acts_downloaded,
+                        'id': queue_id}
+        
+        update_result = self.update_record(update_info)
 
-            if not update_result:
-                err_msg = f'Error updating status table in BigQuery for {self.province_id} [y-m] {year}-{month}'
-                print(err_msg)
-                errors.append(err_msg)
-            else:
-                print(f'Successfully updated status table in BigQuery for {self.province_id} [y-m] {year}-{month}')
+        if not update_result:
+            err_msg = f'Error updating status table in BigQuery for {self.province_id} [y-m] {year}-{month}'
+            print(err_msg)
+            errors.append(err_msg)
+        else:
+            print(f'Successfully updated status table in BigQuery for {self.province_id} [y-m] {year}-{month}')
 
-            ###
+        ###
 
-            ## Log info to BigQuery table
+        ## Log info to BigQuery table
 
-            end_time = time.time()
-            print(f'Page parsing time: {end_time-start_time} seconds')
+        end_time = time.time()
+        print(f'Page parsing time: {end_time-start_time} seconds')
 
-            logs_info = {
-                'id': queue_id,
-                'call_data': str(datetime.now()),
-                'docs_processed': len(rows),
-                'docs_founded': acts_founded,
-                'docs_downloaded': self.acts_downloaded,
-                'errors_num': len(errors),
-                'processing_time': end_time-start_time
-            }
+        logs_info = {
+            'id': queue_id,
+            'call_date': str(datetime.now()),
+            'docs_processed': len(rows),
+            'docs_found': acts_founded,
+            'docs_downloaded': self.acts_downloaded,
+            'errors_num': len(errors),
+            'processing_time': round(end_time-start_time,1)
+        }
 
-            logs_upload = upload_dicts_to_bigquery_table(
+        logs_upload = upload_dicts_to_bigquery_table(
+            project_id=self.project_id,
+            dataset_id=self.dataset_id,
+            table_name=self.logs_table,
+            data=[logs_info]
+        )
+
+        if not logs_upload:
+            err_msg = f'Error uploading logs to BigQuery table for {self.province_id} [y-m] {year}-{month}'
+            print(err_msg)
+            errors.append(err_msg)
+        else:
+            print(f'Successfully uploaded logs to BigQuery table for {self.province_id} [y-m] {year}-{month}')
+
+        ###
+
+        ## Log errors to BigQuery table
+        if len(errors)>0:
+            errors = [{"id": queue_id, "error_message": err, "timestamp": str(datetime.now())} for err in errors]
+            errors_upload = upload_dicts_to_bigquery_table(
                 project_id=self.project_id,
                 dataset_id=self.dataset_id,
-                table_name=self.logs_table,
-                data=[logs_info]
+                table_name=self.errors_table,
+                data=errors
             )
-
-            if not logs_upload:
-                err_msg = f'Error uploading logs to BigQuery table for {self.province_id} [y-m] {year}-{month}'
+            if not errors_upload:
+                err_msg = f'Error uploading errors to BigQuery table for {self.province_id} [y-m] {year}-{month}'
                 print(err_msg)
-                errors.append(err_msg)
             else:
-                print(f'Successfully uploaded logs to BigQuery table for {self.province_id} [y-m] {year}-{month}')
+                print(f'Successfully uploaded {len(errors)} errors to BigQuery table for {self.province_id} [y-m] {year}-{month}')
+        else:
+            print(f'No errors to upload to BigQuery table for {self.province_id} [y-m] {year}-{month}')
+        ###
+        print('-'*50 + '\n')
 
-            ###
-
-            ## Log errors to BigQuery table
-            if len(errors)>0:
-                errors = [{"id": queue_id, "error_message": err, "timestamp": str(datetime.now())} for err in errors]
-                errors_upload = upload_dicts_to_bigquery_table(
-                    project_id=self.project_id,
-                    dataset_id=self.dataset_id,
-                    table_name=self.errors_table,
-                    data=errors
-                )
-                if not errors_upload:
-                    err_msg = f'Error uploading errors to BigQuery table for {self.province_id} [y-m] {year}-{month}'
-                    print(err_msg)
-                else:
-                    print(f'Successfully uploaded {len(errors)} errors to BigQuery table for {self.province_id} [y-m] {year}-{month}')
-            else:
-                print(f'No errors to upload to BigQuery table for {self.province_id} [y-m] {year}-{month}')
-            ###
-            print('-'*50 + '\n')
-
-            return parsed_rows
+        return parsed_rows
     
     def get_pages_with_images(self, pdf_bytes):
         '''
@@ -526,14 +528,14 @@ class EJournalCrawler:
             
             #### UPLOAD DOC INFO TO FIRESTORE
             try:
-                self.db.collection('acts').document(doc_name).set(parsed_info)
+                self.db.collection(self.firestore_collection_name).document(doc_name).set(parsed_info)
             except Exception as e:
                 err_msg = f'Error uploading doc info to Firestore for row {row_id} for {self.province_id} [y] {year}: {str(e)}'
                 print(err_msg)
                 return None, err_msg
                 
             ####
-        return parsed_info
+        return parsed_info, err_msg
     
     def quit_driver(self,):
         '''
@@ -541,3 +543,86 @@ class EJournalCrawler:
         '''
         self.driver.quit()
         self.display.stop()
+
+from geodoc_config import get_service_config
+from geodoc_loader.download.queue import get_queue_items_query
+from geodoc_loader.download.bigquery import get_query_result
+from geodoc_loader.download.process import filter_queue_by_worker
+
+def run_ejournals_download():
+
+    pause_mean = float(os.getenv("PAUSE_MEAN", 1.5))
+    pause_std = float(os.getenv("PAUSE_STD", 0.7))
+    pause_min = float(os.getenv("PAUSE_MIN", 0.5))
+    scrolling_limit = int(os.getenv("SCROLLING_LIMIT", 20))
+    loading_timeout = int(os.getenv("LOADING_TIMEOUT", 60))
+    ignore_first_page_image = os.getenv("IGNORE_FIRST_PAGE_IMAGE", "True").lower() in ("true", "1", "yes")
+    image_dpi = int(os.getenv("IMAGE_DPI", 120))
+    queue_timeout = int(os.getenv("QUEUE_TIMEOUT", 60))
+    text_filter = os.getenv("TEXT_FILTER", "zagosp")
+    browser_size_x = int(os.getenv("BROWSER_SIZE_X", 1920))
+    browser_size_y = int(os.getenv("BROWSER_SIZE_Y", 1080))
+    browser_timeout = int(os.getenv("BROWSER_TIMEOUT", 60))
+
+    config = get_service_config(service_name="ejournals-downloader", key="worker")
+    queue_limit = int(os.environ.get("QUEUE_LIMIT", 1))
+    filter = os.environ.get("FILTER", None)
+
+    full_filter = "completed = false" + (f" AND {filter}" if filter else "")
+
+    bq_client = bigquery.Client()
+    project_id = bq_client.project
+
+    queue_query = get_queue_items_query(
+        project_id=project_id,
+        dataset_id=config['dataset_id'],
+        table_id=config['status_table'],
+        limit=queue_limit,
+        desc_priority=False,
+        filter=full_filter,
+        order_by='province_id'
+    )
+
+    queue_items = get_query_result(client=bq_client, query=queue_query)
+    queue_items = filter_queue_by_worker(queue_items)
+    queue_items_num = len(queue_items)
+
+    PROVINCE_ID = ''
+    print(f'Used TEXT_FILTER: {text_filter}')
+
+    for i, item in enumerate(queue_items):
+        if item['province_id']!=PROVINCE_ID:
+            # if it is not first input given during worker session shutdown firebase and selenium drivers
+            if PROVINCE_ID!='':
+                firebase_admin.delete_app(crw.app)
+                crw.quit_driver()
+            PROVINCE_ID = item['province_id']
+            print('PROVINCE_ID: %s' % (PROVINCE_ID))
+            crw = EJournalCrawler(province_id=PROVINCE_ID, 
+                            pause_mean=pause_mean, 
+                            pause_std=pause_std, 
+                            pause_min=pause_min, 
+                            scrolling_limit=scrolling_limit,
+                            loading_timeout=loading_timeout,
+                            ignore_first_page_image=ignore_first_page_image,
+                            image_dpi=image_dpi,
+                            browser_size_x=browser_size_x, 
+                            browser_size_y=browser_size_y, 
+                            browser_timeout=browser_timeout,
+                            dataset_id=config['dataset_id'],
+                            documents_bucket_name=config['documents_bucket_name'],
+                            images_bucket_name=config['images_bucket_name'],
+                            firestore_collection_name=config['firestore_collection_name'],
+                            status_table=config['status_table'],
+                            logs_table=config['logs_table'],
+                            errors_table=config['errors_table'],
+                            ejournals_urls_path=config['ejournals_urls_path'],
+                            ejournals_urls_filename=config['ejournals_urls_filename']
+                            )
+        parsed_rows = crw.parse_page(
+            year=item['year'],
+            month=item['month'],
+            text_filter=text_filter
+        )
+
+        print(f'Processed {i+1} out of {queue_items_num} queue items')

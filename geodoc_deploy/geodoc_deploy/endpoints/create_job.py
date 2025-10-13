@@ -18,7 +18,7 @@ def main():
     SERVICE_JOB_CONFIG = service_config['gcp_job']
     ARTIFACT_REGISTRY_LOCATION = services_config['location'] # e.g., us-central1, europe-west1
     ARTIFACT_REGISTRY_REPO = services_config['registry_repository'] # Artifact Registry repository name
-    REGION = services_config['location']  # e.g., us-central1, europe-west1
+    REGION = service_config.get("location",services_config['location'])  # e.g., us-central1, europe-west1 | use global default if not specified for specific service
 
     # Define the full image tag for Artifact Registry
     # Format: <LOCATION>-docker.pkg.dev/<PROJECT_ID>/<REPOSITORY>/<IMAGE_NAME>:<TAG>

@@ -99,7 +99,7 @@ Multi purpose service for handling different data sources downloaded based on TE
 The spatial-data-downloader is used only in deployment and run phase. For a setup and add-to-queue operations use supported services names.
 
 ```bash
-geodoc-run-job --service spatial-data-downloader --e SERVICE=SERVICE_NAME --e QUEUE_LIMIT=QUEUE_LIMIT
+geodoc-run-job --job spatial-data-downloader --e SERVICE=SERVICE_NAME --e QUEUE_LIMIT=QUEUE_LIMIT
 ```
 - SERVICE_NAME: The name of the service to run (e.g., bdot).
 - QUEUE_LIMIT: The maximum number of items to process in the queue (default: 5).
@@ -114,9 +114,20 @@ geodoc-run-job --service spatial-data-downloader --e SERVICE=SERVICE_NAME --e QU
 Separate instance of the spatial-data-downloader service to handle multi-worker processing of parcels data.
 Designed for CloudRun jobs, running it locally will not launch multiple workers.
 ```bash
-geodoc-run-job --service parcels --e QUEUE_LIMIT=QUEUE_LIMIT --e QUEUE_SPLIT_METHOD=QUEUE_SPLIT_METHOD
+geodoc-run-job --job parcels --e QUEUE_LIMIT=QUEUE_LIMIT --e QUEUE_SPLIT_METHOD=QUEUE_SPLIT_METHOD
 ```
 - QUEUE_LIMIT: The maximum number of items to process in the queue (default: 5).
 - QUEUE_SPLIT_METHOD: The method to split the queue items (default: cut). Options are:
   - cut: Splits the queue items into equal parts for each worker by separating a list like [1,2], [3,4], [5,6].
   - modulo: Splits the queue items based on the modulo operation, allowing for more flexible distribution across workers like [1,4], [2,5], [3,6].
+
+## EJOURNALS-DOWNLOADER
+Service for downloading documents from province's e-journals.
+```bash
+geodoc-run-job --job ejournals-downloader --e QUEUE_LIMIT=QUEUE_LIMIT --e FILTER=FILTER --e TEXT_FILTER=TEXT_FILTER --e QUEUE_SPLIT_METHOD=QUEUE_SPLIT_METHOD
+```
+
+- QUEUE_LIMIT: The maximum number of items to process in the queue (default: 8).
+- FILTER: A query "where" clause to filter queue (default: None) e.g. FILTER="province_id='30' AND year=2025".
+- TEXT_FILTER: A text string to filter the documents by their title on the e-journals page (default: "zagosp") e.g. TEXT_FILTER="zagosp".
+- QUEUE_SPLIT_METHOD: The method to split the queue items (default: cut).

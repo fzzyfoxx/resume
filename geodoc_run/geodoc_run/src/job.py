@@ -1,6 +1,6 @@
 from google.cloud import run_v2
 from google.api_core import exceptions
-from geodoc_config import load_config
+from geodoc_config import load_config, get_service_config
 from google.api_core.operation import Operation
 
 def run_cloud_run_job(job_name: str, env_vars: dict = None):
@@ -24,7 +24,11 @@ def run_cloud_run_job(job_name: str, env_vars: dict = None):
     # Load configuration for GCP services and general settings.
     services_config = load_config('gcp_services')
     general_config = load_config('gcp_general')
-    region = services_config['location']
+    try:
+        service_config = get_service_config(job_name, "service")
+    except:
+        service_config = {}
+    region = service_config.get("location", services_config['location']) # e.g., us-central1, europe-west1 | use global default if not specified for specific service
     project_id = general_config['project_id']
 
     # Initialize the Cloud Run Jobs client.

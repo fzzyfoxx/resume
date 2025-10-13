@@ -4,7 +4,7 @@ echo "Tearing down expensive GCP resources..."
 echo "Deleting Load Balancer forwarding rule..."
 gcloud compute forwarding-rules delete geodoc-forwarding-rule --global --quiet
 
-# 2. Delete the Cloud Run service
+#  2. Delete the Cloud Run service
 #echo "Deleting Cloud Run service..."
 #gcloud run services delete geodoc-backend --region=europe-west1 --platform=managed --quiet
 

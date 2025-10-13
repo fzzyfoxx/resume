@@ -1,0 +1,78 @@
+FROM ubuntu:20.04
+
+# Allow statements and log messages to immediately appear in the Knative logs
+ENV PYTHONUNBUFFERED True
+WORKDIR /app
+
+COPY requirements.txt .
+COPY ejournals-downloader.py .
+
+# Essential tools and xvfb
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    unzip \
+    curl \
+    xvfb \
+    wget
+
+# Firefox browser
+RUN apt-get install -y firefox
+ 
+# Gecko Driver
+ENV GECKODRIVER_VERSION 0.33.0
+RUN wget --no-verbose -O /tmp/geckodriver.tar.gz https://github.com/mozilla/geckodriver/releases/download/v$GECKODRIVER_VERSION/geckodriver-v$GECKODRIVER_VERSION-linux64.tar.gz \
+  && rm -rf /opt/geckodriver \
+  && tar -C /opt -zxf /tmp/geckodriver.tar.gz \
+  && rm /tmp/geckodriver.tar.gz \
+  && mv /opt/geckodriver /opt/geckodriver-$GECKODRIVER_VERSION \
+  && chmod 755 /opt/geckodriver-$GECKODRIVER_VERSION \
+  && ln -fs /opt/geckodriver-$GECKODRIVER_VERSION /usr/bin/geckodriver \
+  && ln -fs /opt/geckodriver-$GECKODRIVER_VERSION /usr/bin/wires
+
+# Install dependencies for building Python from source
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    build-essential \
+    zlib1g-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    libssl-dev \
+    libreadline-dev \
+    libffi-dev \
+    wget
+
+# Download and build Python 3.10 from source
+RUN wget https://www.python.org/ftp/python/3.10.12/Python-3.10.12.tgz \
+    && tar -xvf Python-3.10.12.tgz \
+    && cd Python-3.10.12 \
+    && ./configure --enable-optimizations \
+    && make -j$(nproc) \
+    && make altinstall \
+    && cd .. \
+    && rm -rf Python-3.10.12 Python-3.10.12.tgz
+
+# Ensure the Python 3.10 binary exists and create a symlink
+RUN ln -sf /usr/local/bin/python3.10 /usr/bin/python3
+
+# Install pip for Python 3.10
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+
+# Install setuptools (includes distutils)
+RUN python3.10 -m pip install setuptools
+
+# Copy the pre-built wheels from the temporary build context
+# (which were copied there by the Python script)
+COPY packages /tmp/wheels/
+
+# Install dependencies, including the local wheel
+RUN pip install --no-cache-dir \
+    --find-links=/tmp/wheels/ \
+    geodoc_config \
+    geodoc_loader \
+    -r requirements.txt
+
+# Clean up
+RUN rm -rf /tmp/wheels/
+
+CMD [ "python3", "ejournals-downloader.py"]

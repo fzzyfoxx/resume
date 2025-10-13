@@ -13,7 +13,7 @@
         "setup": "parcels_setup_config",
         "service": "parcels_service_config"
     },
-    "ejournals": {
+    "ejournals-downloader": {
         "worker": "ejournals_config",
         "setup": "ejournals_setup_config",
         "service": "ejournals_service_config"
