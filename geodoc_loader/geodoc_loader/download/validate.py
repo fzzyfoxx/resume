@@ -6,6 +6,7 @@ from shapely.geometry import shape
 def find_files_with_extension(directory, extension):
     """
     Finds all files with a specific extension in a directory and its subdirectories.
+    
     Args:
         directory (str): The directory to search in.
         extension (str): The file extension to look for (e.g., '.shp').
@@ -22,6 +23,7 @@ def find_files_with_extension(directory, extension):
 def collect_columns_for_sources(sources, target_path):
     """
     Collects columns from shapefiles in the specified sources and returns a list of dictionaries with file names and columns.
+    
     Args:
         sources (list): List of dictionaries with 'name' and 'url' for each source
         target_path (str): Path where the downloaded files are saved

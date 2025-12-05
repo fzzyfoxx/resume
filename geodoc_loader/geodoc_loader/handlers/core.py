@@ -8,6 +8,7 @@ import os
 def get_columns_from_config_schema(schema):
     """
     Extracts column names from the schema, excluding the 'geometry' column.
+    
     Args:
         schema (list): List of dictionaries representing the schema.
     Returns:
@@ -24,6 +25,7 @@ def get_columns_from_config_schema(schema):
 def process_shapefile_for_columns(file_path, columns_set, encode=None, decode=None):
     """
     Processes a shapefile to extract specified columns, handle geometries, and convert CRS.
+    
     Args:
         file_path (str): Path to the shapefile.
         columns_set (list): List of column names to extract.
@@ -119,6 +121,7 @@ def process_shapefile_for_columns(file_path, columns_set, encode=None, decode=No
 def concat_gdfs(gdf_list):
     """
     Concatenates a list of GeoDataFrames into a single GeoDataFrame.
+    
     Args:
         gdf_list (list): List of GeoDataFrames to concatenate.
     Returns:
@@ -137,6 +140,7 @@ def concat_gdfs(gdf_list):
 def save_geojson(gdf, target_path, file_name):
     """
     Saves a GeoDataFrame to a GeoJSON file, ensuring each feature is on a new line.
+    
     Args:
         gdf (GeoDataFrame): The GeoDataFrame to save.
         target_path (str): The directory where the GeoJSON file will be saved.
@@ -174,6 +178,7 @@ def load_json(path):
 def list_to_geodataframe(data, geometry_col='geometry', crs='EPSG:2180', constant_columns=None):
     """
     Convert a list of dictionaries to a GeoDataFrame.
+    
     Args:
         data (list): List of dictionaries containing data.
         geometry_col (str): Name of the column that contains geometry data.
@@ -199,7 +204,13 @@ def list_to_geodataframe(data, geometry_col='geometry', crs='EPSG:2180', constan
     return gdf
 
 def overwrite_metaparams_from_env(meta_params):
-
+    """
+    Overwrites meta parameters with environment variables if they exist.
+    Args:
+        meta_params (dict): Dictionary of meta parameters.
+    Returns:
+        dict: Updated dictionary of meta parameters.
+    """
     for key, value in meta_params.items():
         env_value = os.environ.get(f'ULDK_{key.upper()}')
         if env_value is not None:

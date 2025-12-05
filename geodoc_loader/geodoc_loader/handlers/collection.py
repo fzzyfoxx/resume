@@ -8,6 +8,7 @@ def load_geo_collection(folder_name, config):
     """
     Loads a collection of shapefiles from a specified folder, processes them to extract specified columns.
     Saves the processed data to a GeoJSON file, uploads it to Google Cloud Storage, and loads it into BigQuery.
+    
     Args:
         folder_name (str): The name of the folder containing the shapefiles.
         config (dict): Configuration dictionary containing schema, encoding, and other parameters. Config should include:

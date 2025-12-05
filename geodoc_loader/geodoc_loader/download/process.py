@@ -33,7 +33,17 @@ def divide_list_by_worker(data_list, total_workers, worker_id):
     return data_list[start_idx:end_idx]
 
 def filter_queue_by_worker(queue_items):
+    """
+    Filters queue items based on the worker ID in a GCP Cloud Run environment.
+    There are two methods to split the queue: 'cut' and 'modulo':
+    - 'cut': Divides the list of queue items using pattern 111...222...333... for 3 workers
+    - 'modulo': Assigns items based on assignment_id % total_workers == worker_id % total_workers which work like 123123123... for 3 workers
 
+    Args:
+        queue_items (list): List of queue items (dictionaries) to filter.
+    Returns:
+        list: Filtered list of queue items assigned to the current worker.
+    """
     if len(queue_items) == 0:
         return queue_items
     
@@ -61,9 +71,12 @@ def filter_queue_by_worker(queue_items):
 def download_spatial_data_from_queue(queue_limit, service):
     """
     Downloads spatial data from the queue for a given service and processes it.
+    
     Args:
         queue_limit (int): The maximum number of items to process from the queue.
         service (str): The name of the service to process data for.
+    Returns:
+        None
     """
     print("Setting up BigQuery and Storage clients...")
     bq_client = bigquery.Client()

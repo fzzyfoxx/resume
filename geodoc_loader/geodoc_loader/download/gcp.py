@@ -5,7 +5,16 @@ from geodoc_loader.download.core import delete_local_temp_files
 from geodoc_loader.handlers.core import save_geojson
 
 def create_gcs_bucket(project_id, bucket_name, location='EU'):
-    """Creates a GCS bucket if it doesn't already exist."""
+    """
+    Creates a GCS bucket if it doesn't already exist.
+    
+    Args:
+        project_id (str): Google Cloud project ID.
+        bucket_name (str): Name of the GCS bucket to create.
+        location (str): Location for the bucket (default is 'EU').
+    Returns:
+        storage.Bucket: The created or existing GCS bucket.
+    """
     storage_client = storage.Client(project=project_id)
     try:
         bucket = storage_client.get_bucket(bucket_name)
@@ -35,7 +44,6 @@ def create_bigquery_dataset(project_id, dataset_name, location="EU"):
         project_id (str): Google Cloud project ID.
         dataset_name (str): Name of the dataset to create.
         location (str): Location for the dataset (default is "EU").
-
     Returns:
         str: The full dataset ID of the created dataset, or None if an error occurred.
     """
@@ -76,7 +84,6 @@ def create_bigquery_table(table_name, collection_name, project_id, columns_spec,
         project_id (str): Google Cloud project ID.
         columns_spec (list): List of dictionaries specifying column schema (name, type, mode).
         additional_columns (list): List of additional nullable string columns to add to the schema.
-
     Returns:
         str: The full table ID of the created table, or None if an error occurred.
     """
@@ -123,7 +130,6 @@ def get_bq_table_schema(client, project_id, dataset_name, table_name):
         project_id (str): The ID of the Google Cloud project.
         dataset_name (str): The name of the BigQuery dataset.
         table_name (str): The name of the BigQuery table.
-    
     Returns:
         list: A list of dictionaries representing the schema of the table.
     """
@@ -163,6 +169,7 @@ def upload_to_gcs(storage_client, bucket_name, folder_name, file_name, local_fil
 def load_geojson_to_bigquery(client, project_id, dataset_name, table_name, gcs_uri):
     """
     Loads data from a GeoJSON file in GCS into a BigQuery table. Returns True on success, False on failure.
+    
     Args:
         client (bigquery.Client): The BigQuery client instance.
         project_id (str): The ID of the Google Cloud project.
@@ -203,6 +210,7 @@ def load_geojson_to_bigquery(client, project_id, dataset_name, table_name, gcs_u
 def delete_gcs_temp_files(storage_client, bucket_name, folder_name, file_name):
     """
     Deletes temporary geojson files from GCS.
+    
     Args:
         storage_client (google.cloud.storage.Client): The GCS client instance.
         bucket_name (str): The name of the GCS bucket.
@@ -228,7 +236,6 @@ def list_files_in_gcs_folder(bucket_name, folder_path):
     Args:
         bucket_name (str): The name of the GCS bucket.
         folder_path (str): The folder path in the bucket (e.g., 'bdot_data/0214/').
-
     Returns:
         list: A list of tuples where each tuple contains (file_name, gcs_uri).
     """
@@ -260,6 +267,7 @@ def load_single_geojson_to_bigquery(
         delete_local=True):
     """
     Loads a single GeoJSON file to BigQuery after uploading it to Google Cloud Storage.
+    
     Args:
         bucket_name (str): Name of the GCS bucket.
         bucket_folder (str): Folder in the GCS bucket.
@@ -305,7 +313,6 @@ def upload_dicts_to_bigquery_table(project_id, dataset_id, table_name, data):
         dataset_id (str): BigQuery dataset ID.
         table_name (str): Name of the BigQuery table.
         data (list): List of dictionaries to upload.
-
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
@@ -327,6 +334,7 @@ def upload_dicts_to_bigquery_table(project_id, dataset_id, table_name, data):
 def upload_gdf_to_existing_table(gdf, bq_client, storage_client, project_id, temp_folder, filename, gcs_bucket_name, gcs_folder_name, dataset_name, table_name):
     """
     Uploads a GeoDataFrame to an existing BigQuery table by saving it as a GeoJSON file and uploading it to Google Cloud Storage.
+    
     Args:
         gdf (GeoDataFrame): The GeoDataFrame to upload.
         bq_client (bigquery.Client): The BigQuery client instance.
@@ -405,6 +413,7 @@ def upload_geom_set_to_bigquery(
     ):
     """
     Uploads a set of geometries to BigQuery and handles errors and logs for provided config and entry data.
+    
     Args:
         gdf (GeoDataFrame): The GeoDataFrame containing geometries to upload.
         errors_data (list): List of dictionaries containing error records to upload.

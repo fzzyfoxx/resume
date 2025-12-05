@@ -5,6 +5,7 @@ import pyproj
 def convert_geom_from_wkt(wkt_geom, in_crs='EPSG:4326', out_crs='EPSG:2180'):
     """
     Convert WKT geometry from one CRS to another.
+    
     Args:
         wkt_geom (str): WKT representation of the geometry.
         in_crs (str): Input CRS in EPSG format (default is 'EPSG:4326').
@@ -23,6 +24,7 @@ def convert_geom_from_wkt(wkt_geom, in_crs='EPSG:4326', out_crs='EPSG:2180'):
 def convert_geoms_from_wkt(wkt_geoms, in_crs='EPSG:4326', out_crs='EPSG:2180', geom_key='geometry'):
     """
     Convert a list of WKT geometries from one CRS to another.
+    
     Args:
         wkt_geoms (list): List of dictionaries where wkt geometry is under geom_key.
         in_crs (str): Input CRS in EPSG format (default is 'EPSG:4326').
@@ -42,6 +44,11 @@ def convert_geoms_from_wkt(wkt_geoms, in_crs='EPSG:4326', out_crs='EPSG:2180', g
 def get_bbox_bottom_left(geom):
     """
     Get bottom left corner of the shapely.geometry.
+
+    Args:
+        geom (shapely.geometry): Input geometry.
+    Returns:
+        tuple: (x, y) coordinates of the bottom left corner.
     """
     # get bottom left corner
     x = geom.bounds[0]

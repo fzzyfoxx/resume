@@ -51,6 +51,8 @@ def unzip_file(zip_file_path, target_directory, delete_file=True):
         zip_file_path (str): The path to the ZIP file to be extracted.
         target_directory (str): The directory where the contents will be extracted.
         delete_file (bool): If True, deletes the ZIP file after extraction.
+    Returns:
+        tuple: A tuple containing a boolean indicating success or failure, and an error message if applicable
     """
     try:
         # Ensure the target directory exists
@@ -88,6 +90,7 @@ def delete_local_temp_files(temp_dir):
 def download_data_from_sources(sources, target_path, timeout=120):
     """
     Downloads files from the specified sources, unzips them, and saves them to the target path.
+    
     Args:
         sources (list): List of dictionaries containing 'name' and 'url' for each source
         target_path (str): Path where the downloaded files will be saved
