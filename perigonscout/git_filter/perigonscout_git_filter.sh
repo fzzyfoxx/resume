@@ -1,4 +1,5 @@
 git filter-repo \
+--subdirectory-filter perigonscout \
 --path app_deploy/frontend/ \
 --path app_deploy/perigonscout-backend/ \
 --path app_deploy/run/ \
@@ -41,5 +42,7 @@ git filter-repo \
 --path geodoc_run/ \
 --path management/ \
 --path rasters/solar/ \
+--path git_filter/ \
 --path vector_data/bdzp/ \
+--force
 
