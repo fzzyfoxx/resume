@@ -4,7 +4,19 @@ from geodoc_loader.download.gcp import create_gcs_bucket, create_bigquery_datase
 import json
 
 def bdot_setup(config):
-
+    """
+    Sets up GCS bucket and BigQuery dataset/tables for BDOT data loading.
+    Args:
+        config (dict): Configuration dictionary containing setup parameters. Required keys:
+            - bucket_name: str - Suffix for GCS bucket name.
+            - dataset_id: str - BigQuery dataset ID.
+            - location: str - GCP location for dataset.
+            - data_tables: list - List of table specifications for BDOT data.
+            - default_columns: list - List of default column specifications.
+            - system_tables: list - List of system table specifications for logging.
+    Returns:
+        None
+    """
     client = bigquery.Client()
     project_id = client.project
 

@@ -4,6 +4,7 @@ from importlib.resources import files
 def preload_fonts():
     """
     Pre-load fonts into memory for reuse from the package's resources/fonts folder.
+    
     Args:
         None
     Returns:

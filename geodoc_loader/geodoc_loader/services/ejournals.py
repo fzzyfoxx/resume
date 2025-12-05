@@ -29,19 +29,25 @@ from geodoc_loader.download.gcp import upload_dicts_to_bigquery_table
 
 
 class RandomPause:
+    """
+        Class to generate random pauses based on normal distribution
+    """
     def __init__(self, pause_mean, pause_std, pause_min):
         self.pause_mean = pause_mean
         self.pause_std = pause_std
         self.pause_min = pause_min
     
     def __call__(self,):
-            '''
-                Proceed random pause from normal distribution with given parameters
-            ''' 
-            pause_time = max(self.pause_min, np.random.normal(loc=self.pause_mean, scale=self.pause_std, size=None))
-            time.sleep(pause_time)
+        """
+        Proceed random pause from normal distribution with given parameters
+        """
+        pause_time = max(self.pause_min, np.random.normal(loc=self.pause_mean, scale=self.pause_std, size=None))
+        time.sleep(pause_time)
 
 class EJournalCrawler:
+    """
+    Class to crawl ejournals website for given province and download acts documents
+    """
     def __init__(self, 
                  province_id, 
                  pause_mean, 
@@ -64,21 +70,31 @@ class EJournalCrawler:
                  ejournals_urls_path,
                  ejournals_urls_filename
                  ):
-        '''
-            province_id: there will be web address downloaded from firestore for one of province official 
-                        journal like 'https://edzienniki.duw.pl'
-            
-            pause_mean, pause_std: parameters for normal distridution to generate random pause (in seconds)
-            pause_min: minimal value of pause time (in seconds)
-            
-            scrolling_limit: [positive integer] limit of scrolls down to get to bottom of page 
-            (if too low  crawler might not get to the bottom)
-            
-            loading_timeout: seconds to wait until page is loaded
-            image_dpi: dpi for PDFs page screenshot
-            
-            ignore_first_page_image: do not include first page when extracting images from documents
-        '''
+        """
+        Initialize EJournalCrawler instance.
+
+        Args:
+            province_id (str): Identifier for the province to crawl.
+            pause_mean (float): Mean pause time in seconds.
+            pause_std (float): Standard deviation of pause time in seconds.
+            pause_min (float): Minimum pause time in seconds.
+            scrolling_limit (int): Maximum number of scrolls to reach the bottom of the page.
+            loading_timeout (int): Timeout in seconds for page loading.
+            ignore_first_page_image (bool): Whether to ignore the first page when extracting images.
+            image_dpi (int): DPI for PDF page screenshots.
+            browser_size_x (int): Width of the browser window.
+            browser_size_y (int): Height of the browser window.
+            browser_timeout (int): Timeout in seconds for browser operations.
+            dataset_id (str): GCP BigQuery dataset ID.
+            documents_bucket_name (str): GCP Cloud Storage bucket name for documents.
+            images_bucket_name (str): GCP Cloud Storage bucket name for images.
+            firestore_collection_name (str): Firestore collection name for storing document metadata.
+            status_table (str): BigQuery table name for status tracking.
+            logs_table (str): BigQuery table name for logging.
+            errors_table (str): BigQuery table name for error logging.
+            ejournals_urls_path (str): Path to the configuration file with ejournal URLs.
+            ejournals_urls_filename (str): Filename of the configuration file with ejournal URLs.
+        """
 
         # assign gcp locations
         self.dataset_id = dataset_id
@@ -147,20 +163,28 @@ class EJournalCrawler:
     
     
     def get_dropdown_items(self, dropdown_id):
-        '''
-            dropdown_id: id of dropdown list from which we want to get items from
-            
-            Returns list of strings with available options
-        '''
+        """
+        Gets the list of items from a dropdown menu by its ID.
+
+        Args:
+            dropdown_id (str): The ID of the dropdown element.
+        Returns:
+            list: List of item texts in the dropdown.
+        """
         select_box = Select(self.driver.find_element(By.ID, dropdown_id))
 
         return [element.get_attribute("text") for element in select_box.options]
     
     
     def scroll_to_bottom(self,):
-        '''
-            Scroll down until bottom of the page or get to defined iteration limit
-        '''
+        """
+        Scroll down until bottom of the page or get to defined iteration limit
+
+        Args:
+            None
+        Returns:
+            bool: True if reached bottom of the page, False if limit reached.
+        """
         self.random_pause()
         curr_height = self.driver.execute_script("return document.body.scrollHeight;")
         for i in range(self.scrolling_limit):
@@ -176,19 +200,29 @@ class EJournalCrawler:
         return last_height==curr_height
         
     def select_dropdown_item(self, dropdown_id, item_text):
-        '''
-            Select option for given dropdown list
-        '''
+        """
+        Selects an item from a dropdown menu by its visible text.
+
+        Args:
+            dropdown_id (str): The ID of the dropdown element.
+            item_text (str): The visible text of the item to select.
+        Returns:
+            None
+        """
         self.random_pause()
         select = Select(self.driver.find_element(By.ID,dropdown_id))
         select.select_by_visible_text(item_text)
         
     def use_page_filter(self, filter_text):
-        '''
-            Uses text filter on page
-            
-            ID of textbox is given dynamically so we have to get it from attribute of another element
-        '''
+        """
+        Uses the search box on the page to filter results by given text.
+
+        Args:
+            filter_text (str): Text to filter the results.
+        Returns:
+            None
+        """
+
         # Extract ID of text input
         searchbox_pos = self.driver.find_elements(By.CLASS_NAME,"sr-only")[7]
         searchbox_id = searchbox_pos.get_attribute("for")
@@ -204,6 +238,14 @@ class EJournalCrawler:
         self.random_pause()
 
     def update_record(self, cr):
+        """
+        Update a record in the status table in BigQuery.
+
+        Args:
+            cr (dict): Dictionary containing the record information to update.
+        Returns:
+            bool: True if the update was successful, False otherwise.
+        """
         update_query = f"""
             UPDATE {self.status_table_id}
             SET 
@@ -228,6 +270,15 @@ class EJournalCrawler:
     
     @staticmethod
     def is_month_finished(query_year, query_month):
+        """
+        Check if the queried month is finished compared to the current date.
+
+        Args:
+            query_year (str): Year of the queried month.
+            query_month (str): Month of the queried month.
+        Returns:
+            bool: True if the queried month is finished, False otherwise.
+        """
         current_date = datetime.now()
         diff = (current_date.year-int(query_year)) * 12 + (current_date.month-int(query_month))
         if diff>0:
@@ -236,15 +287,22 @@ class EJournalCrawler:
             return False
                 
     def parse_page(self, year, month, text_filter=None):
-        '''
-            Set specified year and month from dropdown list and scroll to bottom of page
-            
-            year, month: integers specyfing acts publishing dates (months numbers from 1 to 12)
-            
-            text_filter (Optional): string to filter results on page
-            
-            Returns status
-        '''
+        """
+        Parse the ejournal page for a given year and month, download acts documents, and update status in BigQuery.
+        Parsing process includes:
+            1. Check existing downloaded documents in Firestore.
+            2. Load and filter the page for the given year and month.
+            3. Find all acts on the page.
+            4. Iterate over acts, extract data, download PDFs, and upload to Cloud Storage and Firestore.
+            5. Update status table in BigQuery.
+
+        Args:
+            year (int): Year to parse.
+            month (int): Month to parse.
+            text_filter (str, optional): Text filter to apply on the page. Defaults to None.
+        Returns:
+            list: List of parsed rows with act information.
+        """
         print('\n' + '-'*50)
         print(f'Parsing page for province {self.province_id} [y-m] {year}-{month}')
         start_time = time.time()
@@ -402,11 +460,13 @@ class EJournalCrawler:
         return parsed_rows
     
     def get_pages_with_images(self, pdf_bytes):
-        '''
-            Takes 'screenshots' of pages assumed to contain map images
-
-            Return list of bytes images
-        '''
+        """
+        Extracts images from PDF bytes, returning images for each page.
+        Args:
+            pdf_bytes (bytes): The PDF file content in bytes.
+        Returns:
+            list: List of images in bytes for each page containing images.
+        """
         starting_page = int(self.ignore_first)
 
         # Read PDF from bytes
@@ -429,15 +489,19 @@ class EJournalCrawler:
         return map_pages, pages_nums
         
     def parse_row(self, row_object, year, existing_docs=None, queue_id=None, row_id=None):
-        '''
-            Extract important data from given row of ejournal page
-            Also downloads attached PDF file and store it as bytes
+        """
+        Parse a single row (act) from the ejournal page, download the attached PDF document,
+        upload it to Cloud Storage, and store metadata in Firestore.
 
-            row_object: bs4.element.Tag type containing single act data
-            info_class_names: python dict where each key contains tuple of arguments for find function
-
-            Returns python dict with extracted texts and full document
-        '''
+        Args:
+            row_object (bs4.element.Tag): BeautifulSoup Tag object representing the row.
+            year (int): Year of the act.
+            existing_docs (dict, optional): Dictionary of existing documents in Firestore to avoid re-downloading. Defaults to None.
+            queue_id (str, optional): Queue identifier for the current parsing session. Defaults to None.
+            row_id (int, optional): Row index for logging purposes. Defaults to None.
+        Returns:
+            tuple: (parsed_info (dict), err_msg (str or None))
+        """
         
         #### EXTRACT INFO FROM PAGE FOR SINGLE ACT ####
         
@@ -538,9 +602,9 @@ class EJournalCrawler:
         return parsed_info, err_msg
     
     def quit_driver(self,):
-        '''
-            Shutdown Selenium driver and closes all browser windows
-        '''
+        """
+        Quit the Selenium WebDriver and stop the virtual display.
+        """
         self.driver.quit()
         self.display.stop()
 
@@ -550,7 +614,29 @@ from geodoc_loader.download.bigquery import get_query_result
 from geodoc_loader.download.process import filter_queue_by_worker
 
 def run_ejournals_download():
+    """
+    Run the ejournals downloader service.
+    This function retrieves queue items from BigQuery, initializes the EJournalCrawler for each province,
+    and processes the pages for the specified year and month, downloading acts documents as needed.
 
+    Function uses environment variables for configuration:
+        PAUSE_MEAN (float): Mean pause time in seconds.
+        PAUSE_STD (float): Standard deviation of pause time in seconds.
+        PAUSE_MIN (float): Minimum pause time in seconds.
+        SCROLLING_LIMIT (int): Maximum number of scrolls to reach the bottom of the page.
+        LOADING_TIMEOUT (int): Timeout in seconds for page loading.
+        IGNORE_FIRST_PAGE_IMAGE (bool): Whether to ignore the first page when extracting images.
+        IMAGE_DPI (int): DPI for PDF page screenshots.
+        QUEUE_TIMEOUT (int): Timeout in seconds for queue operations.
+        BROWSER_SIZE_X (int): Width of the browser window.
+        BROWSER_SIZE_Y (int): Height of the browser window.
+        BROWSER_TIMEOUT (int): Timeout in seconds for browser operations.
+        QUEUE_LIMIT (int): Maximum number of queue items to process.
+        FILTER (str): Additional filter to apply to the queue items.
+
+    Returns:
+        None
+    """
     pause_mean = float(os.getenv("PAUSE_MEAN", 1.5))
     pause_std = float(os.getenv("PAUSE_STD", 0.7))
     pause_min = float(os.getenv("PAUSE_MIN", 0.5))

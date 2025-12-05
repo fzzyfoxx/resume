@@ -22,6 +22,7 @@ def _force_geometry_collection(geom):
     """
     Force a geometry to be a GeometryCollection if it is not already.
     If the geometry is empty, it will return an empty GeometryCollection.
+
     Args:
         geom (shapely.geometry): The geometry to check.
     Returns:
@@ -158,12 +159,21 @@ def generate_irregular_grid_points(
     return GeometryCollection(list(final_points))
 
 def filter_by_pattern(items, pattern):
+    """
+    Filters a list of strings, returning only those that match a given regex pattern.
+    Args:
+        items (list): List of strings to filter.
+        pattern (str): Regex pattern to match.
+    Returns:
+        list: List of strings that match the pattern.
+    """
     ans = [x if re.match(pattern, x) else None for x in items]
     return list(filter(lambda x: x, ans))
 
 def parse_uldk_response(resp, split_resp_pattern=r';|\n|\|',id_pattern=r'^\d{6}_\d{1}.\d{4}.', wkt_pattern = r'POLYGON\('):
     """
     Parse the ULDK response to extract IDs and WKT polygons.
+
     Args:
         resp (bytes): The response from the ULDK service.
         split_resp_pattern (str): Regex pattern to split the response into items.
@@ -183,6 +193,18 @@ def parse_uldk_response(resp, split_resp_pattern=r';|\n|\|',id_pattern=r'^\d{6}_
     return ids, polygons
 
 async def get_parcel_from_url_async(url, session, req_timeout):
+    """
+    Asynchronously fetch a parcel from a given URL using the provided session.
+
+    Args:
+        url (str): The URL to fetch the parcel from.
+        session (aiohttp.ClientSession): The aiohttp session to use for the request.
+        req_timeout (int): Timeout for the request in seconds.
+    Returns:
+        tuple: A tuple containing:
+            - A tuple of (shapely geometry, parcel ID, timestamp) if successful, else None.
+            - An exception tuple (error message, URL, response content) if an error occurs, else None.
+    """
     try:
         async with session.get(url=url, timeout=req_timeout) as response:
             resp = await response.read()
@@ -205,11 +227,27 @@ async def get_parcel_from_url_async(url, session, req_timeout):
         return None, url_exception
     
 async def get_responses_for_requests(urls, req_timeout):
-        async with aiohttp.ClientSession() as session:
-            ret = await asyncio.gather(*[get_parcel_from_url_async(url, session, req_timeout) for url in urls])
-        return ret
+    """
+    Asynchronously fetch parcels from a list of URLs.
+    Args:
+        urls (list): List of URLs to fetch parcels from.
+        req_timeout (int): Timeout for each request in seconds.
+    Returns:
+        list: List of tuples containing parcel data or exceptions for each URL.
+    """
+    async with aiohttp.ClientSession() as session:
+        ret = await asyncio.gather(*[get_parcel_from_url_async(url, session, req_timeout) for url in urls])
+    return ret
 
 def _get_unique_parcels(parcels_batch, parcels):
+    """
+    Get unique parcels from a batch, filtering out those already present in the existing parcels.
+    Args:
+        parcels_batch (list): List of tuples containing parcel data from the current batch.
+        parcels (np.ndarray): Numpy array of existing parcels to check against.
+    Returns:
+        np.ndarray: Numpy array of unique parcels from the batch.
+    """
     # filter out empty responses
     parcels_batch = list(filter(lambda x: x!=None, parcels_batch))
     if len(parcels_batch)>0:
@@ -228,6 +266,27 @@ def _get_unique_parcels(parcels_batch, parcels):
         return np.empty(shape=(0,3), dtype='object')
     
 def download_iteration(parcels, search_area, min_area_size, target_points, max_targets, min_grid_size, url_form, req_timeout):
+    """
+    Run a single iteration of parcel downloading within the search area. 
+
+    Args:
+        parcels (np.ndarray): Numpy array of already downloaded parcels.
+        search_area (shapely.geometry.GeometryCollection): The area to search for parcels.
+        min_area_size (float): Minimum area size to consider for downloading parcels.
+        target_points (int): Target number of points to generate in the search area.
+        max_targets (int): Maximum number of targets to request from ULDK service.
+        min_grid_size (float): Minimum grid size for point generation.
+        url_form (str): URL template for ULDK service requests.
+        req_timeout (int): Timeout for each request in seconds.
+    Returns:
+        tuple: A tuple containing:
+            - Updated numpy array of parcels including newly downloaded ones.
+            - Updated search area after removing areas covered by newly downloaded parcels.
+            - Numpy array of newly downloaded parcels in this iteration.
+            - List of URL exceptions encountered during the requests.
+            - Number of requests made in this iteration.
+            - Number of parcels found in this iteration.
+    """
     # if search area is single polygon convert it to GeometryCollection so it could be iterated
     search_area = _force_geometry_collection(search_area)
 
@@ -286,6 +345,7 @@ def download_all_parcels_for_teryt(
 ):
     """
     Download all parcels for a given TERYT (Territorial Unit) from ULDK service.
+
     Args:
         teryt (str): The TERYT code to download parcels for.
         teryt_table_id (str): The BigQuery table ID containing TERYT geometries.
@@ -474,6 +534,7 @@ def download_and_upload_parcels(
     ):
     """
     Download and upload parcels for a given TERYT.
+    
     Args:
         teryt (str): The TERYT code to download parcels for.
         teryts_table_id (str): The BigQuery table ID containing TERYT geometries.

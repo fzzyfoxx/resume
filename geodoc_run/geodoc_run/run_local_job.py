@@ -4,6 +4,11 @@ from geodoc_config import get_service_config
 import os 
 
 def main():
+    """
+    Runs a Docker container with specified environment variables.
+    This script accepts command-line arguments to specify the container image name and 
+    environment variables to pass to the container.
+    """
     # Set up argument parsing for command-line inputs.
     parser = argparse.ArgumentParser(
         description="Run a Google Cloud Run job with custom environment variables."

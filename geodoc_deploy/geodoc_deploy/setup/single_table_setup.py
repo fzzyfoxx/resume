@@ -8,12 +8,15 @@ from geodoc_loader.download.gcp import (
 def single_table_setup(config):
     """
     Sets up a GCS bucket and a BigQuery dataset with specified tables.
+
     Args:
         config (dict): Configuration dictionary containing:
             - bucket_name (str): Name of the GCS bucket to create.
             - dataset_id (str): ID of the BigQuery dataset to create.
             - location (str): Location for the BigQuery dataset.
             - tables (list): List of tables to create with their specifications.
+    Returns:
+        None
     """
     bq_client = bigquery.Client()
     project_id = bq_client.project

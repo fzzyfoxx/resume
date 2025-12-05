@@ -9,7 +9,16 @@ from geodoc_loader.handlers.geom import convert_geom_from_wkt
 from geodoc_loader.handlers.core import save_geojson
 
 def get_country_bbox_query(project_id, table_id='country', dataset_id='geo'):
+    """
+    Generates a SQL query to retrieve the bounding box of the country geometry from a BigQuery table.
 
+    Args:
+        project_id (str): Google Cloud project ID.
+        table_id (str): BigQuery table ID containing the country geometry. Default is 'country'.
+        dataset_id (str): BigQuery dataset ID containing the table. Default is 'geo'.
+    Returns:
+        str: SQL query string to retrieve the bounding box.
+    """
     query = f"""
     SELECT
     ST_BOUNDINGBOX(geometry) AS bbox
@@ -22,6 +31,7 @@ def get_country_bbox_query(project_id, table_id='country', dataset_id='geo'):
 def adjust_grid_dimension(d_min, d_max, grid_size, min_side_buffer=0, decimals=-3):
     """
     Adjusts the grid dimension to ensure it aligns with the specified grid size and includes a minimum side buffer.
+
     Args:
         d_min (float): Minimum value of the dimension.
         d_max (float): Maximum value of the dimension.
@@ -46,6 +56,7 @@ def adjust_grid_dimension(d_min, d_max, grid_size, min_side_buffer=0, decimals=-
 def adjust_grid_range(bottom_left, top_right, grid_size, min_side_buffer=0, decimals=-3):
     """
     Adjusts the bounding box coordinates to ensure they align with the specified grid size and includes a minimum side buffer.
+
     Args:
         bottom_left (tuple): Coordinates of the bottom left corner (x_min, y_min).
         top_right (tuple): Coordinates of the top right corner (x_max, y_max).
@@ -132,7 +143,26 @@ from geodoc_loader.download.gcp import load_single_geojson_to_bigquery
 import os
     
 def prepare_and_load_grid(grid_size, min_side_buffer, config, delete_local=True):
+    """
+    Runs the full process of preparing and loading grid data into BigQuery.
+    Function uses configuration parameters:
+        source_crs: str - CRS of the source country geometry.
+        grid_crs: str - CRS to generate the grid in.
+        target_crs: str - CRS to convert the grid to before saving.
+        temp_folder: str - Local temporary folder to save intermediate files.
+        dataset_id: str - BigQuery dataset ID to load the grid into.
+        bucket_folder: str - GCS bucket folder to upload the grid GeoJSON to.
+        prefix: str - Prefix for naming the grid files and tables.
+        adjust_decimals: int - Decimal adjustment for grid alignment.
 
+    Args:
+        grid_size (int): Size of the grid cells in meters.
+        min_side_buffer (int): Minimum side buffer in meters.
+        config (dict): Configuration dictionary containing necessary parameters.
+        delete_local (bool): Whether to delete local temporary files after processing.
+    Returns:
+        bool: True if the process was successful, False otherwise.
+    """
     # Extract configuration parameters
     source_crs = config.get('source_crs', 'EPSG:4326')
     grid_crs = config.get('grid_crs', 'EPSG:2180')

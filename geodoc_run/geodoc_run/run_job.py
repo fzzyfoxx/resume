@@ -2,6 +2,11 @@ import argparse
 from geodoc_run.src.job import run_cloud_run_job
 
 def main():
+    """
+    Run a Google Cloud Run job with specified environment variables.
+    This script accepts command-line arguments to specify the job name and
+    environment variables to pass to the job.
+    """
     # Set up argument parsing for command-line inputs.
     parser = argparse.ArgumentParser(
         description="Run a Google Cloud Run job with custom environment variables."
