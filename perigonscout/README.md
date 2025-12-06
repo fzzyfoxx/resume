@@ -4,7 +4,7 @@
 Perigon Scout is a web application designed for automatic land search based on user-defined criteria.
 It is based on a several public geospatial data sources that requires individual approach to download, process and store them.
 
-**Web application preview** <br><br>
+**Web application preview video** <br><br>
 <a href="https://www.youtube.com/watch?v=1o5VWFYmls8">
     <img src="https://img.youtube.com/vi/1o5VWFYmls8/maxresdefault.jpg" alt="Click to watch video" width="50%">
 </a>
@@ -13,7 +13,16 @@ It is based on a several public geospatial data sources that requires individual
 *Be aware that the source code for this project is not fully available for public access within this repository.*
 
 ---
-<br><br>
+<br>
+
+# Highlighted Features
+- [parcels geometries downloader](./geodoc_loader/geodoc_loader/services/uldk.py) - An algorithm for asynchronous downloading of parcel geometries from ULDK service using `asyncio` with advanced technique for request points selection within given geometry with `shapely` library.
+- [e-journals documents downloader](./geodoc_loader/geodoc_loader/services/ejournals.py) - A web scraping service for downloading documents from province's e-journals using `Selenium` and `BeautifulSoup` libraries.
+- [automatic Docker deployment](./geodoc_deploy) - A set of CLIs for building and deploying Docker images of data acquisition services to Google Cloud Run.
+- [Perigon Scout web application](./app_source) - A full-stack web application built with `React` and `Flask` frameworks, containerized with `Docker` and deployed on Google Cloud Platform.
+- [universal multi worker queue processing](./geodoc_loader/geodoc_loader/download/process.py) - Set of tools for multi worker queue processing with different splitting methods to optimize workload distribution among workers without external queue management systems.
+- [shapefiles preprocessing and concatenation](./geodoc_loader/geodoc_loader/handlers/collection.py) - A function that fully handles multiple shapefiles from a folder with column selection, data validation, reprojection and concatenation into a single GeoDataFrame using `GeoPandas` library.
+
 # System modules
 Perigon Scout system can be divided into two main modules: Data Acquisition and Web Application.
 - Set of loader, deploy and run packages manage collection of services that are responsible for data acquisition and processing to build a geospatial database.
