@@ -4,6 +4,7 @@ import io
 def export_to_csv(data, columns, filename_base):
     """
     Exports a list of dictionaries to a CSV file and returns the CSV content and headers.
+    
     Args:
         data (list): List of dictionaries containing the data to export.
         columns (list): List of column names for the CSV header.

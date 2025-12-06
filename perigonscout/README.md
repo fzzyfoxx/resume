@@ -1,4 +1,79 @@
-# OPERATIONS
+
+# <img src="./resources/PerigonScout_owl_v4_transparent_small_cropped.png" alt="Alt text" width="25"> Perigon Scout
+
+Perigon Scout is a web application designed for automatic land search based on user-defined criteria.
+It is based on a several public geospatial data sources that requires individual approach to download, process and store them.
+
+**Web application preview** <br><br>
+<a href="https://www.youtube.com/watch?v=1o5VWFYmls8">
+    <img src="https://img.youtube.com/vi/1o5VWFYmls8/maxresdefault.jpg" alt="Click to watch video" width="50%">
+</a>
+
+**Warning !** <br>
+*Be aware that the source code for this project is not fully available for public access within this repository.*
+
+---
+<br><br>
+# System modules
+Perigon Scout system can be divided into two main modules: Data Acquisition and Web Application.
+- Set of loader, deploy and run packages manage collection of services that are responsible for data acquisition and processing to build a geospatial database.
+- Web application module contains the backend and frontend source code along with deployment and management scripts for the Perigon Scout web application.
+
+**System general schema:** <br>
+![GeoDoc general schema](./resources/perigonscout_general_schema_cropped.png)
+
+*GeoDoc is a legacy name for the whole system which is now part of Perigon Scout.*
+
+## Data Acquisition
+Perigon Scout databse is populated using a set of `python` packages that provide tools for downloading, processing, and handling geospatial data from various sources. Some datasets can't be downloaded in one go due to their size or structure, so the system uses contenerized services deployed on Google Cloud Platform (GCP) to handle data acquisition in a scalable and efficient manner. <br>
+Listed packages are built to manage the whole process from configuration, deployment to running the services.
+
+### geodoc_loader [link](./geodoc_loader)
+A `python` package that provides tools for data acquisition services within the PerigonScout system. It includes modules for downloading, processing, and handling geospatial data from various sources.
+
+**technological stack** <br>
+BigQuery | firestore | google-cloud-storage | shapely | asyncio | Selenium | BeautifulSoup | PyMuPDF | requests | NumPy | Pillow | GeoPandas | pyproj | pandas | rasterio | importlib | SciPy | tqdm
+
+### geodoc_deploy [link](./geodoc_deploy)
+A `python` package that provides deployment and infrastructure management tools for the PerigonScout system. It includes modules for setting up cloud resources, managing deployments, and automating infrastructure tasks. <br>
+It's main purpose is to build a Docker image of specific service and deploy it to Google Cloud Run. <br>
+It provides set of CLIs to walk through the whole deployment process.
+
+**technological stack** <br>
+Google Cloud Platform | Docker | shutil | pathlib | importlib | subprocess
+
+### geodoc_run [link](./geodoc_run)
+A `python` package that provides tools for executing data acquisition services within the PerigonScout system.
+
+**technological stack** <br>
+Google Cloud Platform | Docker | subprocess
+
+### geodoc_config [link](./geodoc_config)
+The `geodoc_config` is a `python` package that consists a set of json configuration files that define various settings and parameters for the PerigonScout system and tools to access them.
+
+### One-Time Upload
+Notebooks used for one-time data downloads and uploads to BigQuery tables.
+<br>[rasters](./rasters) 
+<br>[vector data](./vector_data)
+
+## Web Application
+
+### geodoc_app [link](./geodoc_app)
+A `python` package that contains the backend source code for the PerigonScout web application.
+
+### Backend & Frontend [link](./app_source)
+The `app_source` module contains the source code for the PerigonScout web application. The backend part is fully available within this repository, while the frontend part contains only some example sidebar components. It is based on `React` and `Flask` frameworks.
+
+### App Deployment [link](./app_deploy)
+The `app_deploy` module contains bash scripts for the PerigonScout application deployment on GCP or locally.
+
+### Management Scripts [link](./management)
+This directory contains management `bash` and `python` scripts for setting up and maintaining the Perigon Scout application.
+
+---
+<br><br>
+# GeoDoc CLI
+`geodoc_deploy` and `geodoc_run` packages offers a set of command line tools to manage deployment and running of GeoDoc services on Google Cloud Platform (GCP) using CloudRun.
 
 ## SETUP
 

@@ -1,5 +1,4 @@
 ## geodoc_config package
-A package for managing PerigonScout system configuration files within geodoc_* packages.
 
 ### Overview
 The `geodoc_config` consists of a set of json configuration files that define various settings and parameters for the PerigonScout system and tools to access them.
@@ -19,3 +18,7 @@ There are two mapping files that define relationships between services, sources,
 #### Configuration Files
 The package includes various configuration files for different services and purposes. They are grouped into folders based on their functionality.
 They are located in the [configs](./geodoc_config/configs) folder.
+
+---
+**Warning !** <br>
+*Be aware that this package is not fully available for public access within this repository.*

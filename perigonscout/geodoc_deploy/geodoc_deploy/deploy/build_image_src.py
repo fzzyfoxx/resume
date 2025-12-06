@@ -9,6 +9,9 @@ def build_image(service_name: str):
     Deploys a specified service by building its Docker image.
     Assumes .whl files are in geodoc_deploy/packages and
     requirements.txt is in each service's folder.
+
+    Args:
+        service_name (str): The name of the service to deploy.
     """
     print(f"Attempting to deploy service: {service_name}")
 

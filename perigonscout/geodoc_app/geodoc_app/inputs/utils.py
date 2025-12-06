@@ -3,6 +3,7 @@ from fuzzywuzzy import fuzz
 def filter_strings_by_search(search, source, n=5, threshold=50, max_difference=10):
     """
     Filter a list of strings by a search string and return the top n matches above a threshold.
+
     Args:
         search (str): Search string to match against.
         source (list): List of strings to search within.
@@ -33,6 +34,7 @@ def filter_strings_by_search(search, source, n=5, threshold=50, max_difference=1
 def calculate_fuzzy_score(search, item, search_keys):
     """
     Calculate the fuzzy matching score between a search string and an item based on specified keys.
+
     Args:
         search (str): Search string to match against.
         item (dict): Dictionary containing keys for matching.
@@ -48,6 +50,7 @@ def calculate_fuzzy_score(search, item, search_keys):
 def filter_strings_set_by_search(search, source, search_keys, n=5, threshold=50, max_difference=10):
     """
     Filter a list of strings by a search string and return the top n matches above a threshold.
+    
     Args:
         search (str): Search string to match against.
         source (list): List of dicts containing keys for matching.

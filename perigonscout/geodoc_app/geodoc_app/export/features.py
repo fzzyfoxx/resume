@@ -10,11 +10,27 @@ from ast import literal_eval
 GEOD = Geod(ellps="WGS84")
 
 def wkt_from_geojson(geometry):
+    """
+    Converts a GeoJSON geometry to WKT format.
+
+    Args:
+        geometry (dict): GeoJSON geometry.
+    Returns:
+        str or None: WKT representation of the geometry or None if geometry is None.
+    """
     if geometry:
         return shapely_shape(geometry).wkt
     return None
 
 def _polygon_area_m2(poly: Polygon):
+    """
+    Calculate the geodetic area of a polygon in square meters.
+
+    Args:
+        poly (Polygon): Shapely Polygon object.
+    Returns:
+        float: Area in square meters.
+    """
     exterior_lon, exterior_lat = zip(*poly.exterior.coords)
     area, _ = GEOD.polygon_area_perimeter(exterior_lon, exterior_lat)
     total = abs(area)
@@ -25,6 +41,14 @@ def _polygon_area_m2(poly: Polygon):
     return total
 
 def _geodetic_area_m2(geom):
+    """
+    Calculate the geodetic area of a geometry in square meters.
+
+    Args:
+        geom: Shapely geometry object.
+    Returns:
+        float: Area in square meters.
+    """
     if geom.is_empty:
         return 0.0
     if isinstance(geom, Polygon):
@@ -34,12 +58,30 @@ def _geodetic_area_m2(geom):
     return 0.0
 
 def _safe_round(val):
+    """
+    Safely round a value to 2 decimal places, returning None if conversion fails.
+
+    Args:
+        val: Value to round.
+    Returns:
+        float or None: Rounded value or None.
+    """
     try:
         return round(float(val), 2)
     except (TypeError, ValueError):
         return None
 
 def _as_list(value):
+    """
+    Convert a value to a list. If the value is already a list, return it.
+    If it's a string, attempt to parse it as JSON or Python literal list.
+    If parsing fails, split the string on commas not inside parentheses.
+
+    Args:
+        value: Value to convert.
+    Returns:
+        list: Resulting list.
+    """
     if isinstance(value, list):
         return value
     if not isinstance(value, str):
@@ -90,7 +132,15 @@ def _as_list(value):
     return cleaned
 
 def extract_filter_features(properties, geometry):
+    """
+    Extracts filter feature data from properties and geometry.
 
+    Args:
+        properties (dict): Feature properties.
+        geometry (dict): Feature geometry.
+    Returns:
+        tuple: (data (list of dicts), columns (list of str))
+    """
     data = {
         'typ': 'filtr',
         'nazwa': properties.get('name', 'Brak nazwy'),
@@ -104,7 +154,15 @@ def extract_filter_features(properties, geometry):
     return [data], columns
 
 def extract_search_features(properties, geometry):
+    """
+    Extracts search area feature data from properties and geometry.
 
+    Args:
+        properties (dict): Feature properties.
+        geometry (dict): Feature geometry.
+    Returns:
+        tuple: (data (list of dicts), columns (list of str))
+    """
     data = {
         'typ': 'obszar wyszukiwania',
         'geometria': wkt_from_geojson(geometry)
@@ -115,7 +173,15 @@ def extract_search_features(properties, geometry):
     return [data], columns
 
 def extract_parcel_features(properties, geometry):
+    """
+    Extracts parcel feature data from properties and geometry.
 
+    Args:
+        properties (dict): Feature properties.
+        geometry (dict): Feature geometry.
+    Returns:
+        tuple: (data (list of dicts), columns (list of str))
+    """
     parcels_geometries = _as_list(properties.get('geometry', None))
     parcels_ids = _as_list(properties.get('parcel_id', None))
 
@@ -157,7 +223,15 @@ def extract_parcel_features(properties, geometry):
     return rows, columns
 
 def extract_features(features, geometry):
+    """
+    Extracts feature data based on the feature type.
 
+    Args:
+        features (dict): Feature containing properties.
+        geometry (dict): Feature geometry.
+    Returns:
+        tuple: (rows (list of dicts), columns (list of str), filename_base (str))
+    """
     properties = features.get('properties', {})
 
     result_type = properties.get('type', None)

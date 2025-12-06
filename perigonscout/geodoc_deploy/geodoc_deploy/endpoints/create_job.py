@@ -4,8 +4,8 @@ from geodoc_config import get_service_config
 
 def main():
     # Argument parser for command line usage
-    parser = argparse.ArgumentParser(description="Deploy a Docker image to Google Artifact Registry.")
-    parser.add_argument("--service", type=str, required=True, help="The name of the service to deploy (e.g., 'soil_complexes').")
+    parser = argparse.ArgumentParser(description="Create or update a Cloud Run job for a specified service.")
+    parser.add_argument("--service", type=str, required=True, help="The name of the service (e.g., 'soil_complexes').")
     args = parser.parse_args()
 
     # --- Configuration ---

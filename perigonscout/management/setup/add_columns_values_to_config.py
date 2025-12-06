@@ -8,7 +8,14 @@ import json
 import argparse
 
 def main():
+    """
+    Generate filter values for each CATEGORICAL and SEARCH column in the collections configuration
+    and save them as JSON files in the specified directory structure.
 
+    Args:
+        main_path (str): Path to the main configuration directory.
+        folder_name (str): Name of the folder to save the filter values.
+    """
     parser = argparse.ArgumentParser(description='Generate filter values for a specific table and column.')
     parser.add_argument('--main_path', type=str, default='./geodoc_config/geodoc_config/configs/search', help='Path to the main configuration directory.')
     parser.add_argument('--folder_name', type=str, default='columns', help='Name of the folder to save the filter values.')

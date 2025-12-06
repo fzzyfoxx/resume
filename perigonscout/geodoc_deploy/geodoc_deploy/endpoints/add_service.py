@@ -11,7 +11,6 @@ def main():
     args = parser.parse_args()
 
     # --- Configuration ---
-    # Replace with your actual project ID and service account email
     general_gcp_config = get_service_config("gcp", "general")
     services_config = get_service_config("gcp", "services")
 
