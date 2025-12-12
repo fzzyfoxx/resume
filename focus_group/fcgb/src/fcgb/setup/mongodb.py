@@ -9,7 +9,7 @@ from fcgb.cfg.vars import mongodb_rag_config
 
 def setup_mongodb():
     """
-        This function creates necessary collections and indexes in MongoDB for the RAG system
+    This function creates necessary collections and indexes in MongoDB for the RAG system
     """
 
     for mode in ['prod', 'dev', 'test']:

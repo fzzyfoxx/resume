@@ -1,4 +1,4 @@
-from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints, Literal
+from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints, Literal, get_origin, Optional, get_args, Union
 from pydantic import BaseModel
 import random
 from langchain_core.messages import AIMessage
@@ -11,21 +11,28 @@ import uuid
 def random_string(length: int) -> str:
     """
     Generate a random string of fixed length.
+
+    Args:
+        length (int): The length of the random string.
+
+    Returns:
+        str: A randomly generated string of the specified length.
     """
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(length))
 
-class FakeStructuredOutput:
-    def __init__(self, model: BaseModel, array_length_range: Tuple[int, int] = (1, 4)):
-        """
-        Initialize the FakeStructuredOutput generator.
 
-        Args:
-            model (BaseModel): The Pydantic BaseModel class to generate fake data for.
-            array_length_range (Tuple[int, int]): Range for the length of generated lists.
-        """
-        self.model = model
-        self.array_length_range = array_length_range
+class FakeStructuredOutput:
+    """
+    A class for generating fake structured output based on a Pydantic BaseModel schema.
+
+    This class is used for testing purposes and generates fake data that matches the structure
+    of a given Pydantic model.
+
+    Attributes:
+        model: The Pydantic BaseModel class to generate fake data for.
+        array_length_range: The range for the length of generated lists.
+    """
 
     def __call__(self) -> Any:
         """
@@ -46,6 +53,11 @@ class FakeStructuredOutput:
         Returns:
             Any: A fake value matching the field type.
         """
+        # Handle Optional types
+        if get_origin(field_type) is Union and type(None) in get_args(field_type):
+            # Extract the inner type from Optional
+            field_type = next(arg for arg in get_args(field_type) if arg is not type(None))
+
         if hasattr(field_type, "__origin__"):  # Handle generic types like List, Dict, etc.
             if field_type.__origin__ is list:
                 return self._generate_list(field_type.__args__[0])
@@ -61,7 +73,7 @@ class FakeStructuredOutput:
                 return self._generate_typed_dict(field_type)
             elif issubclass(field_type, BaseModel):  # Handle nested BaseModel
                 return self._generate_model(field_type)
-        if (field_type is str) | (field_type is Any):
+        if field_type is str:
             return self._get_fake_string()
         elif field_type is int:
             return self._get_fake_int()
@@ -155,32 +167,44 @@ class FakeStructuredOutput:
     def _get_fake_bool(self) -> bool:
         """Generate a fake boolean."""
         return random.choice([True, False])
-    
+
 
 class FakeLLM:
     """
-        A fake LLM that returns a simple string response.
-        This class is used for testing purposes and simulates the behavior of a language model.
-        It increments a counter each time it is called and returns a string indicating the response number.
-        The class also provides an `invoke` method that behaves the same as the `__call__` method.    
+    A fake language model (LLM) for testing purposes.
+
+    This class simulates the behavior of a language model, including generating responses,
+    invoking tools, and producing structured outputs.
+
+    Attributes:
+        counter: A counter to track the number of responses generated.
+        structured_output: The structured output to return when invoked.
+        tools: A list of tools bound to the fake LLM.
+        max_parallel_tools: The maximum number of tools that can be invoked in parallel.
+        tool_usage_prob: The probability of invoking a tool.
+    """
+
+    def __init__(self, max_parallel_tools=2, tool_usage_prob=0.5, *args, **kwargs):
+        """
+        Initialize the FakeLLM instance.
 
         Args:
-        - args: Additional arguments to be passed to the `__call__` method.
-        - kwargs: Additional keyword arguments to be passed to the `__call__` method.
-        
-        Returns:
-        - A string indicating the response number.
-    """
-    def __init__(self, max_parallel_tools=2, tool_usage_prob=0.5, *args, **kwargs):
+            max_parallel_tools (int): The maximum number of tools that can be invoked in parallel.
+            tool_usage_prob (float): The probability of invoking a tool.
+        """
         self.counter = 0
         self.structured_output = None
-
         self.tools = []
         self.max_parallel_tools = max_parallel_tools
         self.tool_usage_prob = tool_usage_prob
 
-
     def __call__(self, *args, **kwargs):
+        """
+        Generate a response or invoke tools based on the current state.
+
+        Returns:
+            AIMessage: A simulated response or tool invocation message.
+        """
         self.counter += 1
         tools_idxs = self._random_tools_selection()
         if len(tools_idxs) > 0:
@@ -190,19 +214,42 @@ class FakeLLM:
             self.structured_output = None
             return response
         return AIMessage(f"Fake LLM response {self.counter}")
-    
+
     def invoke(self, *args, **kwargs):
+        """
+        Alias for the __call__ method.
+
+        Returns:
+            AIMessage: A simulated response or tool invocation message.
+        """
         return self.__call__(*args, **kwargs)
-    
+
     @staticmethod
     def generate_fake_output(model: BaseModel):
-        return FakeStructuredOutput(model)()
-    
-    def with_structured_output(self, structure):
-        self.structured_output = self.generate_fake_output(structure)
+        """
+        Generate fake structured output based on a Pydantic model.
 
+        Args:
+            model (BaseModel): The Pydantic model to generate output for.
+
+        Returns:
+            Any: Fake structured output matching the model's schema.
+        """
+        return FakeStructuredOutput(model)()
+
+    def with_structured_output(self, structure):
+        """
+        Set the structured output to return when invoked.
+
+        Args:
+            structure: The structured output schema.
+
+        Returns:
+            FakeLLM: The current instance with the structured output set.
+        """
+        self.structured_output = self.generate_fake_output(structure)
         return self
-    
+
     def _random_tools_selection(self):
         tools_num = len(self.tools)
 
@@ -260,56 +307,106 @@ class FakeLLM:
         new_instance.tools = tools
         new_instance.parallel_tool_calls = parallel_tool_calls
         return new_instance
-    
+
 
 class FakeHuman:
     """
-        A fake human input generator that returns a simple string response.
-        This class is used for testing purposes and simulates the behavior of a human input generator.
-        It increments a counter each time it is called and returns a string indicating the response number.
-        The class also provides an `__call__` method that can return a specific button output if provided.
+    A fake human input generator for testing purposes.
+
+    This class simulates human input, including button presses and text messages.
+
+    Attributes:
+        counter: A counter to track the number of inputs generated.
+        button_output: The output to return when a button is pressed.
+        button_moment: The moment at which the button output should be returned.
+    """
+
+    def __init__(self, button_output=None, button_moment=None):
+        """
+        Initialize the FakeHuman instance.
 
         Args:
-        - button_output: A string that represents the output of a button.
-        - button_moment: An integer that represents the moment when the button output should be returned.
-
-        Returns:
-        - A dictionary containing the type of message and its value.
-    """
-    def __init__(self, button_output=None, button_moment=None):
+            button_output: The output to return when a button is pressed.
+            button_moment: The moment at which the button output should be returned.
+        """
         self.counter = 0
         self.button_output = button_output
         self.button_moment = button_moment
 
     def __call__(self, button=None):
+        """
+        Generate a human input.
+
+        Args:
+            button: The button to simulate a press for.
+
+        Returns:
+            dict: A dictionary representing the human input.
+        """
         self.counter += 1
         if button:
             return {'type': 'button', 'value': button}
-        elif (self.button_output is not None) & (self.button_moment==self.counter):
+        elif (self.button_output is not None) & (self.button_moment == self.counter):
             return {'type': 'button', 'value': self.button_output}
         return {'type': 'message', 'value': f"Fake Human input {self.counter}"}
-    
+
 
 class FakeEmbeddingModel:
     """
-        A fake embedding model that generates random embeddings.
-        This class is used for testing purposes and simulates the behavior of an embedding model.
+    A fake embedding model for testing purposes.
+
+    This class simulates the behavior of an embedding model by generating random embeddings.
+
+    Attributes:
+        embedding_size: The size of the embeddings to generate.
     """
+
     def __init__(self, embedding_size=768):
+        """
+        Initialize the FakeEmbeddingModel instance.
+
+        Args:
+            embedding_size (int): The size of the embeddings to generate.
+        """
         self.embedding_size = embedding_size
 
     def _gen_embs(self):
         return uniform(-1, 1, self.embedding_size).tolist()
 
     def embed_documents(self, texts, *args, **kwargs):
+        """
+        Generate embeddings for a list of documents.
+
+        Args:
+            texts (list): A list of text documents.
+
+        Returns:
+            list: A list of embeddings for the documents.
+        """
         return [self._gen_embs() for _ in texts]
-    
+
     def embed_query(self, text, *args, **kwargs):
+        """
+        Generate an embedding for a query.
+
+        Args:
+            text (str): The query text.
+
+        Returns:
+            list: The embedding for the query.
+        """
         return self._gen_embs()
 
 
 class FakeTavily:
+    """
+    A fake Tavily client for testing purposes.
+
+    This class simulates the behavior of a Tavily client, including search and extraction operations.
+    """
+
     def __init__(self):
+        """Initialize the FakeTavily instance."""
         pass
 
     def _set_search_result(self, i: int) -> TavilySearchSingleResult:
@@ -328,7 +425,18 @@ class FakeTavily:
             "images": []
         }
 
-    def search(self, query: str, max_results: int, exclude_domains: List[str]=None, *args, **kwargs) -> TavilySearchResults:
+    def search(self, query: str, max_results: int, exclude_domains: List[str] = None, *args, **kwargs) -> TavilySearchResults:
+        """
+        Simulate a search operation.
+
+        Args:
+            query (str): The search query.
+            max_results (int): The maximum number of results to return.
+            exclude_domains (list): A list of domains to exclude from the results.
+
+        Returns:
+            TavilySearchResults: A dictionary containing the search results.
+        """
         results = [self._set_search_result(i) for i in range(max_results)]
 
         return {
@@ -341,6 +449,15 @@ class FakeTavily:
         }
     
     def extract(self, urls: List[str], *args, **kwargs) -> TavilyExtractResults:
+        """
+        Simulate an extraction operation.
+
+        Args:
+            urls (list): A list of URLs to extract content from.
+
+        Returns:
+            TavilyExtractResults: A dictionary containing the extracted content.
+        """
         results = [self._set_extract_result(url, i) for i, url in enumerate(urls)]
 
         return {

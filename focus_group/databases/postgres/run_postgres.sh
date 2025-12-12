@@ -1,1 +1,1 @@
-docker stop lang-memory-postgres
+docker run lang-memory-postgres

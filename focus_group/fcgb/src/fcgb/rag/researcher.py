@@ -16,7 +16,37 @@ import nest_asyncio
 
 class RAGResearcher:
     """
-        RAGResearcher class to perform research using external web sources, llm interpretation and RAG storage.
+    RAGResearcher class to perform research using external web sources, LLM interpretation, and RAG storage.
+
+    This class defines a workflow for retrieving and processing information from web sources, 
+    summarizing the results, and optionally storing the data in a RAG (Retrieval-Augmented Generation) module.
+
+    Attributes:
+        llm: LangChain LLM instance for generating queries and summaries.
+        rag_module: RAG module instance (e.g., MongodbRAG) for managing vector search indexes and document storage.
+        rag_kwargs: Named arguments for the RAG module methods.
+        memory: LangGraph Checkpointer instance for state persistence.
+        web_search_client: Web search client instance for performing web searches and extracting content.
+        web_search_kwargs: Named arguments for the web search client methods.
+        max_queries_num: Maximum number of queries to generate during a single iteration.
+        pm: PromptManager instance for managing prompts.
+        prompts: Loaded prompts for query preparation, web output summarization, and document formatting.
+        web_doc_vector_fields: Vector field specifications for the RAG module.
+        load_web_docs: Boolean indicating whether to load web documents into the RAG module.
+        web_search_graph: Compiled state graph for the web search workflow.
+    """
+    def __init__(self, 
+                 llm, 
+                 rag_module,
+                 rag_kwargs,
+                 memory,
+                 web_search_client,
+                 web_search_kwargs,
+                 max_queries_num,
+                 prompt_manager_spec={}
+                 ):
+        """
+        Initialize the RAGResearcher instance with the given parameters.
 
         Args:
             llm: LangChain LLM instance
@@ -55,17 +85,8 @@ class RAGResearcher:
                     "web_docs_concat_field": "path/to/web_docs_concat_field.txt",
                 }
             max_queries_num: Maximum number of queries to generate during single iteration
-    """
-    def __init__(self, 
-                 llm, 
-                 rag_module,
-                 rag_kwargs,
-                 memory,
-                 web_search_client,
-                 web_search_kwargs,
-                 max_queries_num,
-                 prompt_manager_spec={}
-                 ):
+            prompt_manager_spec: named arguments for the PromptManager initialization
+        """
         
         self.llm = llm
 
@@ -87,16 +108,19 @@ class RAGResearcher:
 
         self._set_web_search_graph()
 
-
     def _load_prompts(self):
         """
-        Load the prompts from the specified paths.
+        Load the prompts from the specified paths using the PromptManager.
         """
         self.prompts = self.pm.get_prompts(['prepare_web_query', 'summarize_web_output', 'web_docs_concat_field'])
 
-
     def _set_prepare_queries_func(self):
+        """
+        Define the functions for preparing queries and routing them to the web search nodes.
 
+        Returns:
+            Tuple[Callable, Callable]: A tuple containing the query preparation function and the routing function.
+        """
         def prepare_queries(state: QueriesState) -> QueriesState:
 
             template_inputs = state.template_inputs | {'current_question': state.current_question, 'max_queries_num': self.max_queries_num}
@@ -112,7 +136,12 @@ class RAGResearcher:
         return prepare_queries, queries_routing
         
     def _set_run_web_search_func(self):
+        """
+        Define the functions for running web searches and routing the results to the output handler nodes.
 
+        Returns:
+            Tuple[Callable, Callable]: A tuple containing the web search function and the routing function.
+        """
         def run_web_search(state: WebSearchState) -> WebResponseRoutingModel:
             urls = [elem['url'] for elem in self.web_search_client.search(state['query'], **self.web_search_kwargs.get('search', {}))['results']]
             urls_response = self.web_search_client.extract(urls, **self.web_search_kwargs.get('extract', {}))['results']
@@ -133,22 +162,33 @@ class RAGResearcher:
     
     def _form_web_document(self, weboutput: WebOutputModel, url: str, query: str, thread_id: str, user_id: str) -> Document:
         """
-        Form a document from a web output llm summary
+        Form a document from a web output LLM summary.
+
         Args:
-            weboutput: WebOutputModel instance with the output from the llm
-            url: URL of the web page
-            query: Query used to search for the web page
+            weboutput: WebOutputModel instance with the output from the LLM.
+            url: URL of the web page.
+            query: Query used to search for the web page.
+            thread_id: Thread ID for the current conversation.
+            user_id: User ID for the current session.
+
         Returns:
-            Document instance with the web page content and metadata
+            Document: A document instance with the web page content and metadata.
         """
         return weboutput.model_dump() | {'url': url, 'query': query, 'thread_id': thread_id, 'user_id': user_id}
 
-
-    def _load_document(self, ):
+    def _load_document(self):
+        """
+        Placeholder method for loading documents into the RAG module.
+        """
         pass
     
     def _set_web_output_handler_func(self):
+        """
+        Define the function for handling web search outputs and summarizing the content.
 
+        Returns:
+            Callable: A function that processes web search outputs and generates summaries.
+        """
         def web_output_handler(state: WebSearchOutputHandlerState, config: RunnableConfig):
             response = self.llm.with_structured_output(WebOutputModel).invoke(self.prompts['summarize_web_output'].format(current_question=state.current_question, query=state.query, url_content=state.url_content))
             response_doc = self._form_web_document(response, state.url, state.query, config['configurable']['thread_id'], config['configurable']['user_id'])
@@ -158,11 +198,24 @@ class RAGResearcher:
         return web_output_handler
     
     def _format_web_doc_for_answer(self, web_doc: Dict[str, str]) -> str:
+        """
+        Format a web document for inclusion in the final answer.
 
+        Args:
+            web_doc: A dictionary containing the web document content and metadata.
+
+        Returns:
+            str: A formatted string representation of the web document.
+        """
         return self.prompts['web_docs_concat_field'].format(**web_doc)
             
     def _set_web_output_aggregation_func(self):
+        """
+        Define the function for aggregating web search outputs and optionally storing them in the RAG module.
 
+        Returns:
+            Callable: A function that aggregates web search outputs and prepares them for the final answer.
+        """
         def web_output_aggregation(state: RAGGeneralState):
             created_at = Timestamp(int(datetime.now().timestamp()), 1)
             filtered_contents = [doc.model_dump() | {'created_at': created_at} for doc in state.documents if doc.is_relevant]
@@ -183,8 +236,9 @@ class RAGResearcher:
     def _set_web_search_graph(self):
         """
         Set the web search graph for the RAGResearcher class.
-        This method defines the sequence of operations to be performed during the web search process.
-        It includes preparing queries, running web searches, handling web search outputs, and aggregating results.
+
+        This method defines the sequence of operations to be performed during the web search process, 
+        including preparing queries, running web searches, handling web search outputs, and aggregating results.
         """
         prepare_queries, queries_routing = self._set_prepare_queries_func()
         run_web_search, urls_responses_routing = self._set_run_web_search_func()
@@ -209,6 +263,12 @@ class RAGResearcher:
         self.web_search_graph = web_search_workflow.compile(checkpointer=self.memory)
 
     def display_graph(self, graph):
+        """
+        Display the specified state graph using Mermaid visualization.
+
+        Args:
+            graph: The state graph to display.
+        """
         nest_asyncio.apply()
         display(Image(graph.get_graph(xray=1).draw_mermaid_png(draw_method=MermaidDrawMethod.PYPPETEER), height=200, width=200))
 

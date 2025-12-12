@@ -9,11 +9,32 @@ def custom_warning_format(message, category, filename, lineno, file=None, line=N
 warnings.formatwarning = custom_warning_format
 
 class MongodbRAG:
+    """
+    A class for managing MongoDB-based Retrieval-Augmented Generation (RAG) workflows.
+    This class provides methods for creating vector search indexes, adding documents with embeddings,
+    and retrieving documents based on vector similarity.
+
+    Attributes:
+        database: The MongoDB database instance.
+        collection_name: The name of the collection used for storing documents.
+        embedding_model: The embedding model used for generating vector representations.
+        collection: The MongoDB collection object for storing documents.
+        index_metadata_collection: The MongoDB collection object for storing index metadata.
+    """
+
     def __init__(self, 
                  database,
                  collection_name,
                  embedding_model,
                  ):
+        """
+        Initialize the MongodbRAG instance with the given parameters.
+
+        Args:
+            database: The MongoDB database instance.
+            collection_name: The name of the collection used for storing documents.
+            embedding_model: The embedding model used for generating vector representations.
+        """
         
         self.database = database
         self.collection_name = collection_name
@@ -28,6 +49,18 @@ class MongodbRAG:
         self.index_metadata_collection = self.database['index_metadata']
 
     def _get_index_definition(self, similarity_func, embedding_dimension, vector_fields, filter_fields):
+        """
+        Generate the index definition for creating a vector search index.
+
+        Args:
+            similarity_func: The similarity function to use ('cosine', 'dot_product', or 'euclidean').
+            embedding_dimension: The dimensionality of the vector embeddings.
+            vector_fields: A list of vector field specifications.
+            filter_fields: A list of filter field specifications.
+
+        Returns:
+            dict: The index definition for the vector search index.
+        """
 
         vector_fields = [{
             "type": "vector",
@@ -44,9 +77,27 @@ class MongodbRAG:
         return {"fields": vector_fields + filter_fields}
     
     def _assign_vector_field_name(self, field_name: str):
+        """
+        Assign a vector field name for a given source field.
+
+        Args:
+            field_name (str): The name of the source field.
+
+        Returns:
+            str: The name of the corresponding vector field.
+        """
         return f"{field_name}_vector"
 
     def _assign_vector_field_names(self, field_names: List[str]):
+        """
+        Assign vector field names for a list of source fields.
+
+        Args:
+            field_names (List[str]): A list of source field names.
+
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries mapping source fields to vector fields.
+        """
         return [{'source_path': field, 'vec_path': self._assign_vector_field_name(field)} for field in field_names]
 
     def add_index(
@@ -57,6 +108,19 @@ class MongodbRAG:
             vector_fields: List[str],
             filter_fields: List[str]
               ):
+        """
+        Add a vector search index to the MongoDB collection.
+
+        Args:
+            index_name (str): The name of the index.
+            similarity_func (Literal): The similarity function to use ('cosine', 'dot_product', or 'euclidean').
+            embedding_dimension (int): The dimensionality of the vector embeddings.
+            vector_fields (List[str]): A list of source fields to be used as vector fields.
+            filter_fields (List[str]): A list of fields to be used as filters.
+
+        Returns:
+            str: A message indicating whether the index was created or already exists.
+        """
         
         vector_field_names = self._assign_vector_field_names(vector_fields)
         index_definition = self._get_index_definition(similarity_func, embedding_dimension, vector_field_names, filter_fields)
@@ -90,6 +154,12 @@ class MongodbRAG:
             return 'index_created'
 
     def drop_index(self, index_name: str):
+        """
+        Drop a vector search index from the MongoDB collection.
+
+        Args:
+            index_name (str): The name of the index to drop.
+        """
         # Drop the index from the collection and remove its metadata
         self.collection.drop_search_index(index_name)
         self.index_metadata_collection.delete_one({"index_name": index_name, "collection": self.collection_name})
@@ -98,10 +168,12 @@ class MongodbRAG:
     def get_vec_fields(self, index_name: str):
         """
         Get the vector fields specification for a given index name.
+
         Args:
             index_name (str): The name of the search index.
+
         Returns:
-            List[Dict[str, str]]: A list of tuples containing the source field and vector field names.
+            List[Dict[str, str]]: A list of dictionaries containing the source and vector field names.
         """
         index_metadata = self.index_metadata_collection.find_one({"index_name": index_name, "collection": self.collection_name})
 
@@ -109,11 +181,13 @@ class MongodbRAG:
     
     def _get_vec_fields_filter(self, index_name: str):
         """
-        Get the vector fields filter for a given index_name that can be used to exclude vector fields in $project stage.
+        Get the vector fields filter for a given index name to exclude vector fields in the $project stage.
+
         Args:
             index_name (str): The name of the search index.
+
         Returns:
-            List[Dict[str, 1]]: A list of tuples containing the source field and vector field names.
+            dict: A dictionary mapping vector field names to 0 for exclusion.
         """
         return {vec_field['vec_path']: 0 for vec_field in self.get_vec_fields(index_name)}
     
@@ -123,21 +197,17 @@ class MongodbRAG:
                       task_type: Literal['RETRIEVAL_QUERY', 'RETRIEVAL_DOCUMENT', 'SEMANTIC_SIMILARITY', 'CLASSIFICATION', 'CLUSTERING'] = 'RETRIEVAL_DOCUMENT'):
         """
         Add documents to the MongoDB collection and generate vector embeddings for specified fields.
-        For every vector field specification (look at get_vec_fields method) input embeddings are generated and added to each document.
-        After that, documents are inserted into the collection.
+
         Args:
-            documents (List[Dict[str, Any]]): List of documents to be added.
-            vector_fields (List[Dict[str, str]]): A list of tuples containing the source field and vector field names.
+            documents (List[Dict[str, Any]]): A list of documents to be added.
+            vector_fields (List[Dict[str, str]]): A list of dictionaries mapping source fields to vector fields.
             task_type (Literal): The type of embedding task to perform. Options are:
                 - 'RETRIEVAL_QUERY'
                 - 'RETRIEVAL_DOCUMENT'
                 - 'SEMANTIC_SIMILARITY'
                 - 'CLASSIFICATION'
                 - 'CLUSTERING'
-        Returns:
-            None
         """
-
         for field_spec in vector_fields:
             source_field = field_spec['source_path']
             vec_field = field_spec['vec_path']
@@ -178,7 +248,6 @@ class MongodbRAG:
         Returns:
             List[Dict[str, Any]]: A list of documents that match the query and specified parameters.
         """
-
         vector_field_name = self._assign_vector_field_name(source_field)
         query_vector = self.embedding_model.embed_query(query, embeddings_task_type='RETRIEVAL_QUERY')
         filters = filters or {}

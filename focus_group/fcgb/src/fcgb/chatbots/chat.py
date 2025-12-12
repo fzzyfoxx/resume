@@ -9,15 +9,19 @@ class ChatInterface:
     Interface provides also a button to send 'button' action to the chatbot with a custom message (how message is handled is up to the chatbot implementation).
     If for a given thread_id there is some message_history in chatbot.memory they are displayed in the chat box (without the 'hidden' messages).
 
-    Args:
-    - chatbot: An instance of the SimpleChatBot class.
-    - accept_button_msg: A string representing the message to be sent when the accept button is clicked.
-    - thread_id: A string representing the thread ID for the current conversation.
-    - template_inputs: A dictionary containing variables to be passed to the chatbot prompts templates.
-    - height: An integer representing the height of the chat box in pixels.
     """
     def __init__(self, chatbot, accept_button_msg=None, thread_id=None, template_inputs={}, height=600, dark_mode=True):
-        
+        """
+        Initialize the ChatInterface with the given parameters.
+
+        Args:
+            chatbot: An instance of the SimpleChatBot class.
+            accept_button_msg: A string representing the message to be sent when the accept button is clicked.
+            thread_id: A string representing the thread ID for the current conversation.
+            template_inputs: A dictionary containing variables to be passed to the chatbot prompts templates.
+            height: An integer representing the height of the chat box in pixels.
+            dark_mode: A boolean indicating whether to use dark mode styling for the chat interface.
+        """
         self.chatbot = chatbot
         self.thread_id = thread_id if thread_id else 'test_thread'
         self.accept_button_msg = accept_button_msg if accept_button_msg else "Accept"
@@ -73,6 +77,9 @@ class ChatInterface:
     def _call_llm(self, human_message):
         """
         Invokes chatbot's graph with the human message passed in input box
+
+        Args:
+            human_message: A dictionary representing the human message to be sent to the chatbot.
         """
         response = self.chatbot.response(human_message, thread_id=self.thread_id)
         
@@ -116,12 +123,22 @@ class ChatInterface:
     def _append_message(self, sender, message):
         """
         Append a message to the chat output area.
+
+        Args:
+            sender: A string representing the sender of the message (e.g., "HUMAN" or "AI").
+            message: A string representing the content of the message.
         """
         formatted_message = "<br>" + "&nbsp;"*4 + message.replace("\n", "<br>" + "&nbsp;"*4)
         new_message = f"<div><b>{sender}:</b> {formatted_message}</div><hr style='border: 1px dashed #ccc;'>"
         self.chat_output.value += new_message
 
     def _dark_mode_style(self):
+        """
+        Formats dark mode CSS styles for the chat interface.
+
+        Returns:
+            A string containing CSS styles for dark mode.
+        """
         return """
         <style>
             .cell-output-ipywidget-background {
@@ -146,6 +163,11 @@ class ChatInterface:
         """
     
     def _light_mode_style(self):
+        """
+        Formats light mode CSS styles for the chat interface.
+        Returns:
+            A string containing CSS styles for light mode.
+        """
         return """
         <style>
             .cell-output-ipywidget-background {

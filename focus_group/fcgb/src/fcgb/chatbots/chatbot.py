@@ -16,6 +16,11 @@ class ButtonMessageSpec(TypedDict):
 
 
 class BaseChatBot:
+    """
+    Base class for chatbots using LangGraph StateGraph.
+    This class provides the foundational structure for creating chatbots that can manage conversations
+    through a state graph, utilizing prompts and memory for state persistence.
+    """
     def __init__(self,
                  llm,
                  initial_messages_spec,
@@ -26,6 +31,18 @@ class BaseChatBot:
                  global_inputs={},
                  compile=True
                  ):
+        """
+        Initialize the BaseChatBot with the given parameters.
+        Args:
+            llm: The language model class to be used for generating responses.
+            initial_messages_spec: A list of dictionaries defining the initial messages for the chatbot.
+            internal_messages_spec: A dictionary defining the internal message specifications.
+            memory: An optional memory saver instance for state persistence. If None, a default MemorySaver is used.
+            init_values: A dictionary of initial values to set in the chatbot's state.
+            prompt_manager_spec: A dictionary specifying the configuration for the PromptManager.
+            global_inputs: A dictionary of global input variables to be used in prompt templates.
+            compile: A boolean indicating whether to compile the state graph upon initialization.
+        """
         
         self.llm = llm
         self.initial_messages_spec = initial_messages_spec
@@ -52,13 +69,17 @@ class BaseChatBot:
             self.compile_graph()
 
     def compile_graph(self):
-        
+        """
+        Compile the state graph for the chatbot.
+        """
         self._set_prompts()
         self._set_state_class()
         self._compile_graph()
 
     def _set_prompts(self):
-
+        """
+        Set the internal prompts for the chatbot based on the internal message specifications.
+        """
         self.internal_prompts = {}
         if self.internal_messages_spec:
             for prompt_key, prompt_spec in self.internal_messages_spec.items():
@@ -79,14 +100,30 @@ class BaseChatBot:
         self.state_class = State
 
     def _get_internal_prompt(self, name: str, template_inputs: Dict):
+        """
+        Retrieve and format an internal prompt based on the provided name and template inputs.
 
+        Args:
+            name: The name of the internal prompt to retrieve.
+            template_inputs: A dictionary of inputs to format the prompt template.
+        Returns:
+            A tuple containing the formatted prompt string and its associated answer format (if any).
+        """
         prompt = self.internal_prompts[name]['prompt'].format(**template_inputs, **self.global_inputs)
         answer_format = self.internal_prompts[name].get('answer_format', None)
 
         return prompt, answer_format
     
     def _get_internal_message(self, name: str, template_inputs: Dict):
+        """
+        Retrieve an internal message object based on the provided name and template inputs.
 
+        Args:
+            name: The name of the internal message to retrieve.
+            template_inputs: A dictionary of inputs to format the prompt template.
+        Returns:
+            A tuple containing the message object and its associated answer format (if any).
+        """
         prompt, answer_format = self._get_internal_prompt(name, template_inputs)
         role = self.internal_messages_spec[name]['role'] if 'role' in self.internal_messages_spec[name] else 'human'
 
@@ -95,7 +132,15 @@ class BaseChatBot:
         return msg, answer_format
 
     def _invoke_internal_msg(self, name, template_inputs):
+        """
+        Invoke the language model with a specific internal message.
 
+        Args:
+            name: The name of the internal message to invoke.
+            template_inputs: A dictionary of inputs to format the prompt template.
+        Returns:
+            The response from the language model.
+        """
         prompt, answer_format = self._get_internal_prompt(name, template_inputs)
         
         if answer_format:
@@ -118,6 +163,10 @@ class BaseChatBot:
     def init_thread(self, thread_id: str, template_inputs: Dict[str, Any] = {}):
         """
         Initialize a new thread with system message template inputs.
+
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+            template_inputs: A dictionary containing variables to be passed to the chatbot prompts templates.
         """
         config = self._get_config(thread_id)
 
@@ -132,24 +181,53 @@ class BaseChatBot:
                 self._apply_initial_message(config, template_inputs, **spec)
 
     def _get_state(self, thread_id):
+        """
+        Get the current state of the conversation for a given thread ID.
+        
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+        """
         return self.graph.get_state({'configurable': {'thread_id': thread_id}})
     
     def _set_llm_func(self):
-        
+        """
+        Set the LLM function for the graph. This function invokes the language model with the current messages in the state.
+
+        Returns:
+            A callable function that takes the graph state as input and returns the LLM response.
+        """
         def llm_call(state: self.state_class) -> Dict: # type: ignore
+            """
+            A callable function that takes the graph state as input and returns the LLM response.
+
+            Args:
+                state: The current state of the graph.
+            Returns:
+                A dictionary containing the LLM response message.
+            """
             response = self.llm.invoke(state['messages'])
             response.name = 'llm'
             return {'messages': response}
         return llm_call
     
     def _set_human_func(self):
+        """
+        Set the human function for the graph. This is a placeholder method and should be
+        overridden in subclasses to provide specific human input handling.
+
+        Returns:
+            A callable function that takes the graph state as input.
+        """
         def human_input(state: self.state_class): # type: ignore
             pass
 
         return human_input
     
     def _compile_graph(self):
-
+        """
+        Compile the state graph for the chatbot. This method sets up the nodes and edges of the graph,
+        defining the flow of conversation between human input and LLM responses.
+        """
         human_func = self._set_human_func()
         llm_func = self._set_llm_func()
 
@@ -167,18 +245,43 @@ class BaseChatBot:
         )
     
     def display_graph(self):
+        """
+        Display the compiled state graph using Mermaid visualization.
+        """
         nest_asyncio.apply()
         display(Image(self.graph.get_graph(xray=1).draw_mermaid_png(draw_method=MermaidDrawMethod.PYPPETEER), height=200, width=200))
 
     def _get_config(self, thread_id: str):
+        """
+        Get the configuration dictionary for a given thread ID.
+
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+        Returns:
+            A dictionary containing the configuration for the given thread ID.
+        """
         return {'configurable': {'thread_id': thread_id}}
     
     @staticmethod
     def _filter_stream_output(output):
+        """
+        Filter the stream output to extract relevant message information.
+
+        Args:
+            output: The output stream from the graph execution.
+        Returns:
+            A list of tuples containing the type and content of each message.
+        """
         return [(x['messages'].type, x['messages'].content) for x in [[v for v in elem.values()][0] for elem in output] if isinstance(x, dict)]
     
     def _message_handler(self, message: dict):
-
+        """
+        Handle incoming messages and prepare them for graph state update.
+        Args:
+            message: A dictionary containing the type of message and its value.
+        Returns:
+            A dictionary of values to update the graph state.
+        """
         if message['type'] == 'message':
             # add pure human input
             human_msg = HumanMessage(message['value'], name='response')
@@ -192,9 +295,11 @@ class BaseChatBot:
         """
         Process the response from the human input and update the graph state accordingly.
 
-        Inputs:
-        - message: A dictionary containing the type of message and its value.
-        - thread_id: A string representing the thread ID for the current conversation.
+        Args:
+            message: A dictionary containing the type of message and its value.
+            thread_id: A string representing the thread ID for the current conversation.
+        Returns:
+            A list of tuples containing the type and content of each message in the response.
         """
         config = self._get_config(thread_id)
 
@@ -214,11 +319,10 @@ class BaseChatBot:
         """
         Get the current state of the conversation for a given thread ID.
 
-        Inputs:
-        - thread_id: A string representing the thread ID for the current conversation.
-
-        Outputs:
-        - A dictionary containing the current state of the conversation.
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+        Returns:
+            A dictionary containing the current state of the conversation.
         """
         config = self._get_config(thread_id)
         state = self.memory.get(config)
@@ -230,11 +334,10 @@ class BaseChatBot:
         """
         Get all messages for a given thread ID.
 
-        Inputs:
-        - thread_id: A string representing the thread ID for the current conversation.
-
-        Outputs:
-        - A list of tuples containing the type, content and name of each message.
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+        Returns:
+            A list of tuples containing the type, content and name of each message.
         """
         config = self._get_config(thread_id)
         state = self.memory.get(config)
@@ -246,12 +349,11 @@ class BaseChatBot:
         """
         Get the State field for a given thread ID and field_name.
 
-        Inputs:
-        - thread_id: A string representing the thread ID for the current conversation.
-        - field_name: A string representing the name of the field to retrieve.
-
-        Outputs:
-        - A string containing the requested field content of the conversation.
+        Args:
+            thread_id: A string representing the thread ID for the current conversation.
+            field_name: A string representing the name of the field to retrieve.
+        Returns:
+            A string containing the requested field content of the conversation.
         """
         state = self.get_state(thread_id)
         if state:
@@ -259,6 +361,11 @@ class BaseChatBot:
         return None
 
 class ButtonSummaryChatBot(BaseChatBot):
+    """
+    A chatbot class that extends the BaseChatBot to include functionality for handling
+    button-based interactions and generating summaries using a state graph workflow.
+    """
+
     def __init__(self,
                  llm,
                  initial_messages_spec,
@@ -268,7 +375,18 @@ class ButtonSummaryChatBot(BaseChatBot):
                  init_values={},
                  prompt_manager_spec={}
                  ):
+        """
+        Initialize the ButtonSummaryChatBot with the given parameters.
 
+        Args:
+            llm: The language model used for generating responses.
+            initial_messages_spec: Specification for the initial messages.
+            internal_messages_spec: Specification for internal messages.
+            memory: Optional memory object for state persistence.
+            global_inputs: Global inputs shared across the chatbot.
+            init_values: Initial values for the chatbot's state.
+            prompt_manager_spec: Specifications for managing prompts.
+        """
         super().__init__(
             llm=llm,
             initial_messages_spec=initial_messages_spec,
@@ -281,29 +399,51 @@ class ButtonSummaryChatBot(BaseChatBot):
         )
 
     def _set_state_class(self): 
-        
+        """
+        Set the state class for the chatbot, defining the structure of the state
+        with attributes for button and summary. The summary type is dynamically
+        determined from the internal prompts.
+        """
         summary_type = self.internal_prompts['button_message']['answer_format']
 
         class State(MessagesState):
             button: bool
             summary: summary_type # type: ignore
 
-        self.state_class = State[summary_type]
+        self.state_class = State
 
     def _set_button_prompt(self, template_inputs):
         """
-        Set the button prompt for the graph state.
+        Set the button prompt for the chatbot's graph state based on the internal
+        prompts and the provided template inputs.
+
+        Args:
+            template_inputs (dict): A dictionary of inputs to format the button prompt.
         """
         if self.internal_prompts['button_message']:
             self.button_prompt = self.internal_prompts['button_message']['prompt'].format(**template_inputs)
             self.button_model = self.internal_prompts['button_message']['answer_format']
 
     def init_thread(self, thread_id: str, template_inputs: Dict[str, Any] = {}):
-        super().init_thread(thread_id, template_inputs)
+        """
+        Initialize a new thread for the chatbot and set the button prompt.
 
+        Args:
+            thread_id (str): The unique identifier for the thread.
+            template_inputs (dict, optional): Template inputs for initializing the thread.
+        """
+        super().init_thread(thread_id, template_inputs)
         self._set_button_prompt(template_inputs)
 
     def _set_summary_func(self):
+        """
+        Define the summary function for the chatbot's state graph. This function
+        uses the language model to generate a summary based on the current state.
+
+        Returns:
+            Callable: A function that takes the chatbot's state and returns a dictionary
+            with the summary and button flag.
+        """
         def summary_llm_call(state: self.state_class) -> Dict: # type: ignore
             button_model = self.internal_prompts['button_message']['answer_format']
             response = self.llm.with_structured_output(button_model).invoke(state['messages'])
@@ -311,6 +451,13 @@ class ButtonSummaryChatBot(BaseChatBot):
         return summary_llm_call
     
     def _set_button_cond_func(self) -> str:
+        """
+        Define the conditional function for transitioning between nodes in the state graph
+        based on the button flag in the chatbot's state.
+
+        Returns:
+            Callable: A function that determines the next node based on the button flag.
+        """
         def button_cond_func(state: self.state_class): # type: ignore
             if state['button']:
                 return 'summary_node'
@@ -319,7 +466,10 @@ class ButtonSummaryChatBot(BaseChatBot):
         return button_cond_func
     
     def _compile_graph(self):
-
+        """
+        Compile the state graph for the chatbot, defining the nodes, edges, and
+        conditional transitions. The graph includes human, LLM, and summary nodes.
+        """
         human_func = self._set_human_func()
         llm_func = self._set_llm_func()
         summary_func = self._set_summary_func()
@@ -341,13 +491,21 @@ class ButtonSummaryChatBot(BaseChatBot):
         )
 
     def _message_handler(self, message: dict):
+        """
+        Handle incoming messages and update the chatbot's state accordingly.
 
+        Args:
+            message (dict): A dictionary representing the incoming message. It should
+            contain a 'type' key (e.g., 'message' or 'button') and a 'value' key.
+        Returns:
+            dict: A dictionary of values to update the chatbot's state.
+        """
         if message['type'] == 'message':
             # add pure human input
             human_msg = HumanMessage(message['value'], name='response')
             values={'messages': human_msg}
         elif message['type'] == 'button':
-            # update button flag and add passed butten message as human input
+            # update button flag and add passed button message as human input
             values = {'button': True}
             button_msg = message['value'] if message['value'] else self.button_prompt
             values['messages'] = HumanMessage(button_msg, name='hidden')
