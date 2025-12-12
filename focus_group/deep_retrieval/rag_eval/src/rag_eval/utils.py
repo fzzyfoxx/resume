@@ -38,6 +38,7 @@ def create_path_if_not_exists(path: str):
 def arxiv_pdf_link_extractor(links: List[Dict[str, str]]) -> str | None:
     """
     Extracts the PDF link from a list of links.
+    
     Args:
         links (List[Dict[str, str]]): A list of dictionaries containing link information.
     Returns:

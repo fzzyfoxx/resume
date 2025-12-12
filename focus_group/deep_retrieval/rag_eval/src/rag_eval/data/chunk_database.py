@@ -11,11 +11,31 @@ import asyncio
 from tqdm.notebook import tqdm as notebook_tqdm
 
 class ChunkDataHandler:
+    """
+    A class for managing and handling document chunks for evaluation.
+
+    This class provides methods for organizing, retrieving, and summarizing document metadata, 
+    evaluation files, and HyDE queries. It also tracks the state of document evaluation and 
+    provides utilities for managing document paths.
+
+    Attributes:
+        output_path: The base directory for storing document metadata, evaluation files, and HyDE queries.
+        docs_metadata_path: The directory for storing document metadata files.
+        docs_path: The directory for storing document files.
+        eval_path: The directory for storing evaluation files.
+        hyde_path: The directory for storing HyDE queries.
+    """
+
     def __init__(
             self,
             output_path: str,
         ):
+        """
+        Initialize the ChunkDataHandler instance.
 
+        Args:
+            output_path: The base directory for storing document-related files.
+        """
         self.output_path = output_path
         create_path_if_not_exists(self.output_path)
 
@@ -27,36 +47,60 @@ class ChunkDataHandler:
     def _evaluated_docs(self):
         """
         Returns a list of evaluated documents.
+
+        Returns:
+            List[str]: A list of filenames for evaluated documents.
         """
         return get_filenames_list(self.eval_path)
 
     def _docs_without_evaluation(self):
         """
         Returns a list of documents that have not been evaluated yet.
+
+        Returns:
+            List[str]: A list of filenames for documents without evaluation.
         """
         return get_filenames_without(self.docs_metadata_path, self._evaluated_docs())
     
     def _docs_with_hyde(self):
         """
-        Returns a list of documents that have set of HyDE queries saved.
+        Returns a list of documents that have HyDE queries saved.
+
+        Returns:
+            List[str]: A list of filenames for documents with HyDE queries.
         """
         return get_filenames_list(self.hyde_path)
     
     def _docs_without_hyde(self):
         """
-        Returns a list of documents that do not have set of HyDE queries saved but have evaluated chunks.
+        Returns a list of documents that do not have HyDE queries saved but have evaluated chunks.
+
+        Returns:
+            List[str]: A list of filenames for documents without HyDE queries.
         """
         return get_filenames_without(self.eval_path, self._docs_with_hyde())
     
     def _all_docs(self):
         """
         Returns a list of all documents.
+
+        Returns:
+            List[str]: A list of filenames for all documents.
         """
         return get_filenames_list(self.docs_metadata_path)
     
     def get_eval_file(self, doc_name: str):
         """
-        Loads the evaluation file for a given document name.
+        Load the evaluation file for a given document name.
+
+        Args:
+            doc_name: The name of the document.
+
+        Returns:
+            dict: The content of the evaluation file.
+
+        Raises:
+            FileNotFoundError: If the evaluation file does not exist.
         """
         path = os.path.join(self.eval_path, f"{doc_name}.json")
         if os.path.exists(path):
@@ -66,7 +110,16 @@ class ChunkDataHandler:
         
     def get_metadata_file(self, doc_name: str):
         """
-        Loads the metadata file for a given document name.
+        Load the metadata file for a given document name.
+
+        Args:
+            doc_name: The name of the document.
+
+        Returns:
+            dict: The content of the metadata file.
+
+        Raises:
+            FileNotFoundError: If the metadata file does not exist.
         """
         path = os.path.join(self.docs_metadata_path, f"{doc_name}.json")
         if os.path.exists(path):
@@ -76,7 +129,16 @@ class ChunkDataHandler:
         
     def get_hyde_file(self, doc_name: str):
         """
-        Loads the HyDE queries file for a given document name.
+        Load the HyDE queries file for a given document name.
+
+        Args:
+            doc_name: The name of the document.
+
+        Returns:
+            dict: The content of the HyDE queries file.
+
+        Raises:
+            FileNotFoundError: If the HyDE queries file does not exist.
         """
         path = os.path.join(self.hyde_path, f"{doc_name}.json")
         if os.path.exists(path):
@@ -86,7 +148,13 @@ class ChunkDataHandler:
         
     def get_doc_titles(self, docs_names: list):
         """
-        Returns a list of titles for the given document names.
+        Retrieve the titles of the given documents.
+
+        Args:
+            docs_names: A list of document names.
+
+        Returns:
+            List[str]: A list of document titles.
         """
         titles = []
         for doc_name in docs_names:
@@ -96,7 +164,7 @@ class ChunkDataHandler:
     
     def summary(self):
         """
-        Prints a summary of the current state of the document loader and evaluator.
+        Print a summary of the current state of the document loader and evaluator.
         """
         print(f"All docs: {self.all_docs}")
         if self.all_docs > 0:
@@ -109,39 +177,77 @@ class ChunkDataHandler:
     @property
     def docs_to_evaluate(self):
         """
-        Returns a number of documents that need to be evaluated.
+        Get the number of documents that need to be evaluated.
+
+        Returns:
+            int: The number of documents to evaluate.
         """
         return len(self._docs_without_evaluation())
     
     @property
     def docs_evaluated(self):
         """
-        Returns a number of documents that have been evaluated.
+        Get the number of documents that have been evaluated.
+
+        Returns:
+            int: The number of evaluated documents.
         """
         return len(self._evaluated_docs())
     
     @property
     def all_docs(self):
         """
-        Returns a number of all documents.
+        Get the total number of documents.
+
+        Returns:
+            int: The total number of documents.
         """
         return len(self._all_docs())
     
     @staticmethod
     def _add_json_extension(paths):
         """
-        Adds '.json' extension to a list of paths.
+        Add the '.json' extension to a list of paths.
+
+        Args:
+            paths: A list of file paths.
+
+        Returns:
+            List[str]: The file paths with the '.json' extension added.
         """
         return [f + '.json' for f in paths]
     
     @staticmethod
     def _add_pdf_extension(paths):
         """
-        Adds '.pdf' extension to a list of paths.
+        Add the '.pdf' extension to a list of paths.
+
+        Args:
+            paths: A list of file paths.
+
+        Returns:
+            List[str]: The file paths with the '.pdf' extension added.
         """
         return [f + '.pdf' for f in paths]
 
+
 class ChunkEvalBaseBuilder(ChunkDataHandler):
+    """
+    A class for building and managing chunk evaluation workflows.
+
+    This class extends ChunkDataHandler and provides additional functionality for 
+    loading documents, evaluating chunks, and managing configurations for the evaluation process.
+
+    Attributes:
+        llm: The language model used for generating responses.
+        builder_config: Configuration for the builder, including batch sizes and limits.
+        prompts_config: Configuration for prompts used in the evaluation process.
+        doc_search_config: Configuration for document search parameters.
+        chunk_eval_config: Configuration for chunk evaluation parameters.
+        memory: Optional memory object for state persistence.
+        prompt_manager_spec: Specifications for managing prompts.
+    """
+
     def __init__(
             self,
             llm,
@@ -174,6 +280,19 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
             memory=None,
             prompt_manager_spec: dict = {}
         ):
+        """
+        Initialize the ChunkEvalBaseBuilder instance.
+
+        Args:
+            llm: The language model used for generating responses.
+            output_path: The base directory for storing document-related files.
+            builder_config: Configuration for the builder, including batch sizes and limits.
+            prompts_config: Configuration for prompts used in the evaluation process.
+            doc_search_config: Configuration for document search parameters.
+            chunk_eval_config: Configuration for chunk evaluation parameters.
+            memory: Optional memory object for state persistence.
+            prompt_manager_spec: Specifications for managing prompts.
+        """
         super().__init__(
             output_path=output_path
             )
@@ -189,7 +308,9 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
         self.build()
 
     def build(self):
-
+        """
+        Build the document loader and chunk evaluator based on the provided configurations.
+        """
         self.doc_loader = RandomQueriesPaperSearchGraph(
             llm=self.llm,
             prompts_config=self.prompts_config,
@@ -212,15 +333,27 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
     
     @property
     def new_docs_per_turn(self):
+        """
+        Get the number of new documents added per turn.
+
+        Returns:
+            int: The number of new documents per turn.
+        """
         return self.doc_search_config['main_queries_num'] * self.doc_search_config['max_results']
     
     @property
     def evaluations_per_turn(self):
+        """
+        Get the number of evaluations performed per turn.
+
+        Returns:
+            int: The number of evaluations per turn.
+        """
         return self.builder_config['eval_batch_size']
     
     def summary(self):
         """
-        Prints a summary of the current state of the document loader and evaluator.
+        Print a summary of the current state of the document loader and evaluator.
         """
         print(f"All docs: {self.all_docs}")
         if self.all_docs > 0:
@@ -231,12 +364,22 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
     
     @staticmethod
     def _is_doc_oversized(path, pages_limit):
+        """
+        Check if a document exceeds the maximum allowed number of pages.
+
+        Args:
+            path: The path to the document metadata file.
+            pages_limit: The maximum number of pages allowed.
+
+        Returns:
+            bool: True if the document is oversized, False otherwise.
+        """
         doc_metadata = load_json(path)
         return doc_metadata['pages_count'] > pages_limit
     
     def _remove_oversized_docs(self):
         """
-        Removes oversized documents based on the max_pages limit specified in the builder_config.
+        Remove oversized documents based on the max_pages limit specified in the builder_config.
         """
         if self.builder_config.get('max_pages'):
             oversized_docs = [
@@ -255,7 +398,12 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
             print(f"Removed {docs_removed} oversized docs. Remaining docs: {docs_after}")
 
     def extend_docs(self, target_docs: int):
+        """
+        Extend the document collection to reach the target number of documents.
 
+        Args:
+            target_docs: The target number of documents.
+        """
         current_docs_num = self.all_docs
         docs_per_turn = self.new_docs_per_turn
 
@@ -279,32 +427,13 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
             pbar.update(1)
             pbar.set_postfix({'All docs': all_docs, 'New docs': new_docs})
 
-    """async def evaluate_docs(self, target_docs: int):
-
-        self._remove_oversized_docs()
-
-        batch_size = self.evaluations_per_turn
-        turns_needed = math.ceil((target_docs - self.docs_evaluated) / batch_size)
-        docs_paths = self._add_json_extension(self._docs_without_evaluation())
-
-        async def run_query_async(metadata_file: str):
-            thread_id = uuid.uuid4().hex
-            state = await self.chunk_eval.run_with_progress_async(metadata_file=metadata_file, thread_id=thread_id)
-            return metadata_file, state
-        
-        process_pbar = notebook_tqdm(total=turns_needed, desc="Evaluating docs", postfix={'Target Docs': target_docs, 'Evaluated': self.docs_evaluated})
-        
-        for _ in range(turns_needed):
-
-            batch_files = docs_paths[:batch_size]
-            docs_paths = docs_paths[batch_size:]
-
-            tasks = [run_query_async(metadata_file) for metadata_file in batch_files]
-            results = await asyncio.gather(*tasks)
-
-            process_pbar.set_postfix({'Target Docs': target_docs, 'Evaluated': self.docs_evaluated})"""
-    
     async def evaluate_docs(self, target_docs: int):
+        """
+        Evaluate the documents to reach the target number of evaluated documents.
+
+        Args:
+            target_docs: The target number of evaluated documents.
+        """
         self._remove_oversized_docs()
 
         batch_size = self.evaluations_per_turn
@@ -338,7 +467,6 @@ class ChunkEvalBaseBuilder(ChunkDataHandler):
         # Start worker tasks
         num_workers = batch_size  # Number of concurrent workers
         workers = [asyncio.create_task(worker(queue)) for _ in range(num_workers)]
-
 
         # Wait for all tasks to complete
         await queue.join()
