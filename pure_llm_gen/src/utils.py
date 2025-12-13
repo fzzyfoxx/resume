@@ -1,5 +1,6 @@
 import json
 import random
+import os
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, Runnable
@@ -45,6 +46,30 @@ def set_dicts_to_proper_format(input_dicts, specs):
         input_dicts = [input_dicts]
 
     return sum([assign_formats(input_dict, specs) for input_dict in input_dicts], [])
+
+def create_path_if_not_exists(path):
+    try:
+        os.makedirs(path)
+    except:
+        pass
+
+def get_siblings_for_elem(elem, sections, sep=', ', key='current_sections'):
+    parent_id = elem['parent_id']
+    sibling_sections = sep.join([x['title'] + '-' + x['subtitle'] for x in sections if x['parent_id'] == parent_id])
+    output = elem.copy()
+    output[key] = sibling_sections
+    return output
+
+def get_siblings(sections, sep='\n', key='current_sections'):
+    return [get_siblings_for_elem(elem, sections.copy(), sep, key) for elem in sections]
+
+def count_files_in_folder(folder_path):
+    try:
+        files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+        print(f"Number of files in the folder: {len(files)}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return 0
 
 class RandomNameGenerator:
     def __init__(self):

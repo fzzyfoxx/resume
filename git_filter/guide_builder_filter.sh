@@ -1,0 +1,12 @@
+git filter-repo \
+    --path focus_group/experimental_notebooks/code_examples.ipynb \
+    --path focus_group/experimental_notebooks/container_research.ipynb \
+    --path focus_group/experimental_notebooks/personas.ipynb \
+    --path focus_group/experimental_notebooks/main_subject.ipynb \
+    --path focus_group/experimental_notebooks/phantom_researcher.ipynb \
+    --path focus_group/experimental_notebooks/planning_pts.ipynb \
+    --path focus_group/experimental_notebooks/test_threads.md \
+    --path pure_llm_gen/experimental_notebooks/guide_prompt_saving.ipynb \
+    --path focus_group/api_docs/ \
+    --invert-paths \
+    --force \

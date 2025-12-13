@@ -24,7 +24,7 @@ def extract_named_class_variables(cls, vars):
     return attributes
 
 class BaseConfig:
-    """Base configuration class with a params classmethod."""
+    """Base configuration class."""
 
     @classmethod
     def params(cls):
