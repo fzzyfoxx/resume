@@ -8,5 +8,9 @@ git filter-repo \
     --path focus_group/experimental_notebooks/test_threads.md \
     --path pure_llm_gen/experimental_notebooks/guide_prompt_saving.ipynb \
     --path focus_group/api_docs/ \
+    --path focus_group/deep_retrieval/notebooks/hotpotqa.ipynb \
+    --path focus_group/deep_retrieval/notebooks/ollama.ipynb \
+    --path focus_group/deep_retrieval/notebooks/simple_temp_rag.ipynb \
+    --path focus_group/deep_retrieval/notebooks/chunk_eval.ipynb \
     --invert-paths \
     --force \

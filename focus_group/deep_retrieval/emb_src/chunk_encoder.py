@@ -13,6 +13,15 @@ def chunk2query_cosine_similarity(encoded_chunks, encoded_queries):
     return tf.matmul(encoded_chunks, encoded_queries, transpose_b=True) / (tf.expand_dims(Q_norm, axis=0) * tf.expand_dims(K_norm, axis=1))
 
 class ChunkEncoder:
+    """
+    Encodes document chunks and queries for similarity evaluation.
+
+    Args:
+        data_path (str): Path to the data directory.
+        preprocessor_path (str): Path to the preprocessor model.
+        encoder_path (str): Path to the encoder model.
+        seq_length (int): Maximum sequence length for encoding.
+    """
     def __init__(
             self,
             data_path: str = '../data',
@@ -28,6 +37,9 @@ class ChunkEncoder:
         self.build()
 
     def build(self):
+        """
+        Initializes the data handler, preprocessor, tokenizer, input packer, and encoder.
+        """
         self.data_handler = ChunkDataHandler(output_path=self.data_path)
         self.preprocessor = hub.load(self.preprocessor_path)
         self.tokenizer = hub.KerasLayer(self.preprocessor.tokenize)
@@ -36,16 +48,49 @@ class ChunkEncoder:
         self.encoder = hub.KerasLayer(self.encoder_path)
 
     def get_doc_names(self):
+        """
+        Retrieves the names of evaluated documents.
+
+        Returns:
+            list: List of document names.
+        """
         return self.data_handler._evaluated_docs()
     
     def get_doc_titles(self, doc_names):
+        """
+        Retrieves the titles of the specified documents.
+
+        Args:
+            doc_names (list): List of document names.
+
+        Returns:
+            list: List of document titles.
+        """
         return self.data_handler.get_doc_titles(doc_names)
     
     @staticmethod
     def check_max_token_length(encoder_inputs):
+        """
+        Checks the maximum token length in the encoder inputs.
+
+        Args:
+            encoder_inputs (dict): Dictionary containing encoder input tensors.
+
+        Returns:
+            int: Maximum token length.
+        """
         return tf.reduce_max(tf.reduce_sum(encoder_inputs['input_mask'], axis=1)).numpy()
     
     def load_doc(self, doc_name):
+        """
+        Loads the document chunks, labels, and queries for the specified document.
+
+        Args:
+            doc_name (str): Name of the document.
+
+        Returns:
+            tuple: Chunks, chunk labels, and queries.
+        """
         eval_metadata = self.data_handler.get_eval_file(doc_name)
         chunks = [chunk_spec['text'] for chunk_spec in eval_metadata['chunks_eval']]
         chunks_labels = tf.constant([chunk_spec['labels'] for chunk_spec in eval_metadata['chunks_eval']], tf.int32)
@@ -53,18 +98,48 @@ class ChunkEncoder:
         return chunks, chunks_labels, queries
     
     def prepare_inputs(self, chunks, queries):
+        """
+        Prepares encoder inputs from document chunks and queries.
+
+        Args:
+            chunks (list): List of document chunks.
+            queries (list): List of queries.
+
+        Returns:
+            tuple: Encoder inputs and the number of queries.
+        """
         tokenized_inputs = self.tokenizer(chunks + queries)
         encoder_inputs = self.inputer([tokenized_inputs])
         queries_num = len(queries)
         return encoder_inputs, queries_num
     
     def encode_inputs(self, inputs, queries_num):
+        """
+        Encodes the inputs into chunk and query embeddings.
+
+        Args:
+            inputs (dict): Encoder input tensors.
+            queries_num (int): Number of queries.
+
+        Returns:
+            tuple: Encoded chunks and queries.
+        """
         encoder_output = self.encoder(inputs)['pooled_output']
         encoded_chunks = encoder_output[:-queries_num]
         encoded_queries = encoder_output[-queries_num:]
         return encoded_chunks, encoded_queries
     
     def encode_doc(self, doc_name, return_all=False):
+        """
+        Encodes the document chunks and queries for the specified document.
+
+        Args:
+            doc_name (str): Name of the document.
+            return_all (bool): Whether to return all data or only encodings.
+
+        Returns:
+            dict: Encoded chunks, queries, and optionally other data.
+        """
         chunks, chunks_labels, queries = self.load_doc(doc_name)
         inputs, queries_num = self.prepare_inputs(chunks, queries)
         encoded_chunks, encoded_queries = self.encode_inputs(inputs, queries_num)
@@ -83,6 +158,16 @@ class ChunkEncoder:
         }
     
     def evaluate_similarities(self, max_docs=None, threshold=0.45):
+        """
+        Evaluates the similarity between document chunks and queries.
+
+        Args:
+            max_docs (int, optional): Maximum number of documents to evaluate.
+            threshold (float): Similarity threshold for evaluation metrics.
+
+        Returns:
+            dict: Evaluation metrics including F1 score, precision, recall, similarity coverage, and labels coverage.
+        """
         doc_names = self.get_doc_names()
         if max_docs is not None:
             doc_names = doc_names[:max_docs]
@@ -132,6 +217,15 @@ class ChunkEncoder:
     
 
 class HyDEChunkEncoder(ChunkEncoder):
+    """
+    Extends ChunkEncoder to handle HyDE (Hypothetical Document Embeddings) data.
+
+    Args:
+        data_path (str): Path to the data directory.
+        preprocessor_path (str): Path to the preprocessor model.
+        encoder_path (str): Path to the encoder model.
+        seq_length (int): Maximum sequence length for encoding.
+    """
     def __init__(
             self,
             data_path: str = '../data',
@@ -147,9 +241,24 @@ class HyDEChunkEncoder(ChunkEncoder):
         )
 
     def get_doc_names(self):
+        """
+        Retrieves the names of documents with HyDE data.
+
+        Returns:
+            list: List of document names.
+        """
         return self.data_handler._docs_with_hyde()
     
     def load_hyde_doc(self, doc_name):
+        """
+        Loads the document chunks, labels, and HyDE queries for the specified document.
+
+        Args:
+            doc_name (str): Name of the document.
+
+        Returns:
+            tuple: Chunks, chunk labels, concatenated queries, and query lengths.
+        """
         chunks, chunks_labels, _ = self.load_doc(doc_name)
         hyde_doc = self.data_handler.get_hyde_file(doc_name)
 
@@ -159,6 +268,16 @@ class HyDEChunkEncoder(ChunkEncoder):
         return chunks, chunks_labels, concatenated_queries, queries_lengths
     
     def encode_doc(self, doc_name, return_all=False):
+        """
+        Encodes the document chunks and HyDE queries for the specified document.
+
+        Args:
+            doc_name (str): Name of the document.
+            return_all (bool): Whether to return all data or only encodings.
+
+        Returns:
+            dict: Encoded chunks, queries, and optionally other data.
+        """
         chunks, chunks_labels, queries, queries_lengths = self.load_hyde_doc(doc_name)
         inputs, queries_num = self.prepare_inputs(chunks, queries)
         encoded_chunks, encoded_queries = self.encode_inputs(inputs, queries_num)
@@ -179,10 +298,30 @@ class HyDEChunkEncoder(ChunkEncoder):
         }
     
     def aggregate_hyde_queries(self, results, queries_lengths):
+        """
+        Aggregates HyDE query results by taking the maximum similarity for each query set.
+
+        Args:
+            results (tf.Tensor): Similarity results tensor.
+            queries_lengths (list): List of query lengths for each set.
+
+        Returns:
+            tf.Tensor: Aggregated similarity results.
+        """
         results_set = tf.split(results, num_or_size_splits=queries_lengths, axis=-1)
         return tf.concat([tf.reduce_max(x, axis=-1, keepdims=True) for x in results_set], axis=-1)
     
     def evaluate_similarities(self, max_docs=None, threshold=0.45):
+        """
+        Evaluates the similarity between document chunks and HyDE queries.
+
+        Args:
+            max_docs (int, optional): Maximum number of documents to evaluate.
+            threshold (float): Similarity threshold for evaluation metrics.
+
+        Returns:
+            dict: Evaluation metrics including F1 score, precision, recall, similarity coverage, and labels coverage.
+        """
         doc_names = self.get_doc_names()
         if max_docs is not None:
             doc_names = doc_names[:max_docs]

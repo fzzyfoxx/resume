@@ -1,24 +1,120 @@
-# Guide Builder
+# Guide Builder System
+
+The Guide Builder system is a comprehensive framework designed to facilitate the creation of structured guides, books, and research workflows using advanced AI techniques. It is composed of two main components: the **fcgb package** and the **Simplified Guide Builder (SGB)**. Together, these components provide a robust environment for content generation, retrieval-augmented generation (RAG), and strategic planning, with a strong emphasis on experimentation and optimization for better content retrieval.
+
+**technological stack**: <br>
+LangGraph | LangChain | Pydantic | Tavily | MongoDB | pymongo | pytest | IPython | PyMuPDF | Matplotlib | NetworkX | Scikit-learn | Tensorflow Hub | LangSmith | SciPy
+
+---
+
+## fcgb Package
+
+The `fcgb` package is an advanced, modular framework tailored for highly interactive environments. It is designed to support the development of conversational agents, retrieval-augmented generation systems, and strategic workflows. The package is particularly suited for scenarios involving:
+
+- **Reviewer Personas**: Define and simulate target group personas to provide feedback and refine content.
+- **External Sources Research**: Integrate with tools like MongoDB and Tavily for vector-based document retrieval and web content extraction.
+- **Strategic Planning**: Use self-conversational agents and state-driven workflows to plan, distribute, and execute tasks iteratively.
+
+### Key Features:
+- **Dynamic Chatbots**: Create task-specific chatbots with customizable prompts, memory persistence, and state graph workflows.
+- **Retrieval-Augmented Generation (RAG)**: Manage document retrieval, vector-based indexing, and relevance evaluation using MongoDB and embedding models.
+- **Interactive Tools**: Simulate iterative task execution and research workflows with tools like `JobHandler` and `PhantomResearcher`.
+- **Experiments for Content Retrieval**: Conduct experiments to optimize chunk evaluation, clustering, and query expansion for better retrieval accuracy.
+- **Highly Modular Design**: Build and test workflows with fake models, predefined configurations, and unit tests for rapid prototyping.
+
+### Current Status:
+The `fcgb` package is a work in progress and is not yet fully complete. While it provides a powerful foundation for building interactive and strategic systems, some components are still under development. For users seeking a complete and ready-to-use solution, the Simplified Guide Builder offers a streamlined alternative.
+
+---
+
+## Simplified Guide Builder (SGB)
+
+The Simplified Guide Builder is a lightweight and complete framework for generating structured guides or books. It simplifies the complexities of the `fcgb` package while retaining core functionalities, making it ideal for users who need a straightforward solution.
+
+### Key Features:
+- **Hierarchical Content Generation**: Generate concepts, parts, chapters, and detailed content using a structured workflow.
+- **PDF Compilation**: Convert markdown content into professionally formatted PDFs with features like table of contents and chapter organization.
+- **Customizable Covers**: Create visually appealing Voronoi diagram-based covers with customizable aesthetics.
+- **LangChain Integration**: Use LangChain for LLM interactions, ensuring simplicity and ease of use.
+
+### Use Case:
+The SGB framework is designed for users who want to generate complete books or guides without the need for external databases or complex configurations. It provides a polished and user-friendly experience, with an example book already generated using this framework.
+
+---
+
+## Experiments for Better Content Retrieval
+
+A significant focus of the Guide Builder system is on improving content retrieval through experimentation. The `fcgb` package includes tools and workflows for conducting advanced experiments, such as:
+
+- **Chunk Evaluation**: Evaluate the relevance of document chunks to specific queries using state graphs and embedding models.
+- **Query Expansion**: Generate hypothetical document expansion (HyDE) queries to improve the robustness of chunk relevance predictions.
+- **Clustering and Graph Analysis**: Analyze relationships between document chunks, queries, and labels using clustering, spectral methods, and graph-based techniques.
+- **Similarity Comparisons**: Compare standard query-to-chunk similarity measures with HyDE-enhanced methods to optimize retrieval accuracy.
+
+These experiments leverage advanced techniques like spectral clustering, cosine similarity, and embedding-based analysis to refine the retrieval-augmented generation process.
+
+---
+
 
 ## Table of Contents
-- [fcgb package](#fcgb-package)
-    - [general](#general)
-    - [cfg](#cfg)
-    - [chatbots](#chatbots)
-    - [tools](#tools)
-    - [rag](#rag)
-    - [setup](#setup)
-    - [types](#types)
-    - [prompts](#prompts)
-    - [tests](#tests)
-- [fcbg notebooks](#fcbg-notebooks)
-- [Simplified Guide Builder](#simplified-guide-builder)
-    - [builder](#builder-link)
-    - [cover](#cover-link)
-    - [pdf](#pdf-link)
-    - [display](#display-link)
+- [fcgb package](#fcgb-package)  
+A modular framework for building conversational agents, research workflows, and retrieval-augmented generation (RAG) systems with tools for chatbot development, prompt management, and vector-based document retrieval.
 
+    - [general](#general)  
+      Overview of core modules like fake models, prompt management, and utilities for testing and development.
 
+    - [cfg](#cfg)  
+      Configuration modules for defining and managing LLM agents, RAG components, and utility functions.
+
+    - [chatbots](#chatbots)  
+      Modules for creating and managing chatbots, including state-driven workflows, self-conversational agents, and predefined task-oriented bots.
+
+    - [tools](#tools)  
+      Tools for iterative task execution, research simulation, and predefined workflows for specific tasks.
+
+    - [rag](#rag)  
+      Components for managing RAG workflows, including vector-based document retrieval and state-driven research processes.
+
+    - [setup](#setup)  
+      Setup scripts for initializing databases and other dependencies required for RAG workflows.
+
+    - [types](#types)  
+      Data models and type definitions for consistent handling of agent states, structured outputs, and RAG components.
+
+    - [prompts](#prompts)  
+      Directory of prompt templates organized for chatbot and tool usage, managed by the PromptManager.
+
+    - [tests](#tests)  
+      Unit tests for validating the functionality of core components using the pytest framework.
+
+- [fcbg notebooks](#fcbg-notebooks)  
+  Jupyter notebooks demonstrating the usage of fcgb components for task solving, RAG workflows, and chatbot interactions.
+
+- [Simplified Guide Builder](#simplified-guide-builder)  
+  A lightweight framework for generating structured guides or books using LLMs, with tools for content creation, cover design, and PDF compilation.
+
+    - [builder](#builder-link)  
+      A hierarchical workflow for generating concepts, parts, chapters, and detailed content for structured guides.
+
+    - [cover](#cover-link)  
+      A utility for creating visually appealing Voronoi diagram-based covers with customizable aesthetics.
+
+    - [pdf](#pdf-link)  
+      A tool for converting markdown content into professionally formatted PDFs with features like TOC and chapter-based organization.
+
+    - [display](#display-link)  
+      Interactive widgets for navigating and selecting options in Jupyter Notebooks, useful for managing outputs.
+
+- [deep retrieval](#deep-retrieval)  
+  Tools and workflows for document retrieval, chunk evaluation, and analysis, focusing on relevance labeling and clustering.
+
+    - [rag_eval package](#rag_eval-package)  
+      A package for automating document retrieval, chunk evaluation, and workflow orchestration for relevance labeling.
+
+    - [chunk analysis notebooks](#chunk-analysis-notebooks)  
+      Notebooks for analyzing relationships between document chunks, queries, and labels using clustering, embeddings, and graph-based methods.
+
+<br><br>
 # fcgb package
 The fcgb package is a versatile framework designed for building and managing advanced conversational agents, research workflows, and retrieval-augmented generation (`RAG`) systems. It provides a modular architecture with components for chatbot development, prompt management, task distribution, and integration with external tools like `MongoDB` for vector-based document retrieval. Key features include dynamic state graph workflows, customizable prompt templates, `self-conversational` agents for strategy generation, and tools for simulating research and testing workflows.
 
@@ -254,6 +350,7 @@ A collection of unit tests for general components of the `fcgb` package using `p
 - [Structured Output tests](focus_group/fcgb/tests/fake_models_tests/structured_output_test.py)
 - [PromptManager tests](focus_group/fcgb/tests/prompt_manager_tests/prompt_manager_test.py)
 
+<br><br>
 # fcgb notebooks
 A collection of Jupyter notebooks demonstrating the usage of various components of the `fcgb` package including chatbots, RAG workflows, and tools.
 - [Planned Iterative Task Solver](focus_group/experimental_notebooks/planned_task_solver.ipynb) - Experimental notebook presenting development of a planned iterative task solver agent using `fcgb` components. The agent is a state-driven workflow designed to iteratively plan, distribute, execute, and refine tasks based on a given job description. The process begins with a **planning phase**, where the system generates a high-level plan and identifies tasks. These tasks are then routed to the **distribution phase**, where they are assigned for execution. The **executor phase** processes each task, generating outputs that are aggregated and used to extend the knowledge base in the **base extension phase**. The workflow loops back to planning for further iterations unless a termination condition is met, such as reaching the maximum number of turns or deciding to generate a final report. The process concludes with the **report phase**, where all results are compiled into a comprehensive output.
@@ -481,8 +578,71 @@ Key Features:
 - **Option Collection**: Collects selected options for further processing.
 - **Callback Execution**: Executes a target function after all options are processed.
 
+<br><br>
 # Deep Retrieval
 
+## rag_eval package
+This package is designed to automate the process of collecting documents, splitting them into chunks, and evaluating the relevance of these chunks to specific queries. It achieves this by integrating document retrieval, chunk evaluation, and workflow management into a cohesive system. The primary goal is to identify and label chunks as relevant or irrelevant based on the provided queries, enabling efficient and scalable processing of large document collections.
+
+Key Features:
+Document Retrieval: Uses `arXiv` as a source to fetch documents based on user-defined or randomly generated queries, storing metadata and PDFs for further processing.
+Chunk Evaluation: Splits documents into manageable chunks and evaluates their relevance to specific queries using a language model, updating context iteratively.
+Workflow Orchestration: Combines retrieval and evaluation into a high-level workflow, managing the state of documents and ensuring smooth transitions between processes.
+Parallel Processing: Leverages `asyncio` for concurrent evaluation of document chunks, enabling efficient handling of large datasets.
+Advanced Techniques: Utilizes state graphs for workflow automation, language models for query generation and evaluation, and tools like `PyMuPDF` for document handling and text extraction.
+
+- [Papers downloader](focus_group/deep_retrieval/rag_eval/src/rag_eval/doc_loader.py)
+    - Responsible for retrieving documents from arXiv based on search queries and downloading their metadata and PDF files.
+    - Manages the creation of workflows (state graphs) for searching, downloading, and processing documents.
+    - Supports generating random queries and routing them to retrieve additional documents.
+- [Chunk evaluation](focus_group/deep_retrieval/rag_eval/src/rag_eval/chunk_eval.py)
+    - Handles the evaluation of document chunks based on queries using a language model.
+    - Manages workflows for chunking documents, evaluating chunks, updating context, and saving results.
+    - Supports asynchronous and progress-based evaluation of document chunks.
+- [Chunk database builder](focus_group/deep_retrieval/rag_eval/src/rag_eval/chunk_database.py)
+    - Acts as a high-level manager for document retrieval and evaluation workflows by integrating doc_loader and chunk_eval.
+    - Tracks the state of documents (e.g., retrieved, evaluated) and manages metadata, evaluation files, and queries.
+    - Provides utilities for extending document collections, evaluating documents, and summarizing the overall process.
+
+## Chunk analysis notebooks
+
+- [docs loader](focus_group/deep_retrieval/rag_eval/experimental_notebooks/docs_loader.ipynb) - Demontrates the process of retrieving documents from arXiv with `RandomQueriesPaperSearchGraph` and evaluation of chunks relevance of a single document using `ChunkEvalGraph`.
+
+- [chunk database](focus_group/deep_retrieval/rag_eval/experimental_notebooks/chunk_database.ipynb) - Evaluated chunks database creation using `ChunkEvalBaseBuilder` class.
+
+- [chunks relations](focus_group/deep_retrieval/rag_eval/experimental_notebooks/chunks_relations.ipynb) - Notebook focuses on analyzing relationships between document chunks, queries, and labels through similarity computations, clustering, and visualization techniques. It uses [ChunkEncoder](focus_group/deep_retrieval/emb_src/chunk_encoder.py) class to calculate embeddings and similarity scores. Key experiments include:
+    - **Chunk-Query-Label Relations**: Visualized similarity matrices to explore relationships between document chunks, appended queries, and labels. Markers were used to distinguish boundaries between these components.
+    - **Thresholded Self-Similarity**: Applied a threshold to self-similarity matrices to highlight significant connections between chunks.
+    - **Next Chunk Similarity**: Analyzed the flow of content by calculating cosine similarity between consecutive chunks and visualizing the results.
+    - **Single Document Analysis**: Generated detailed relation maps for individual documents, including average chunk similarity, to understand internal structure.
+    - **Spectral Clustering**: Grouped chunks into clusters using spectral clustering. Constructed a weighting kernel to enhance the similarity matrix, computed the Laplacian matrix, and analyzed eigenvalues to determine cluster counts. Clustering results were visualized on the similarity matrix.
+    - **Cluster Analysis**: Aggregated labels and query scores for each cluster to summarize their characteristics. Identified the most representative chunk for each cluster based on proximity to the cluster centroid.
+    - **Cluster-Query Relationships**: Determined representative chunks for queries within clusters by analyzing query similarity scores.
+    - **Inter-Cluster Similarity**: Calculated and visualized similarity between cluster centroids to understand inter-cluster relationships.
+<br><br><img src="./resources/chunks_relations.png" alt="chunks relations" width="700">
+
+- [embeddings](focus_group/deep_retrieval/rag_eval/experimental_notebooks/embeddings.ipynb) - Notebook explores the use of pre-trained `embeddings` from `TensorFlow Hub` to analyze relationships between document chunks and queries. The primary goal is to encode textual data into dense vector representations and examine their spatial relationships in the embedding space. This is achieved by leveraging a preprocessor and encoder model, specifically the `cmlm-en-base` encoder, which is designed for generating universal sentence embeddings.
+    - The process begins with the preparation of document chunks and queries, which are tokenized and packed into a format suitable for the encoder. The encoder then transforms these inputs into high-dimensional vector embeddings. These embeddings represent the semantic content of the text, enabling the comparison of chunks and queries based on their vector distances.
+    - To better understand the relationships between these embeddings, dimensionality reduction is applied using `Principal Component Analysis` (PCA). This technique reduces the high-dimensional embeddings to a two-dimensional space, making it possible to visualize their distribution. The resulting scatter plot provides insights into how chunks and queries are positioned relative to each other, with color coding used to indicate chunk labels and distinct markers for queries. This visualization helps identify clusters, outliers, and the overall structure of the embedding space.
+    - The notebook also includes an analysis of the encoder's output, such as the pooled embeddings for chunks and queries, and examines their shapes and properties. By focusing on `vector distances` and their reduced representations, the notebook provides a foundation for understanding the semantic relationships within the data and lays the groundwork for further tasks like clustering or retrieval.
+<br><br><img src="./resources/embeddings_pca.png" alt="chunk embeddings PCA" width="400">
+
+- [HyDE queries](focus_group/deep_retrieval/rag_eval/experimental_notebooks/hyde_queries.ipynb) - Notebook demonstrates the generation of hypothetical document expansion (HyDE) queries to enhance the chunk evaluation system. The goal is to create multiple synthetic queries for each base query associated with a document, enabling a more comprehensive evaluation of document chunks in terms of their relevance to diverse query formulations. This process supports the retrieval-augmented generation (RAG) workflow by enriching the query space and improving the robustness of chunk-label relationships.
+    - The notebook utilizes the HyDEQueriesGenerator class, which integrates a language model (LLM) to generate synthetic queries based on the document's title, summary, and existing queries. The workflow begins by loading metadata for a selected document, including its title, summary, and base queries. For each base query, the LLM generates a specified number of HyDE queries using a predefined prompt. These synthetic queries are then stored alongside the base query in a structured format.
+    - The generated queries are saved as JSON files within the dataset, making them accessible for downstream tasks such as chunk evaluation. By expanding the query set, the system can evaluate document chunks against a broader range of query formulations, improving the granularity and accuracy of relevance labeling. This process also supports parallel execution, enabling efficient generation of HyDE queries for large document collections.
+    - The notebook concludes with an analysis of the generated outputs, including the number of documents processed, the structure of the HyDE query sets, and the concatenation of base and synthetic queries for further use. This approach enhances the chunk evaluation system by diversifying the query space, ultimately contributing to more robust and scalable document retrieval workflows.
+
+- [chunk clustering](focus_group/deep_retrieval/rag_eval/experimental_notebooks/lang_chunk_clustering.ipynb) - Notebook focuses on analyzing relationships between document chunks and queries through clustering and `graph-based methods`. The primary goal is to explore the structure of document chunks, identify clusters of related content, and visualize their relationships using graph representations.
+    - The notebook begins by loading and chunking documents into smaller, manageable pieces. These chunks are then embedded into vector representations using a pre-trained embedding model. The embeddings are used to calculate cosine similarity between chunks, resulting in a similarity matrix that quantifies the relationships between all pairs of chunks.
+    - `Spectral clustering` is applied to the similarity matrix to group similar chunks into clusters. The clustering process can optionally incorporate a weighting kernel to emphasize sequential relationships between chunks. The clusters are adjusted to ensure that they contain consecutive points, reflecting the natural flow of the document.
+    - The core of the notebook lies in its `graph-based analysis`. A graph is constructed where nodes represent document chunks, and edges represent similarity relationships between them. The graph is enriched with metadata, such as chunk labels, similarity scores, and query relevance. Various graph-based metrics, such as centrality and connectivity, are explored to understand the structure of the relationships.
+    - Community detection algorithms, such as the `Louvain method`, are applied to the graph to identify tightly connected groups of chunks. These communities are evaluated for their relevance to specific queries, and their structure is visualized using network graphs. Nodes are color-coded based on their relevance, and edges are weighted by similarity scores, providing an intuitive representation of the relationships.
+    - The notebook also identifies representative chunks for each community by analyzing their proximity to the `community centroid`. These representative chunks are used to summarize the content of each community and evaluate its relevance to the queries.
+<br><br><img src="./resources/chunks_graph.png" alt="chunks graph" width="500">
+
+- [similarity label comparision](focus_group/deep_retrieval/rag_eval/experimental_notebooks/similarity_label_comparison.ipynb) - Notebook evaluates and compares the effectiveness of standard query-to-chunk similarity measures with those derived from `HyDE` (Hypothetical Document Embeddings) queries. The primary focus is on analyzing how these two approaches align with ground truth labels and their ability to identify relevant document chunks.
+    - The notebook uses the `ChunkEncoder` for standard queries and the `HyDEChunkEncoder` for HyDE queries. Both encoders calculate cosine similarity between chunk embeddings and query embeddings. For HyDE queries, the similarity is aggregated across multiple synthetic queries to capture a broader semantic range.
+    - The comparison is visualized through heatmaps of similarity matrices, including binarized versions to highlight overlaps with ground truth labels. Metrics such as `F1 score`, `precision`, and `recall` are computed to quantitatively assess the performance of both methods. This analysis demonstrates the potential of HyDE queries to improve the robustness and coverage of chunk relevance predictions.
 
 
 
