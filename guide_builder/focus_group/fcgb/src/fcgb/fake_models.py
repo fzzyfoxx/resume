@@ -1,0 +1,467 @@
+from typing import Any, List, Dict, Tuple, TypedDict, get_type_hints, Literal, get_origin, Optional, get_args, Union
+from pydantic import BaseModel
+import random
+from langchain_core.messages import AIMessage
+from numpy import arange
+from numpy.random import uniform, choice
+import string
+from fcgb.types.tavily import TavilySearchSingleResult, TavilySearchResults, TavilyExtractSingleResult, TavilyExtractResults
+import uuid
+
+def random_string(length: int) -> str:
+    """
+    Generate a random string of fixed length.
+
+    Args:
+        length (int): The length of the random string.
+
+    Returns:
+        str: A randomly generated string of the specified length.
+    """
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
+
+
+class FakeStructuredOutput:
+    """
+    A class for generating fake structured output based on a Pydantic BaseModel schema.
+
+    This class is used for testing purposes and generates fake data that matches the structure
+    of a given Pydantic model.
+
+    Attributes:
+        model: The Pydantic BaseModel class to generate fake data for.
+        array_length_range: The range for the length of generated lists.
+    """
+
+    def __call__(self) -> Any:
+        """
+        Generate fake structured output based on the model schema.
+
+        Returns:
+            Any: A dictionary or value matching the model's structure.
+        """
+        return self._generate_field(self.model)
+
+    def _generate_field(self, field_type: Any) -> Any:
+        """
+        Generate a fake value for a given field type.
+
+        Args:
+            field_type (Any): The type of the field.
+
+        Returns:
+            Any: A fake value matching the field type.
+        """
+        # Handle Optional types
+        if get_origin(field_type) is Union and type(None) in get_args(field_type):
+            # Extract the inner type from Optional
+            field_type = next(arg for arg in get_args(field_type) if arg is not type(None))
+
+        if hasattr(field_type, "__origin__"):  # Handle generic types like List, Dict, etc.
+            if field_type.__origin__ is list:
+                return self._generate_list(field_type.__args__[0])
+            elif field_type.__origin__ is dict:
+                return self._generate_dict(field_type.__args__[0], field_type.__args__[1])
+            elif field_type.__origin__ is tuple:
+                return self._generate_tuple(field_type.__args__)
+            elif field_type.__origin__ is Literal:  # Handle Literal type
+                return random.choice(field_type.__args__)
+        elif isinstance(field_type, type):  # Ensure field_type is a class
+            # Check if field_type is a TypedDict
+            if hasattr(field_type, "__annotations__") and issubclass(field_type, dict):
+                return self._generate_typed_dict(field_type)
+            elif issubclass(field_type, BaseModel):  # Handle nested BaseModel
+                return self._generate_model(field_type)
+        if field_type is str:
+            return self._get_fake_string()
+        elif field_type is int:
+            return self._get_fake_int()
+        elif field_type is float:
+            return self._get_fake_float()
+        elif field_type is bool:
+            return self._get_fake_bool()
+        elif field_type is None:
+            return None
+        else:
+            raise ValueError(f"Unsupported field type: {field_type}")
+        
+    def _generate_typed_dict(self, typed_dict: TypedDict) -> Dict[str, Any]: # type: ignore
+        """
+        Generate fake data for a TypedDict.
+
+        Args:
+            typed_dict (TypedDict): The TypedDict class.
+
+        Returns:
+            Dict[str, Any]: A dictionary with fake data matching the TypedDict structure.
+        """
+        type_hints = get_type_hints(typed_dict)
+        return {key: self._generate_field(value) for key, value in type_hints.items()}
+
+    def _generate_model(self, model: BaseModel) -> BaseModel:
+        """
+        Generate fake data for a nested BaseModel.
+
+        Args:
+            model (BaseModel): The nested BaseModel class.
+
+        Returns:
+            BaseModel: An instance of the model with fake data.
+        """
+        data = {field_name: self._generate_field(field_type)
+                for field_name, field_type in model.__annotations__.items()}
+        return model(**data)
+
+    def _generate_list(self, item_type: Any) -> List[Any]:
+        """
+        Generate a fake list of items.
+
+        Args:
+            item_type (Any): The type of items in the list.
+
+        Returns:
+            List[Any]: A list of fake items.
+        """
+        length = random.randint(*self.array_length_range)
+        return [self._generate_field(item_type) for _ in range(length)]
+
+    def _generate_dict(self, key_type: Any, value_type: Any) -> Dict[Any, Any]:
+        """
+        Generate a fake dictionary.
+
+        Args:
+            key_type (Any): The type of keys in the dictionary.
+            value_type (Any): The type of values in the dictionary.
+
+        Returns:
+            Dict[Any, Any]: A dictionary with fake keys and values.
+        """
+        length = random.randint(*self.array_length_range)
+        return {self._generate_field(key_type): self._generate_field(value_type) for _ in range(length)}
+
+    def _generate_tuple(self, item_types: Tuple[Any, ...]) -> Tuple[Any, ...]:
+        """
+        Generate a fake tuple.
+
+        Args:
+            item_types (Tuple[Any, ...]): The types of items in the tuple.
+
+        Returns:
+            Tuple[Any, ...]: A tuple of fake items.
+        """
+        return tuple(self._generate_field(item_type) for item_type in item_types)
+
+    def _get_fake_string(self) -> str:
+        """Generate a fake string."""
+        return f"Fake string {random_string(5)}"
+
+    def _get_fake_int(self) -> int:
+        """Generate a fake integer."""
+        return random.randint(0, 100)
+
+    def _get_fake_float(self) -> float:
+        """Generate a fake float."""
+        return random.uniform(0.0, 100.0)
+
+    def _get_fake_bool(self) -> bool:
+        """Generate a fake boolean."""
+        return random.choice([True, False])
+
+
+class FakeLLM:
+    """
+    A fake language model (LLM) for testing purposes.
+
+    This class simulates the behavior of a language model, including generating responses,
+    invoking tools, and producing structured outputs.
+
+    Attributes:
+        counter: A counter to track the number of responses generated.
+        structured_output: The structured output to return when invoked.
+        tools: A list of tools bound to the fake LLM.
+        max_parallel_tools: The maximum number of tools that can be invoked in parallel.
+        tool_usage_prob: The probability of invoking a tool.
+    """
+
+    def __init__(self, max_parallel_tools=2, tool_usage_prob=0.5, *args, **kwargs):
+        """
+        Initialize the FakeLLM instance.
+
+        Args:
+            max_parallel_tools (int): The maximum number of tools that can be invoked in parallel.
+            tool_usage_prob (float): The probability of invoking a tool.
+        """
+        self.counter = 0
+        self.structured_output = None
+        self.tools = []
+        self.max_parallel_tools = max_parallel_tools
+        self.tool_usage_prob = tool_usage_prob
+
+    def __call__(self, *args, **kwargs):
+        """
+        Generate a response or invoke tools based on the current state.
+
+        Returns:
+            AIMessage: A simulated response or tool invocation message.
+        """
+        self.counter += 1
+        tools_idxs = self._random_tools_selection()
+        if len(tools_idxs) > 0:
+            return self._get_tool_message(tools_idxs)
+        elif self.structured_output:
+            response = self.structured_output
+            self.structured_output = None
+            return response
+        return AIMessage(f"Fake LLM response {self.counter}")
+
+    def invoke(self, *args, **kwargs):
+        """
+        Alias for the __call__ method.
+
+        Returns:
+            AIMessage: A simulated response or tool invocation message.
+        """
+        return self.__call__(*args, **kwargs)
+
+    @staticmethod
+    def generate_fake_output(model: BaseModel):
+        """
+        Generate fake structured output based on a Pydantic model.
+
+        Args:
+            model (BaseModel): The Pydantic model to generate output for.
+
+        Returns:
+            Any: Fake structured output matching the model's schema.
+        """
+        return FakeStructuredOutput(model)()
+
+    def with_structured_output(self, structure):
+        """
+        Set the structured output to return when invoked.
+
+        Args:
+            structure: The structured output schema.
+
+        Returns:
+            FakeLLM: The current instance with the structured output set.
+        """
+        self.structured_output = self.generate_fake_output(structure)
+        return self
+
+    def _random_tools_selection(self):
+        tools_num = len(self.tools)
+
+        if tools_num == 0:
+            return []
+        
+        indexes = arange(tools_num)
+        max_tools = self.max_parallel_tools if self.parallel_tool_calls else 1
+        drawn_idxs = choice(indexes, size=max_tools, replace=True)
+        draw_probs = uniform(0, 1, size=max_tools)
+
+        selected_idxs = [idx for idx, prob in zip(drawn_idxs.tolist(), draw_probs) if prob > self.tool_usage_prob]
+
+        return selected_idxs
+    
+    def _get_tool_message(self, tools_idxs: List[int]):
+
+        tool_calls = [self._set_tool_call(self.tools[i]) for i in tools_idxs]
+
+        return AIMessage(
+            content="",
+            tool_calls=tool_calls,
+        )
+
+    def _set_tool_call(self, tool):
+
+
+        call_id = 'call_' + uuid.uuid4().hex
+        name = tool.name
+        args = self.generate_fake_output(tool.args_schema).model_dump()
+
+        return {
+            'id': call_id,
+            'name': name,
+            'args': args,
+        }
+    
+    def bind_tools(self, tools: List[Any], parallel_tool_calls: bool=True):
+        """
+        Create a new FakeLLM instance with the specified tools bound to it.
+
+        Args:
+            tools (List[Any]): List of tools to bind.
+            parallel_tool_calls (bool): Whether to allow parallel tool calls.
+
+        Returns:
+            FakeLLM: A new FakeLLM instance with the tools bound.
+        """
+        # Create a new instance of FakeLLM
+        new_instance = FakeLLM(
+            max_parallel_tools=self.max_parallel_tools,
+            tool_usage_prob=self.tool_usage_prob
+        )
+        # Bind tools and parallel_tool_calls to the new instance
+        new_instance.tools = tools
+        new_instance.parallel_tool_calls = parallel_tool_calls
+        return new_instance
+
+
+class FakeHuman:
+    """
+    A fake human input generator for testing purposes.
+
+    This class simulates human input, including button presses and text messages.
+
+    Attributes:
+        counter: A counter to track the number of inputs generated.
+        button_output: The output to return when a button is pressed.
+        button_moment: The moment at which the button output should be returned.
+    """
+
+    def __init__(self, button_output=None, button_moment=None):
+        """
+        Initialize the FakeHuman instance.
+
+        Args:
+            button_output: The output to return when a button is pressed.
+            button_moment: The moment at which the button output should be returned.
+        """
+        self.counter = 0
+        self.button_output = button_output
+        self.button_moment = button_moment
+
+    def __call__(self, button=None):
+        """
+        Generate a human input.
+
+        Args:
+            button: The button to simulate a press for.
+
+        Returns:
+            dict: A dictionary representing the human input.
+        """
+        self.counter += 1
+        if button:
+            return {'type': 'button', 'value': button}
+        elif (self.button_output is not None) & (self.button_moment == self.counter):
+            return {'type': 'button', 'value': self.button_output}
+        return {'type': 'message', 'value': f"Fake Human input {self.counter}"}
+
+
+class FakeEmbeddingModel:
+    """
+    A fake embedding model for testing purposes.
+
+    This class simulates the behavior of an embedding model by generating random embeddings.
+
+    Attributes:
+        embedding_size: The size of the embeddings to generate.
+    """
+
+    def __init__(self, embedding_size=768):
+        """
+        Initialize the FakeEmbeddingModel instance.
+
+        Args:
+            embedding_size (int): The size of the embeddings to generate.
+        """
+        self.embedding_size = embedding_size
+
+    def _gen_embs(self):
+        return uniform(-1, 1, self.embedding_size).tolist()
+
+    def embed_documents(self, texts, *args, **kwargs):
+        """
+        Generate embeddings for a list of documents.
+
+        Args:
+            texts (list): A list of text documents.
+
+        Returns:
+            list: A list of embeddings for the documents.
+        """
+        return [self._gen_embs() for _ in texts]
+
+    def embed_query(self, text, *args, **kwargs):
+        """
+        Generate an embedding for a query.
+
+        Args:
+            text (str): The query text.
+
+        Returns:
+            list: The embedding for the query.
+        """
+        return self._gen_embs()
+
+
+class FakeTavily:
+    """
+    A fake Tavily client for testing purposes.
+
+    This class simulates the behavior of a Tavily client, including search and extraction operations.
+    """
+
+    def __init__(self):
+        """Initialize the FakeTavily instance."""
+        pass
+
+    def _set_search_result(self, i: int) -> TavilySearchSingleResult:
+        return {
+            "title": f"Fake title {i} {random_string(5)}",
+            "url": f"https://fake-url-{i}-{random_string(5)}.com",
+            "content": f"Fake content {i}-{random_string(5)}",
+            "score": uniform(0, 1),
+            "raw_content": None
+        }
+    
+    def _set_extract_result(self, url: str, i: int) -> TavilyExtractSingleResult:
+        return {
+            "url": url,
+            "raw_content": f"Fake raw content {i} {random_string(5)}",
+            "images": []
+        }
+
+    def search(self, query: str, max_results: int, exclude_domains: List[str] = None, *args, **kwargs) -> TavilySearchResults:
+        """
+        Simulate a search operation.
+
+        Args:
+            query (str): The search query.
+            max_results (int): The maximum number of results to return.
+            exclude_domains (list): A list of domains to exclude from the results.
+
+        Returns:
+            TavilySearchResults: A dictionary containing the search results.
+        """
+        results = [self._set_search_result(i) for i in range(max_results)]
+
+        return {
+            "query": query,
+            "follow_up_questions": None,
+            "answer": None,
+            "images": None,
+            "results": results,
+            "response_time": uniform(0, 1)
+        }
+    
+    def extract(self, urls: List[str], *args, **kwargs) -> TavilyExtractResults:
+        """
+        Simulate an extraction operation.
+
+        Args:
+            urls (list): A list of URLs to extract content from.
+
+        Returns:
+            TavilyExtractResults: A dictionary containing the extracted content.
+        """
+        results = [self._set_extract_result(url, i) for i, url in enumerate(urls)]
+
+        return {
+            "results": results,
+            "failed_results": [],
+            "response_time": uniform(0, 1)
+        }

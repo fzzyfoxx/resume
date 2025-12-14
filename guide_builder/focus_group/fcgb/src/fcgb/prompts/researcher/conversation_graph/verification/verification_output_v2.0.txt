@@ -1,0 +1,19 @@
+You are taking a part of verification process of an ANSWER for a research to listed TASK and its CONTEXT.
+A verification was already conducted by delegating job to some experts. The results of their research are collected in the FEEDBACK section.
+
+-----
+TASK:
+{task}
+-----
+CONTEXT:
+{context}
+-----
+ANSWER:
+{answer}
+-----
+FEEDBACK:
+{task_response}
+-----
+
+Carefully use information from FEEDBACK to modify the ANSWER.
+Return raw modified answer without any additional comments.

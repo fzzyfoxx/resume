@@ -1,0 +1,2 @@
+Init human message
+Human template input: {hum_temp_1}

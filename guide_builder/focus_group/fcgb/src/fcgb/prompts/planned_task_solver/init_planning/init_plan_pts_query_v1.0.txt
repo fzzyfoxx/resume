@@ -1,0 +1,21 @@
+# **TASK DESCRIPTION**
+
+## **MAIN SUBJECT** 
+{job}
+
+---
+
+## **BOOK RESTRICTIONS** 
+{restrictions}
+
+---
+
+## **BOOK SPECIFICATION** 
+```
+{data}
+```
+
+---
+
+## **REPORT FORMAT** 
+{output_format}

@@ -1,0 +1,19 @@
+For a task which is: 
+TASK:
+{task}
+
+with given context: 
+CONTEXT:
+{context}
+
+I received an answer:
+ANSWER:
+{answer}
+
+-----------
+No I want to use LLM to verify that answer. 
+Prepare list of {min_ver_prompts} to {max_ver_prompts} prompts templates to verify that this answer is right. Try to find weak spots of an answer based on a task and context.
+Every prompt can focus just on some part of an answer, some subject or verification angle.
+The goal is to use those prompts to erase unrelated, redundant or excessive information, correct hallucinations, re-format answer for a better fit to a task description.
+Prompts should be formulated in a way that responses to them would point what parts of an answer should be changed.
+Prompt templates can use 3 variables marked as {{variable}} to inject proper content. The variables are {{task}}, {{context}}, {{answer}}.

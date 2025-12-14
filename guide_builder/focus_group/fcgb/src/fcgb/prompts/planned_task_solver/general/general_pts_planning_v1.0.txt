@@ -1,0 +1,17 @@
+# **Knowledge Base**
+{knowledge_base}
+
+# **Planning**
+With provided task description and already gathered knowledge base describe your planning reasoning of the next step to be taken.
+You are now at turn {turns} of maximum {max_turns} iterations.
+Reason strategically to dive into the task's main subject and to avoid unnecessary steps.
+Your analysis will be used directly to formulate and distribute up to {max_jobs} specific jobs to specialized agents within next step so at the end add some plan summary.
+
+# **Important**
+All jobs will be performed concurrently so they have to be independent of each other.
+Focus on how to divide current phase into different jobs that will cover task's main subject from different perspectives.
+At this point do not write specific jobs, just describe your reasoning and plan next steps.
+
+# **End of research process**
+If you think that no further research steps are necessary, you can finish it earlier by typing __end__ in your output message.
+Remember that writing __end__ will disable all planned jobs and will lead you to the final report writing step.

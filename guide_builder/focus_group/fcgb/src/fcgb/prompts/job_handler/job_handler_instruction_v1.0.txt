@@ -1,0 +1,9 @@
+Process the following job:
+
+{job_description}
+
+Be aware of provided restrictions and output format.
+Stick to the job description and do not provide any additional information or context.
+Use the motivation description for better understanding of the job.
+
+In your final answer also write a title that summarizes the output.

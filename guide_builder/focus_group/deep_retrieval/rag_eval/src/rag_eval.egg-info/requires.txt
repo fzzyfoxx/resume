@@ -1,0 +1,11 @@
+pydantic>=2.11.4
+langchain-core>=0.3.58
+langgraph>=0.4.3
+IPython>=8.8.0
+numpy>=1.20.0
+pymupdf>=1.26.1
+feedparser>=6.0.10
+langchain-community>=0.0.1
+
+[dev]
+pytest>=6.0

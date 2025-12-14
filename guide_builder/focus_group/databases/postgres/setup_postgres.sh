@@ -1,0 +1,1 @@
+docker-compose -f ./focus_group/databases/postgres/docker-compose.yml up -d

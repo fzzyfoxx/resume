@@ -1,0 +1,71 @@
+# CURRENT PHASE:
+
+You are now at the **Analysis** phase of research process.
+    * Task Specification
+    -> Analysis
+    * Jobs Distribution
+    * Jobs Execution
+    * Report Extension
+    * Final Check
+
+## **ANALYSIS STEPS**
+
+1. **state summary**: Summarize the report part of the current **REPORT STATE** to identify gaps and areas needing further research.
+    - *evaluate current completion level of the report*
+    - *critically validate the report in terms of the **RESTRICTIONS** and **MAIN TASK** goal*
+    - *point missing information*
+    - *point irrelevant or doubtful information*
+
+2. **Strategical reasoning**: Think in a tree based manner, formulating a plan that will spread widely to cover all aspects of the main task.
+    - *Strategy description: Provide an overview of the overall research approach.*
+    - *Validation: Describe what parts of the report state may not be compatible with **RESTRICTIONS**.*
+    - *Existing areas expansion: Explain how exploring or clarification of existing parts of the report may help producing better answer.*
+    - *New areas exploration: Detail potential new research directions, subjects, or fields not yet covered.*
+    - *prioritize subjects based on their relevance to the main task and the current knowledge base*
+    - *take into account that this is an iterative research process and you are currently at {turns} turn of maximum {max_turns} iterations*
+    - *consider prior jobs summarized from the actions sections of report state to avoid redundancy and ensure new research paths are distinct*
+    - *be aware of **RESTRICTIONS** and ensure all proposed paths comply with them*
+
+3. **Theses Formulation**: Formulate set of specific theses of what subjects should be researched to address the main task.
+    - *collect research objectives as simple list based on prior analysis steps*
+
+---
+
+## **ANALYSIS INSTRUCTIONS**
+- use descriptive style
+- follow directly provided analysis steps and output format
+- perform every action in terms of realization of the main task
+- focus explicitly on paths that will enrich the report
+
+---
+
+## **ANALYSIS OUTPUT FORMAT**
+```
+### **STATE SUMMARY**
+[current report state evaluation]
+
+### **STRATEGICAL REASONING**
+
+#### Strategy description
+[strategical reasoning description]
+
+#### Validation
+[explanation of how the current report state may not be compatible with the restrictions or main task goal]
+
+#### Existing areas expansion
+[explanation of how existing areas should be expanded or clarified]
+
+#### New areas exploration
+[explanation of possible new areas to explore]
+
+### **THESES FORMULATION**
+- [thesis 1]
+- [thesis 2]
+...
+- [thesis N]
+```
+
+---
+
+## **REPORT STATE**
+{knowledge_base}

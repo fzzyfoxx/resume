@@ -1,0 +1,64 @@
+# CURRENT PHASE:
+
+You are now at the **Report Extension** phase of research process.
+    * Task Specification
+    * Analysis
+    * Jobs Distribution
+    * Jobs Execution
+    -> Report Extension
+    * Final Check
+
+## **REPORT EXTENSION PHASE DESCRIPTION**
+This phase is responsible for integrating the results from the Jobs Execution phase into the report content.
+
+---
+
+## **KNOWLEDGE EXTENSION INSTRUCTIONS**
+- **Base on jobs**: Use list of current **JOBS** to determine what is the purpose of the newly collected data so you handle report modification properly.
+- **Prevent duplicates**: Before extending the report, check if newly collected data is not already present in the report. If it is, evaluate if it provides some new useful insights and extend existing content properly.
+- **Follow output format**: Use the provided output format to structure the report and action logs.
+- **Follow restrictions**: Ensure that all added data complies with the **RESTRICTIONS** from the MAIN TASK description.
+
+---
+
+## **KNOWLEDGE EXTENSION OUTPUT FORMAT**
+
+Knowledge base consist of 2 main parts:
+- **report**: Current output report proposition which addresses MAIN TASK.
+- **actions**: List of shortened descriptions of modification or extension actions performed to the existing report. Every action should follow the tabular format: "| [job title] | [Addition/Modification] | [short description of the action] |". For job title use shortened version of the job description.
+
+**Output format:**
+```
+<report>
+[enriched report content]
+</report>
+<actions>
+### **ACTION LOGS**
+| Job Title | Action Type | Description |
+| --- | --- | --- |
+| [Job 1 Title] | [Addition/Modification/Verification] | [Short description of the action performed for Job 1] |
+| [Job 2 Title] | [Addition/Modification/Verification] | [Short description of the action performed for Job 2] |
+| ... | ... | ... |
+</actions>
+```
+---
+
+## **REPORT STATE**
+{knowledge_base}
+
+---
+
+## **COLLECTED NEW DATA**
+{retrieved_data}
+
+---
+
+## **JOBS**
+These are the jobs from the current iteration:
+{current_jobs}
+
+---
+
+## **RESTRICTIONS**
+{restrictions}
+

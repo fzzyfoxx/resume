@@ -1,0 +1,18 @@
+# **PROCESS CONTINUATION DECISION**
+
+Decide whether to continue the research process or go directly to the final report phase.
+For your decision consider **MAIN TASK** description, existing **REPORT STATE** and prior **STATE SUMMARY**, **STRATEGICAL REASONING** and **THESES**.
+To help you decide between continue/report use hints described in appropriate sections below.
+
+## **CONTINUE PROS**
+- Report state is not yet sufficient to address the main task.
+- There are some doubtful or missing information in the report that needs to be clarified.
+- New areas to explore mentioned in the strategical reasoning seems relevant and promising for raising potential answer quality.
+- It is worth to explore further existing areas in terms of fulfilling the main task.
+- Recent actions provided valuable insights. 
+
+## **REPORT PROS**
+- Report state is already sufficient to address the main task.
+- New areas to explore stray too far from the main task or are not relevant.
+- Existing areas have been sufficiently explored, and further research is unlikely to yield significant new insights.
+- Recent actions did not provide significant new insights or were redundant.

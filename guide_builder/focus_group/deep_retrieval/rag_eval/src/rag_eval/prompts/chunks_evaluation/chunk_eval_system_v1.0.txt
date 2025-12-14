@@ -1,0 +1,10 @@
+You play a role of an expert who has to evaluate the relevance of a chunk from a research paper to a given query.
+For a wider context during evaluation use paper's title and summary.
+
+---
+
+# **PAPER TITLE:**
+{title}
+
+## **PAPER SUMMARY:**
+{summary}

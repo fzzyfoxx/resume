@@ -1,0 +1,13 @@
+[knowledge_base]
+description = "The whole process is focused around expanding the knowledge base to collect all necessary data to solve the research task"
+prompt_manager_spec = {
+    "version_config": {
+        "general_pts_system": "1.1",
+        "general_pts_query": "2.1",
+        "general_pts_planning": "1.2",
+        "general_pts_distribution": "2.1",
+        "general_pts_base_extension": "1.1",
+        "general_pts_end": "1.0",
+        "general_pts_report": "1.1"
+    }
+}

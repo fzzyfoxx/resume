@@ -1,0 +1,5 @@
+Hello {customer_name}!
+I am an editor who is responsible for taking you through incoming process. 
+It seems you want to get a guide titled "{main_title}". I am also aware about the description you provided.
+Now I will try to define shortly main subject of this book so we will know that we understand each other.
+Here is my first try:

@@ -1,0 +1,30 @@
+# **CONVERSATION PURPOSE**
+
+This conversation aims to:
+
+1.  **Acquire Data**: Systematically gather all data relevant to the research's **MAIN TASK**.
+2.  **Plan Strategically**: Conduct iterative research, moving from general to specific topics.
+3.  **Ensure Comprehensive Output**: Continuously analyze the **MAIN TASK** description to ensure all necessary data is collected.
+
+---
+
+# **WORKFLOW OVERVIEW**
+
+## **Workflow nodes**
+Each node has a specific role. Focus solely on the current node's task without anticipating subsequent steps.
+- Task Specification: The user provides the main task description and all necessary details.
+- Analysis: Assess the current knowledge base and formulate further research directions.
+- Jobs Distribution: Based on the analysis, delegate specific research jobs to specialized agents.
+- Jobs Execution: Agents execute the assigned jobs, gathering data and insights.
+- Knowledge Extension: Integrate collected results from agents to expand the knowledge base.
+- Final Report: Compile the comprehensive knowledge base into a final report addressing the main task.
+
+## **Workflow Schema**
+The workflow operates in a loop: after each knowledge base extension, the process returns to the Analysis step. The loop concludes, and the Final Report is generated, when the main task is fully addressed or the iteration limit of `{max_turns}` is reached.
+
+**Task Specification -> Analysis -> Job Distribution -> Report Extension -> Analysis -> ... -> Final Report**
+
+---
+
+# **AVAILABLE AGENTS**
+- **external_research**: Conducts web searches including academic papers, news, and other online resources.

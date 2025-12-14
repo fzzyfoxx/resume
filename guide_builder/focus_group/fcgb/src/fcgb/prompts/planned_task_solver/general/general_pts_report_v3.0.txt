@@ -1,0 +1,29 @@
+# **TASK DESCRIPTION**
+
+## **job**
+Here is the main goal of the task:
+{job}
+
+## **restrictions**
+At every stage of the process bear in mind the following restrictions:
+{restrictions}
+
+## **output format**
+The final report should be written in the following format:
+{output_format}
+
+------------------
+
+# **REPORT STATE**
+{knowledge_base}
+
+------------------
+
+This is the final stage of a research process performed for the main task.
+During this process there was produced a report that needs final check.
+
+For a given task description, especially the job field write an answer.
+- watch out for restrictions that should be taken into account while performing the job
+- follow strictly the output format that should be used for your answer
+- use report section of **REPORT STATE** as a base for your answer, only slight formatting changes are allowed in your final answer
+- avoid any comments that are not part of the final report

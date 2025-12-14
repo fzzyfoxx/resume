@@ -1,0 +1,22 @@
+I want to conduct a research using only LLM's by a conversation between researcher and an expert roles, where researcher model sees expert answers as human input and expert sees researcher input as human. 
+The Researcher asks the expert questions to extract relevant information. Reason behind that solution is to extract more comprehensive answer for a given task with some context description. 
+To get more reliable results I want to add a strategy element so there could be few independent interviews with different strategy approaches for researcher behaviour.
+Every researcher behaviour is limited to {max_turns_num} questions. 
+Now, propose a list of {min_strategies_num} to {max_strategies_num} strategies for a researcher that may provide best results for a given task.
+A strategy may contain following elements:
+- prompting technique to focus on
+- patterns of how to influence an expert to provide more comprehensive answers
+- paraphrase task and context content so every strategy may focus on a little different angle
+
+----
+TASK:
+{task}
+----
+CONTEXT:
+{context}
+----
+
+Return an answer as a list of strategies with elements:
+- strategy description
+- paraphrased task
+- paraphrased context

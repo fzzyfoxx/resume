@@ -1,0 +1,9 @@
+Process the following job:
+
+{job_description}
+
+Be aware of provided restrictions and output format.
+Stick to the job description and do not provide any additional information or context.
+If there is any additional data provided use it for your answer. You can also pass it directly to tools if they allows it.
+
+In your final answer also write a title that summarizes the output.

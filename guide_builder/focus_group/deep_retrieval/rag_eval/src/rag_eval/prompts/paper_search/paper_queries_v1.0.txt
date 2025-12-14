@@ -1,0 +1,19 @@
+# **TASK:**
+Based on research paper title and summary generate a list of {paper_queries_num} queries that could be used to extract relevant content from the paper.
+Try to cover different aspects of the paper like definitions, methotology, comparisions, results, references etc.
+Write only queries that you think could be answered at least partially by this specific paper.
+
+## **Format:**
+Use questions and declarative sentences to form the queries like:
+- Can Random Forests be used for both classification and regression tasks?
+- Explain Random Forests algorithm step-by-step.
+- Define Random Forests and its key components.
+- What are the advantages of using Random Forests over other machine learning algorithms?
+
+## **Research Paper Title:**
+{title}
+
+## **Research Paper Summary:**
+{summary}
+
+## **Queries:**

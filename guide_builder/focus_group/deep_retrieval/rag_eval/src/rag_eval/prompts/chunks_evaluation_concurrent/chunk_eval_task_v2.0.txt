@@ -1,0 +1,69 @@
+# **TASK:**
+Evaluate if the **MIDDLE CHUNK** of a research paper is relevant to each query from the **QUERIES** list separately.
+In your answer write pairs of query_id (the number on the left side of the query) and evaluation (True or False).
+Relevance should be understood as the middle chunk being definitely useful for answering the query.
+
+To catch the meaning of the middle chunk, you can use the previous and next chunks which are neighboring the middle chunk.
+Also use the **CONTEXT** so it provides additional information about current section of the paper and summarization of earlier important parts.
+
+You are currently at {current_chunk_index} chunk of {total_chunks_num} chunks.
+---
+
+# **QUERIES:**
+{queries}
+
+---
+
+# **CONTEXT:**
+{context}
+
+---
+
+**PREVIOUS CHUNK**
+{prev_chunk}
+
+# **MIDDLE CHUNK (EVALUATION)**
+{current_chunk}
+
+**NEXT CHUNK**
+{next_chunk}
+
+---
+
+# **EVALUATION EXAMPLES:**
+
+Example 1 (Middle is Relevant):
+
+    queries: 
+        [1] "What are the benefits of exercise?"
+        [2] "How does physical activity affect health?"
+    previous chunk: "Many people seek ways to improve their health. Diet is one important factor."
+    middle chunk: "Regular physical activity can significantly reduce the risk of chronic diseases such as heart disease and diabetes."
+    next chunk: "It also helps with weight management and improves mood."
+    **answer:** 
+        id=1, evaluation=True (Here, the middle chunk directly addresses the benefits of exercise, making it relevant to the query.)
+        id=2, evaluation=True (The middle chunk also addresses how physical activity affects health, making it relevant to the second query.)
+
+Example 2 (Continuation is also Relevant but not for all queries):
+
+    queries: 
+        [1] "What are the benefits of exercise?"
+        [2] "Is it important to eat breakfast?"
+    previous chunk: "Regular physical activity can significantly reduce the risk of chronic diseases such as heart disease and diabetes."
+    middle: "It also helps with weight management and improves mood."
+    next: "On the other hand, a sedentary lifestyle can lead to various health issues."
+    **answer:** 
+        id=1, evaluation=True (In this case, even though the middle chunk doesn't address physical activity directly, it continues the discussion about health benefits, making it relevant.)
+        id=2, evaluation=False (The middle chunk does not address breakfast, making it irrelevant to the second query.)
+
+Example 3 (Middle is undirectly relevant to the second query):
+
+    queries: 
+        [1] "What are the benefits of exercise?"
+        [2] "How does diet affect health?"
+    previous chunk: "Diet is a key component of a healthy lifestyle. Consuming nutrient-rich foods is vital."
+    middle chunk: "The typical Western diet often lacks sufficient fiber and essential vitamins, leading to various health issues."
+    next chunk: "However, incorporating more fruits and vegetables can counteract these negative effects."
+    **evaluation:** 
+        id=1, evaluation=False (Even though the surrounding chunks are about health, the middle chunk isn't about exercise benefits.)
+        id=2, evaluation=True (The middle chunk discusses diet, which is relevant to the second query about how diet affects health.)

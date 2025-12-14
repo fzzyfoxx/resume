@@ -1,0 +1,66 @@
+# CURRENT PHASE:
+
+You are now at the **Knowledge Extension** phase of research process.
+    * Task Specification
+    * Analysis
+    * Jobs Distribution
+    * Jobs Execution
+    -> Knowledge Extension
+    * Final Report
+
+## **KNOWLEDGE EXTENSION PHASE DESCRIPTION**
+This phase is responsible for integrating the results from the Jobs Execution phase into the knowledge base. The goal is to expand the knowledge base with new data collected by agents.
+
+---
+
+## **KNOWLEDGE EXTENSION INSTRUCTIONS**
+- **Base on jobs**: Use list of current **JOBS** to determine what is the purpose of the newly collected data so you can add it to knowledge base in proper format.
+- **Prevent duplicates**: If some parts of **NEW DATA** are already present in the knowledge base, just extend it in-place with new information, except a situation where new piece of information is dedicated to a different section.
+- **Extend or modify**: "If some parts of NEW DATA are already present in the knowledge base, integrate new information by extending existing entries. Only create a new section if the new data introduces a distinct topic or a fundamentally different aspect that cannot logically extend an existing section."
+- **Just formatted output**: In your answer include only the formatted output without any additional explanations or comments.
+- **Keep existing data**: Both **data** and **actions** sections should contain all previously collected data, not just the new one.
+- **New data heading level**: When passing the new data to the knowledge base control that any headings in section content have at least level H4 ('####').
+
+---
+
+## **KNOWLEDGE EXTENSION OUTPUT FORMAT**
+
+Knowledge base consist of 2 main parts:
+- **data**: The main body of knowledge, which is a collection of structured data entries.
+- **actions**: List of shortened descriptions of modification or extension actions performed to the existing data. Every action should follow the tabular format: "| [job title] | [Addition/Modification/Verification] | [short description of the action] |". For job title use shortened version of the job description.
+
+**Output format:**
+```
+<data>
+### **DATA REPORT**
+#### [Section 1 title]
+[section 1 content]
+#### [Section 2 title]
+[section 2 content]
+...
+</data>
+<actions>
+### **ACTION LOGS**
+| Job Title | Action Type | Description |
+| --- | --- | --- |
+| [Job 1 Title] | [Addition/Modification/Verification] | [Short description of the action performed for Job 1] |
+| [Job 2 Title] | [Addition/Modification/Verification] | [Short description of the action performed for Job 2] |
+| ... | ... | ... |
+</actions>
+```
+---
+
+## **KNOWLEDGE BASE**
+{knowledge_base}
+
+---
+
+## **COLLECTED NEW DATA**
+{retrieved_data}
+
+---
+
+## **JOBS**
+These are the jobs from the current iteration:
+{current_jobs}
+

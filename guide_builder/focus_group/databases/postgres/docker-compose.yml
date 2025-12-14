@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres
+    container_name: lang-memory-postgres
+    environment:
+      POSTGRES_PASSWORD: fzzy
+    ports:
+      - "5432:5432"
+    volumes:
+      - /focus_group/postgres:/var/lib/postgresql/data
+    mem_limit: 512m

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .wrap {{
+        display: flex;
+        }}
+
+        .title_div {{
+        margin-bottom: 10px;
+        padding-top: 20px;
+        }}
+
+        .left {{
+        flex: 1;
+        display: flex;
+        }}
+
+        .right {{
+        flex: 1;
+        display: flex;
+        }}
+
+        .left::after {{
+        content: '';
+        border-bottom: 1px dotted;
+        flex: 1;
+        margin: 0 .5em;
+        }}
+
+        .title {{
+            font-weight: bold;
+            font-size: {toc_title_font_size}px;
+        }}
+
+        body {{
+            font-family: Tahoma, sans-serif;
+            margin: 20px;
+            font-size: {toc_font_size}px;
+        }}
+        .toc-entry {{
+            margin-bottom: 10px;
+        }}
+        .toc-entry span {{
+            display: inline-block;
+        }}
+    </style>
+</head>
+<body>
+<h1>Table of Contents</h1>
+{toc_entries}
+</body>
+</html>

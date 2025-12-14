@@ -1,0 +1,11 @@
+locals
+lang_venv
+focus_group/studio
+get-pip.py
+__pycache__/
+.vscode
+focus_group/deep_retrieval/docs
+focus_group/deep_retrieval/docs_metadata
+focus_group/deep_retrieval/chunk_eval_results
+focus_group/deep_retrieval/models
+focus_group/deep_retrieval/data

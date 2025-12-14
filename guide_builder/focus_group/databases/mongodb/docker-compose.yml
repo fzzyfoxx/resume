@@ -1,0 +1,16 @@
+services:
+  mongodb:
+    hostname: mongodb
+    image: mongodb/mongodb-atlas-local
+    container_name: lang-store-mongodb
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=fzzy
+      - MONGODB_INITDB_ROOT_PASSWORD=fzzy
+    ports:
+      - 27019:27017
+    volumes:
+      - data:/data/db
+      - config:/data/configdb
+volumes:
+  data:
+  config:

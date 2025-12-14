@@ -1,0 +1,39 @@
+# **TASK:**
+Update **CURRENT CONTEXT** information based on the current chunk.
+
+- treat the context as a long-term memory of the paper;
+- analyze the current chunk to update the current section description;
+- recognize structure of the document like sections, subsections, and paragraphs to update the current section field (remove outdated information);
+- for every new section or significant subject change, add short summary (max 2 sentences) of current section description as previous one and edit the current section description to reflect the new content;
+- keep in mind that it isn't single chunk evaluation, but rather a continuous process of updating the context as you go through the paper.
+
+You are currently at {current_chunk_index} chunk of {total_chunks_num} chunks.
+---
+
+# **QUERY:**
+{query}
+
+---
+
+# **CURRENT CONTEXT:**
+{context}
+
+---
+
+## **PREVIOUS CHUNK**
+{prev_chunk}
+
+## **CURRENT CHUNK**
+{current_chunk}
+
+---
+
+# **ANSWER FORMAT:**
+```
+## Summary of previous sections:
+- [summary 1]
+- [summary 2]
+...
+## Current Section:
+[description of the current section/subsection of the paper, including its purpose and how it relates to the overall paper]
+```
