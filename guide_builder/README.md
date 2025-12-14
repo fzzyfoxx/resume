@@ -87,7 +87,7 @@ A modular framework for building conversational agents, research workflows, and 
     - [tests](#tests)  
       Unit tests for validating the functionality of core components using the pytest framework.
 
-- [fcbg notebooks](#fcbg-notebooks)  
+- [fcgb notebooks](#fcgb-notebooks)  
   Jupyter notebooks demonstrating the usage of fcgb components for task solving, RAG workflows, and chatbot interactions.
 
 - [Simplified Guide Builder](#simplified-guide-builder)  
