@@ -10,11 +10,11 @@ Google Cloud Platform | Docker | shutil | pathlib | importlib | subprocess
 
 ### Modules
 
-#### deploy
+#### [deploy](geodoc_deploy/deploy)
 General functions to build a Docker image for a predefined service (`geodoc_config`), push it to Google Container Registry and deploy to Cloud Run.
 
 ---
-#### endpoints
+#### [endpoints](geodoc_deploy/endpoints)
 CLIs scripts to manage deployment process from command line. The system is designed to handle every service by those universal methods.
 Available endpoints:
 - geodoc-build-image - builds Docker image for specified service
@@ -25,10 +25,10 @@ Available endpoints:
 - geodoc-prepare-grid - prepares spatial grid for specified area and uploads it to BigQuery
 
 ---
-#### services
+#### [services](geodoc_deploy/services)
 Contains dockerfiles, python scripts and requirements files for each available service.
 
-#### setup
+#### [setup](geodoc_deploy/setup)
 GCP preparation scripts to create necessary resources for each service, including:
 - BigQuery datasets and tables
 - GCS buckets

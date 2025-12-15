@@ -8,15 +8,15 @@ BigQuery | firestore | google-cloud-storage | shapely | asyncio | Selenium | Bea
 
 ### Modules
 
-#### area
+#### [area](geodoc_loader/area)
 Collection of BigQuery parametrized SQL queries to extract geometries for specified areas based on TERYT codes and source tables.
 
 ---
-#### data
+#### [data](geodoc_loader/data)
 Contains single function `download_files_from_gcp` to download files with optional randomization from specified GCS bucket and file type.
 
 ---
-#### download
+#### [download](geodoc_loader/download)
 Set of functions that handles various download & upload operations, including GC and environment setup:
 - run BigQuery queries
 - download files from given urls
@@ -26,17 +26,17 @@ Set of functions that handles various download & upload operations, including GC
 - validates geospatial data inputs
 
 ---
-#### handlers
+#### [handlers](geodoc_loader/handlers)
 Helps with processing geospatial data formats and conversions:
 - prepares multiple shapefiles from a folder for an upload to BigQuery
 - converts spatial types and perform CRS transformations
 
 ---
-#### resurces
+#### [resurces](geodoc_loader/resources)
 Handles fonts loading (used in SVG parsing)
 
 ---
-#### services
+#### [services](geodoc_loader/services)
 Contains functions for specific services:
 - eJournals - crawlers to acquire pdf documents from province's eJournals websites
 - grid - functions to create spatial grids over specified areas
