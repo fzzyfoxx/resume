@@ -4,6 +4,7 @@
    1,
    12
   ],
+  "single_pattern_type": 0,
   "pattern_types_probs": {
    "solid": 0.6,
    "striped": 0.2,
@@ -331,6 +332,13 @@
   "grayscale_prob": 0.8,
   "light_limit": 200,
   "background_labels_prob": 0.7,
+  "min_shapes_num": 4,
+  "minimal_bbox_size": 0.02,
+  "distr_args": {
+    "a": 13.81,
+    "loc": 0.82,
+    "scale": 2.04
+  },
   "background_labels_range": [
    5,
    30
