@@ -3,7 +3,21 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 class ImageClusters:
+    """Utility for clustering image pixels and producing cluster masks and centroids.
+
+    This class wraps sklearn KMeans to cluster pixels of a square image and
+    provides helpers to compute cluster masks, centroids in image coordinates,
+    and to generate smoothed/combined cluster masks using pooling and IoU-based
+    similarity.
+    """
     def __init__(self, img_size ,n_clusters, n_init):
+        """Initialize ImageClusters.
+
+        Args:
+            img_size (int): Width and height of the square image in pixels.
+            n_clusters (int): Number of clusters to compute with KMeans.
+            n_init (int): Number of KMeans initializations (n_init passed to sklearn.KMeans).
+        """
 
         self.n_clusters = n_clusters
         self.img_size = img_size
@@ -11,17 +25,40 @@ class ImageClusters:
         self.coords = self.gen_coords()
 
     def gen_coords(self,):
+        """Generate xy coordinates for each pixel in the image.
+
+        Returns:
+            numpy.ndarray: Array of shape (img_size*img_size, 2) where each row is (x, y).
+        """
         xs = np.repeat(np.arange(self.img_size)[np.newaxis, :, np.newaxis], self.img_size, axis=0)
         ys = np.transpose(xs, axes=[1,0,2])
         coords = np.reshape(np.concatenate([xs,ys], axis=-1), (-1,2))
         return coords
 
     def get_clusters(self, x):
+        """Run KMeans clustering on an image array.
+
+        Args:
+            x (array-like): Image array of shape (img_size, img_size, channels) or a compatible shape.
+
+        Returns:
+            tuple: (kmeans_results, clusters)
+                - kmeans_results: fitted sklearn KMeans object.
+                - clusters: 1-D array of cluster labels for each pixel (length img_size*img_size).
+        """
         kmeans_results = self.kmeans.fit(np.reshape((x), (-1,3)))
         clusters = kmeans_results.labels_
         return kmeans_results, clusters
     
     def get_coords_centroids(self, clusters):
+        """Compute centroids (mean coordinates) for each cluster.
+
+        Args:
+            clusters (array-like): 1-D array of cluster labels for each pixel.
+
+        Returns:
+            numpy.ndarray: Array of shape (C, 2) with (x, y) centroid for each cluster.
+        """
         C = np.max(clusters)+1
 
         centroids = []
@@ -35,6 +72,14 @@ class ImageClusters:
         return np.stack(centroids, axis=0)
     
     def get_cluster_masks(self, clusters):
+        """Convert 1-D cluster labels into binary masks per cluster.
+
+        Args:
+            clusters (array-like): 1-D array of cluster labels for each pixel.
+
+        Returns:
+            numpy.ndarray: Array of shape (C, img_size, img_size, 1) with binary masks for each cluster.
+        """
         C = np.max(clusters)+1
 
         masks = []
@@ -45,6 +90,17 @@ class ImageClusters:
     
     @staticmethod
     def crossIoU(masks):
+        """Compute a pairwise similarity matrix based on IoU for binary masks.
+
+        The returned matrix is scaled from [-1, 1] by mapping IoU values to
+        the range [-1, 1] via (I/U - 0.5) * 2.
+
+        Args:
+            masks (numpy.ndarray): Array of shape (N, ...) containing binary masks.
+
+        Returns:
+            numpy.ndarray: Pairwise similarity matrix of shape (N, N).
+        """
         N = masks.shape[0]
         x = np.reshape(masks.copy(), (N, -1))
         a = np.repeat(np.expand_dims(x, axis=1), N, axis=1)
@@ -56,6 +112,14 @@ class ImageClusters:
     
     @staticmethod
     def match_idxs_pair(a,b):
+        """Check whether two index arrays are identical.
+
+        Args:
+            a, b (array-like): Index arrays to compare.
+
+        Returns:
+            bool: True if arrays have equal length and identical elements, else False.
+        """
         if len(a)==len(b):
             return np.all(a==b)
         else:
@@ -67,7 +131,6 @@ class ImageClusters:
             masks: clusters masks of shape (N, ...)
             th: threshold for combining masks
         '''
-
         N = ct.shape[0]
 
         collections = [np.where(r>th)[0] for r in ct]
@@ -91,6 +154,26 @@ class ImageClusters:
                               max_pool_th=0.7,
                               return_scores=False
                               ):
+        """Generate smoothed and combined cluster masks from an input image.
+
+        The method clusters pixels, produces binary masks per cluster, applies
+        average pooling to merge similar nearby clusters, computes similarity
+        scores, then applies max pooling and a second merge stage.
+
+        Args:
+            img (tf.Tensor or array-like): Input image tensor or array.
+            avg_pools (int): Number of average-pooling steps to apply.
+            avg_pool_ksize (int): Kernel size for average pooling.
+            avg_pool_th (float): Similarity threshold for combining after avg pooling.
+            max_pools (int): Number of max-pooling steps to apply.
+            max_pool_ksize (int): Kernel size for max pooling.
+            max_pool_th (float): Similarity threshold for combining after max pooling.
+            return_scores (bool): If True, also return the avg and max similarity matrices.
+
+        Returns:
+            numpy.ndarray or tuple: If return_scores is False returns combined masks
+            of shape (M, img_size, img_size, 1). If True returns (masks, avg_similarity, max_similarity).
+        """
         img = img.numpy()
         _, clusters = self.get_clusters(img)
         clusters_masks = self.get_cluster_masks(clusters)

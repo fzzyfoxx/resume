@@ -2,6 +2,14 @@ import tensorflow as tf
 from models_src.Support import SmoothOutput
 
 class UNetConvBlock(tf.keras.layers.Layer):
+    """UNet down-sampling convolutional block.
+
+    This block applies `conv_num` Conv2D layers (with the given filters,
+    kernel size and activation), then a MaxPooling2D and Dropout. The
+    call() returns a tuple (pooled_output, pre_pool_output) where
+    `pre_pool_output` is the output before pooling and is intended for
+    skip-connections in the UNet architecture.
+    """
     def __init__(self, filters, kernel_size, activation, padding, pooling_size, dropout, conv_num=2, **kwargs):
         super().__init__(**kwargs)
 
@@ -18,6 +26,13 @@ class UNetConvBlock(tf.keras.layers.Layer):
         return self.Dropout(x_pool, training=training), x
     
 class UNetUpConvBlock(tf.keras.layers.Layer):
+    """UNet up-sampling convolutional block.
+
+    This block applies a Conv2DTranspose to upsample the input, concatenates
+    the result with the corresponding skip-connection tensor, applies Dropout
+    and then `conv_num` Conv2D layers. It returns the processed tensor for
+    the next up-sampling step.
+    """
     def __init__(self, filters, kernel_size, activation, padding, strides, dropout, conv_num=2, **kwargs):
         super().__init__(**kwargs)
 
@@ -81,6 +96,23 @@ class UNetUpConvBlock(tf.keras.layers.Layer):
         return self.final_conv(x)'''
     
 class UNet(tf.keras.Model):
+    """U-Net model factory wrapping the encoder-decoder architecture.
+
+    This class builds a Keras Model using UNetConvBlock for down-sampling
+    and UNetUpConvBlock for up-sampling. The model can optionally apply
+    batch normalization, color embedding, and a smoothing output layer.
+
+    Args:
+        input_shape: tuple, shape of the input tensor (H, W, C).
+        out_dims: int, number of output channels.
+        out_activation: activation for the final Conv2D layer.
+        init_filters_power: base power for initial filter count (2**power).
+        levels: number of encoder/decoder levels.
+        level_convs: number of Conv2D layers per level.
+        color_embeddings: bool, whether to apply a Dense color embedding.
+        batch_normalization: bool, whether to apply batch normalization.
+        output_smoothing: bool, whether to apply the SmoothOutput layer.
+    """
     def __init__(self, 
                  input_shape=(256,256,3), 
                  out_dims=1, 
