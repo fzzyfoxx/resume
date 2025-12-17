@@ -13,12 +13,22 @@ git filter-repo \
 --path maps_vectorization/src/parcel_input_args.json \
 --path maps_vectorization/src/screenshots/ \
 --path maps_vectorization/src/fonts/ \
-# RPN anchor optimization
---path maps_vectorization/RPN_optimization.ipynb \
+# Simple pattern generator
+--path maps_vectorization/models_src/VecDataset.py \
+# RRPE
+--path maps_vectorization/models_src/VecModels.py \
+--path maps_vectorization/Fourier/pixel_features_model.ipynb \
+--path maps_vectorization/Fourier/pixel_similarity_model.ipynb \
+--path maps_vectorization/Fourier/radial_relative_pos_enc.ipynb \
+--path maps_vectorization/Fourier/radial_enc_pixel_features.ipynb \
+--path maps_vectorization/Fourier/radial_enc_vec_detection.ipynb \
+--path maps_vectorization/Fourier/pixel_similarity_shapes_model.ipynb \
+--path maps_vectorization/Fourier/model_generators/ \
 # Minor experiments
 --path maps_vectorization/Vertex_detection/install_CRF.sh \
 --path maps_vectorization/Vertex_detection/CRF_imports.py \
 --path maps_vectorization/Vertex_detection/stages_flow.ipynb \
+--path maps_vectorization/RPN_optimization.ipynb \
 # Architectures
 --path maps_vectorization/models_src/DETR.py \
 --path maps_vectorization/models_src/Mask_RCNN.py \
@@ -26,6 +36,10 @@ git filter-repo \
 --path maps_vectorization/models_src/SegNet_model.py \
 --path maps_vectorization/models_src/Kmeans.py \
 --path maps_vectorization/models_src/backbones.py \
+--path maps_vectorization/models_src/CombinedMetricsModel.py \
 # Documentation
 --path maps_vectorization/README.md \
+--path maps_vectorization/RRPE.md \
+# Other
+--path maps_vectorization/models_src/Support.py \
 --force \

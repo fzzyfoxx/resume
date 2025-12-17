@@ -2,6 +2,7 @@
 
 ### Table of Contents
 - [Sythetic Map Generator Framework](#sythetic-map-generator-framework-link)
+- [Simple Patterns Generator](#simple-patterns-generator-link)
 - [Architectures](#architectures-link)
     - [DETR](#detr-link)
     - [Mask R-CNN](#mask-r-cnn-link)
@@ -9,6 +10,7 @@
     - [SegNet](#segnet-link)
     - [K-Means](#k-means-link)
     - [Residual Conv Block](#residual-conv-block-link)
+- [Relative Radial Positional Encoding](#relative-radial-positional-encoding-link)
 - [Minor experiments](#minor-experiments)
     - [RPN Anchor Optimization](#rpn-anchor-optimization-link)
     - [U-Net edge detection with CRF](#u-net-edge-detection-with-crf-link)
@@ -19,8 +21,8 @@ A Synthetic Map Generator Framework designed to create diverse training datasets
 **technological stack**:<br>
 NumPy | math | shapely | Pillow | tensorflow | OpenCV | Spacy | pyproj | SciPy | google.cloud
 
-<img src="./src/screenshots/full_map1.png" alt="map example 1" height="400"/>
-<img src="./src/screenshots/full_map2.png" alt="map example 2" height="400"/>
+<img src="./src/screenshots/full_map1.png" alt="map example 1" height="300"/>
+<img src="./src/screenshots/full_map2.png" alt="map example 2" height="300"/>
 
 ### Key Features
 
@@ -37,6 +39,56 @@ NumPy | math | shapely | Pillow | tensorflow | OpenCV | Spacy | pyproj | SciPy |
 - [map_drawer](src/map_drawing.py): Generates maps with shapes, patterns, and background elements.
 - [map_concatenation](src/map_generator.py): Combines maps, legends, and minimaps into a single output.
 - [pattern_randomization](src/patterns.py): Provides utilities for generating diverse patterns.
+
+<br><br>
+
+## Simple Patterns Generator [link](./models_src/VecDataset.py)
+
+A compact but expressive synthetic patterns generator built around `MultishapeMapGenerator` and `DatasetGenerator`. It is a simplified, self-contained variant of the full Synthetic Map Generator Framework, designed specifically for controlled experiments on pattern recognition in highly dense and noisy environments.
+
+Instead of producing full map layouts with legends and minimaps, this module focuses on generating small, information-dense canvases with overlapping linear structures and geometric shapes, together with rich supervision signals for learning.
+
+**technological stack**:<br>
+TensorFlow | NumPy | OpenCV | google.cloud | math
+
+<img src="resources/vec_data_output1.png" alt="vec data output" height="120"/>
+<img src="resources/vec_data_output2.png" alt="vec data output" height="120"/>
+
+**MultishapeMapGenerator**
+
+- Composes multiple heterogeneous pattern generators into a single synthetic "map":
+  - line corridors and double-line bands,
+  - flexible polylines with angle constraints,
+  - regularly placed shapes along lines,
+  - scattered rotated shapes with spacing constraints.
+- Applies extensive randomisation of geometry, orientation, spacing, counts and colors, so a single configuration can produce a broad variety of scenes.
+- Handles occlusions explicitly: each new pattern is drawn on top of previous ones and only the actually visible portions contribute to masks, vectors, bounding boxes and angle labels.
+- Produces a configurable set of outputs in one pass. Depending on requested keys, a sample can include, for example:
+  - RGB image with foreground/background colors,
+  - per-pixel line/shape masks and class labels,
+  - instance-level masks for segments and shape components,
+  - vector endpoints and bounding box corners in image coordinates,
+  - per-pixel angle and center-vector labels,
+  - per-instance and per-pixel thickness and pattern indices.
+- Output selection is fully declarative: you specify which outputs you need, and the generator automatically computes only those tensors while keeping them geometrically consistent.
+
+**DatasetGenerator**
+
+- Wraps `MultishapeMapGenerator` into a ready-to-use TensorFlow `tf.data` pipeline.
+- Supports two operation modes:
+  - on-the-fly sample generation for rapid prototyping and infinite training streams,
+  - offline TFRecord creation and reloading for large-scale training or distributed setups.
+- Automatically handles batching, padding to fixed maximum numbers of components, shape assignment and optional shuffling.
+- Exposes an output filtering mechanism: downstream experiments can keep only the subset of fields required by a particular model (for example, image + angle map, or image + instance vectors, or image + dense segmentation).
+- Integrates a flexible preprocessing stage where you can chain high-level operations such as color jitter, blurring, random flips, feature construction, similarity labels or vector-based targets, all expressed as composable dataset transforms.
+
+**Highlighted features**
+
+- Occlusion-aware labeling: visible parts of lines and shapes are recomputed after overlaps so that all masks, vectors, bounding boxes and angles describe only what is actually observable in the final image.
+- Multi-task supervision from a single pass: the same synthetic scene can simultaneously provide dense segmentation targets, instance-level geometry, per-pixel angles, center-vectors, thickness and pattern indices, making it suitable for joint training of several heads.
+- Angle- and frequency-aware targets: dedicated utilities support rotated encoders, angle-conditioned labels and frequency-space angle masks, enabling experiments on rotation robustness and spectral consistency of learned features.
+- Point-based vector supervision: several dataset ops sample points on components and attach local vector, class and thickness labels, which is useful for probe-based models and sparse supervision schemes.
+- Tight tf.data integration: the whole pipeline (on-the-fly or TFRecord-based) is expressed as standard dataset transformations, making it easy to plug into custom training loops, add new preprocessing stages or branch dataflows for different model families.
 
 <br><br>
 
@@ -167,6 +219,51 @@ Key components and responsibilities:
 - **gen_residual_stage**: Helper that composes multiple ResidualConvBlock instances into a stage, applying downsampling on the first block and identity-like blocks afterwards.
 - **gen_backbone**: Constructs a sequential residual backbone from multiple stages; useful as an image encoder that returns final stage feature maps for downstream heads.
 - **gen_memorizing_res_backbone**: Patch-level backbone that first embeds inputs with an FFN then applies ResidualConvBlock layers, collecting intermediate "memory" feature maps and concatenating them. Supports optional 1x1 pixel convs, dropout and selecting a subset of memory indices for output.
+
+<br><br>
+
+## Relative Radial Positional Encoding [link](RRPE.md)
+
+Relative Radial Positional Encoding (RRPE) is a family of geometry-aware positional encodings and attention-based models designed for dense, line‑dominated map vectorization. Instead of describing where a pixel is in the image (absolute x/y), RRPE describes where a pixel is relative to a reference point in polar coordinates (angle and normalized distance). This makes the inductive bias of the model match the geometry of cartographic data: long strokes, rings, junctions and star‑like structures.
+
+The RRPE work in this repository is not a single layer, but a set of related experiments and architectures documented in detail in **RRPE.md** and the linked notebooks. Together, they show that adding a query‑centric radial prior on top of standard CNN/Transformer backbones consistently improves:
+
+- pixel‑wise feature estimation (class, angle, thickness, center‑vector),
+- pixel‑to‑pixel similarity and shape masks,
+- sample‑centric vector detection (segment endpoints, class, optional thickness),
+
+while keeping the runtime overhead moderate.
+
+### Motivation and idea
+
+Cartographic scenes tend to be dominated by thin, elongated and often intersecting structures. For such data, what matters for a decision at a pixel is usually the **relative** geometry to a few reference points ("along this road", "around this junction"), not the absolute (x, y) in the image. Standard sinusoidal encodings over image coordinates ignore this: they are tied to the image frame, not to the object.
+
+RRPE changes the frame of reference. Given a query point (a pixel or a sample), every other pixel is represented by:
+
+- angle: orientation of the ray from the query to that pixel,
+- radius: normalized distance along that ray.
+
+This representation is then encoded either by smooth sector/ring channels or by compact multi‑frequency sin/cos features. Attention uses these encodings as a learned, query‑conditional bias, so it naturally prefers pixels that lie on the same stroke, ring or ray as the query and can suppress distracting parallel structures.
+
+### Families of models using RRPE
+
+The RRPE encodings are exercised in three main model families, all built on synthetic pattern datasets from this repository:
+
+1. **Radial‑encoded pixel features model**  
+   A U‑Net–style backbone is augmented with radial attention and trained to predict, per pixel, shape class (line / shape / background), local angle, thickness and a center‑vector pointing to the shape center or line axis. This model is used as a general geometric feature extractor for other experiments. With RRPE, all feature heads see lower validation losses than the plain U‑Net baseline, showing that query‑centric geometry helps recover local orientation and center information in cluttered scenes.
+
+2. **RRPE‑based pixel similarity models**  
+   These models output dense pixel‑to‑pixel similarity matrices where each row (for a chosen pixel) acts as a soft mask of “pixels belonging to the same object or stroke”. Combined with a relational similarity loss, RRPE makes these masks substantially cleaner: similarity stays high along the true object even through gaps or weak contrast, and falls off on nearby but distinct lines. This is particularly important for downstream attention‑based architectures that rely on good similarity patterns from the first iteration.
+
+3. **RRPE vector detection models**  
+   In a sample‑centric setting, the model receives an image and a set of sample points and predicts, for each sample, one or more vectors (segment endpoints) with class and optional thickness. Here RRPE is centered on each sample: attention looks outwards along rays and rings around the sample and gathers evidence for likely continuations of the underlying stroke. Experiments on synthetic line maps show that RRPE improves endpoint localization and stability in the presence of clutter, crossings and breaks compared to Cartesian encodings or purely convolutional baselines.
+
+Across these families the concrete architectures differ (backbones, number of attention stages, use of backbone features vs colors‑only), but the role of RRPE is the same: provide a strong, query‑relative geometric prior that guides where attention should look.
+
+Overall, RRPE confirms that rephrasing positional information in a query‑centric radial frame is an effective way to inject geometric knowledge into attention mechanisms for map vectorization. The code and experiments in **RRPE.md** can serve both as a reference implementation of relative radial encodings and as a set of end‑to‑end examples for integrating them into feature extractors, similarity models and vector detectors.
+
+<img src="resources/pixel_features_rot.png" alt="pixel features" width="900"/>
+<img src="resources/radial_encoding.png" alt="relative radial encoding" width="900"/>
 
 <br><br>
 

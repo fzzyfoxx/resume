@@ -1,3 +1,9 @@
+"""VecDataset module: utilities for synthetic vectorized map generation, labeling, and TensorFlow dataset pipelines.
+
+This module provides geometry helpers, procedural generators for lines and shapes,
+label construction routines for training, and a DatasetGenerator to produce
+TFRecord-backed datasets.
+"""
 import os
 import numpy as np
 import tensorflow as tf
@@ -15,6 +21,16 @@ import time
 ### GENERAL PURPOSE FUNCTIONS ###
 
 def cut_vec(center, angle, size):
+    """Clip the infinite line passing through a center at angle to image bounds.
+
+    Args:
+        center: [N, 2] or [2] array-like in (y, x) order.
+        angle: scalar or [N] angle in radians (0 along +x with tan convention).
+        size: int image size (square image with coordinates [0, size-1]).
+
+    Returns:
+        vec: [N, 2, 2] endpoints (y, x) of the clipped segment across the image.
+    """
     cy, cx = np.split(center, 2, axis=-1)
     slope = np.tan(angle)
     bias = cy-slope*cx
@@ -31,12 +47,31 @@ def cut_vec(center, angle, size):
     return vec
 
 def numpy_decode1Dcoords(coords, width, xy=False):
+    """Decode flat indices to 2D coordinates.
+
+    Args:
+        coords: np.ndarray of flat indices.
+        width: image width.
+        xy: if True return (x, y); otherwise (y, x).
+
+    Returns:
+        np.ndarray of shape (..., 2) with decoded coordinates.
+    """
     direction = 1 if xy else -1
     x = coords % width
     y = coords // width
     return np.stack([x,y][::direction], axis=-1)
 
 def numpy_dist_to_line(points, vecs):
+    """Compute perpendicular distance from points to line segments.
+
+    Args:
+        points: [..., 2] (y, x) points.
+        vecs: [..., 2, 2] (y, x) endpoints of segments.
+
+    Returns:
+        Distance array broadcast over inputs with same batch shape as points vs vecs.
+    """
     v1, v2 = np.split(vecs, 2, axis=-2)
     y1, x1 = np.split(v1-1e-4, 2, axis=-1)
     y2, x2 = np.split(v2+1e-4, 2, axis=-1)
@@ -47,12 +82,39 @@ def numpy_dist_to_line(points, vecs):
     return dist
 
 def gen_point_rot_matrix(rot_angle):
+    """Generate 2x2 rotation matrix for rotating (y, x) points by rot_angle.
+
+    Note: The matrix is constructed for (y, x) ordering consistent with module.
+
+    Args:
+        rot_angle: scalar angle in radians.
+
+    Returns:
+        np.ndarray 2x2 rotation matrix.
+    """
     return np.array([[np.cos(rot_angle), np.sin(rot_angle)],[-np.sin(rot_angle), np.cos(rot_angle)]])
 
 def tan_angle(x):
+    """Map angle to principal value using tan/atan to keep orientation equivalence.
+
+    Args:
+        x: angle in radians.
+
+    Returns:
+        Angle wrapped to (-pi/2, pi/2).
+    """
     return np.arctan(np.tan(x))
 
 def numpy_closest_point_on_line(line_vec, points):
+    """Project points orthogonally onto a line segment.
+
+    Args:
+        line_vec: [..., 2, 2] line endpoints (y, x).
+        points: [..., 2] query points (y, x).
+
+    Returns:
+        [..., 2] closest positions on the infinite line through the segment.
+    """
 
     p1, p2 = np.split(line_vec, 2, axis=-2)
     p0 = points
@@ -70,7 +132,21 @@ def numpy_closest_point_on_line(line_vec, points):
 ### LINE FILLED ###
 
 class LinesGenerator:
+    """Base class for generating rasterized line-like patterns.
+
+    Handles size, thickness sampling, and drawing utilities used by subclasses.
+    """
     def __init__(self, size, thickness_range, progressive_thickness, progressive_gamma, min_length, dtype=np.int32, **kwargs):
+        """Initialize generator configuration.
+
+        Args:
+            size: output square size.
+            thickness_range: (low, high) integer pixel thickness range.
+            progressive_thickness: if True, sample thickness with power-law.
+            progressive_gamma: gamma used for progressive thickness distribution.
+            min_length: minimal drawable length in pixels.
+            dtype: mask dtype used by OpenCV drawing ops.
+        """
 
         self.size = size
         self.thickness_range = thickness_range
@@ -80,15 +156,31 @@ class LinesGenerator:
         self.dtype = dtype
 
     def draw_vecs(self, vecs, thickness):
+        """Rasterize multiple segments to masks using OpenCV.
+
+        Args:
+            vecs: [N, 2, 2] (y, x) endpoints.
+            thickness: integer line thickness.
+        Returns:
+            [N, H, W, 1] mask array with lines drawn.
+        """
         return np.stack([cv.line(np.zeros((self.size, self.size, 1), self.dtype), *vec, 1, thickness) for vec in vecs.astype(np.int32)], axis=0)
     
     def random_progresive_thickness(self, size=None):
+        """Sample thicknesses with power-law distribution controlled by gamma.
+        
+        Args:
+            size: number of samples to draw.
+        Returns:
+            Sampled thicknesses as int or np.ndarray.
+        """
         a = np.arange(*self.thickness_range)
         p = 1/a**self.gamma
         p = p/np.sum(p)
         return np.random.choice(a, size=size, p=p)
 
     def gen_line_args(self):
+        """Sample line drawing arguments (currently thickness only)."""
 
         if self.progressive_thickness:
             thickness = self.random_progresive_thickness(size=None)
@@ -99,6 +191,15 @@ class LinesGenerator:
     
     @staticmethod
     def gen_shift_vec(angle, space, round=True):
+        """Generate a perpendicular shift vector of given spacing.
+
+        Args:
+            angle: base angle of primary line.
+            space: distance to shift.
+            round: if True, round components for pixel shifts.
+        Returns:
+            [2] shift vector in (y, x).
+        """
         shift_vec =  np.stack([np.sin(angle), np.cos(angle)], axis=-1)*space
         if round:
             shift_vec = np.round(shift_vec)
@@ -107,7 +208,16 @@ class LinesGenerator:
     
 
 class LineFilledGenerator(LinesGenerator):
+    """Generate a bundle of parallel clipped line segments filling a corridor."""
     def __init__(self, lines_num_range, spacing_range, center_padding, angles_prop_num, **kwargs):
+        """Configure multi-line generator.
+
+        Args:
+            lines_num_range: (low, high) number of lines to draw.
+            spacing_range: (low, high) spacing in pixels between lines.
+            center_padding: min distance of center from borders.
+            angles_prop_num: proposals when avoiding previous angles.
+        """
         super().__init__(**kwargs)
 
         self.lines_num_range = lines_num_range
@@ -116,6 +226,14 @@ class LineFilledGenerator(LinesGenerator):
         self.angles_prop_num = angles_prop_num
 
     def gen_line_filled_args(self, max_components, previous_angles=None):
+        """Sample parameters for a line-filled pattern, respecting constraints.
+
+        Args:
+            max_components: limit on number of drawable components.
+            previous_angles: optional angles to avoid for diversity.
+        Returns:
+            Dict of generation args including lines_num, spacing, center, angle, thickness.
+        """
 
         lines_num = min(np.random.randint(*self.lines_num_range), max_components)
         spacing = np.random.randint(*self.spacing_range)
@@ -136,12 +254,26 @@ class LineFilledGenerator(LinesGenerator):
 
     @staticmethod
     def gen_side_vec_centers(shift_vec, vecs_num, center):
+        """Generate centers for lines offset from the main center.
+
+        Args:
+            shift_vec: [2] shift per line.
+            vecs_num: number of centers to generate.
+            center: [2] base center.
+        Returns:
+            [vecs_num, 2] array of centers.
+        """
         if vecs_num==0:
             return np.transpose(np.array([[],[]], np.float32), axes=[1,0])
         n = np.arange(vecs_num)+1
         return n[:,np.newaxis]*shift_vec[np.newaxis] + center[np.newaxis]
 
     def gen_vecs_to_draw(self, lines_num, thickness, spacing, angle, center):
+        """Construct and clip the actual line segments to draw.
+
+        Returns:
+            [M, 2, 2] array of (y, x) endpoints, possibly fewer than lines_num.
+        """
         thickness = 1 if thickness==1 else thickness + thickness//2 + 1
         min_length = self.min_length+thickness
         perp_angle = angle-math.pi/2
@@ -178,6 +310,11 @@ class LineFilledGenerator(LinesGenerator):
         return np.round(cutted_vecs+0.5,0)
     
     def __call__(self, max_components, previous_angles=None):
+        """Generate a single line-filled pattern instance.
+
+        Returns:
+            List with a tuple: (shape_masks, borderline_masks, vecs, bboxes, angle, thickness).
+        """
         shape_args = self.gen_line_filled_args(max_components=max_components, previous_angles=previous_angles)
 
         vecs = self.gen_vecs_to_draw(**shape_args)
@@ -188,9 +325,11 @@ class LineFilledGenerator(LinesGenerator):
     
 
 class DoubleLineFilledGenerator(LineFilledGenerator):
+    """Draw two parallel line-filled bands separated by spacing."""
 
     @staticmethod
     def shifted_pattern_args(center, angle, spacing, thickness, lines_num, max_components, **kwargs):
+        """Shift the center perpendicular to create a second parallel band."""
         center = center + np.array([np.sin(angle-math.pi/2), np.cos(angle-math.pi/2)])*(spacing+thickness//2)
 
         lines_num = min(lines_num, max_components)
@@ -198,6 +337,7 @@ class DoubleLineFilledGenerator(LineFilledGenerator):
         return {'lines_num': lines_num, 'spacing': spacing, 'center': center, 'angle': angle, 'thickness': thickness, **kwargs}
 
     def __call__(self, max_components, previous_angles=None):
+        """Generate up to two adjacent line-filled patterns."""
 
         shape_args = self.gen_line_filled_args(max_components=max_components, previous_angles=previous_angles)
 
@@ -224,7 +364,15 @@ class DoubleLineFilledGenerator(LineFilledGenerator):
 ### POLYLINE ###
 
 class PolylineGenerator(LinesGenerator):
+    """Generate random polylines with angle and length constraints."""
     def __init__(self, vertices_range, min_angle_diff, proposals_num, **kwargs):
+        """Configure polyline generation.
+
+        Args:
+            vertices_range: (low, high) number of segments.
+            min_angle_diff: minimal angle difference between consecutive segments.
+            proposals_num: candidate angles per step.
+        """
         super().__init__(**kwargs)
 
         self.vertices_range = vertices_range
@@ -232,6 +380,11 @@ class PolylineGenerator(LinesGenerator):
         self.proposals_num = proposals_num
 
     def gen_limited_vec_range(self, point, angle):
+        """Compute border-intersection points for a ray from point at angle.
+
+        Returns:
+            [2] endpoints clipped to image bounds.
+        """
         b = np.array([[0,0],[self.size-1, self.size-1]])
         unit_vec = self.gen_shift_vec(angle, 1.0, round=False)
 
@@ -240,6 +393,7 @@ class PolylineGenerator(LinesGenerator):
         return border_points
 
     def gen_next_vec(self, startpoint, prev_angle, min_angle_diff, min_length, i, proposals_num):
+        """Propose and pick the next segment endpoint satisfying constraints."""
 
         if i<=1:
             denom = 1
@@ -271,6 +425,11 @@ class PolylineGenerator(LinesGenerator):
         return None, None, None
 
     def __call__(self, max_components, **kwargs):
+        """Generate a random polyline and its rasterized mask.
+
+        Returns:
+            List with tuple (mask, None, vecs, None, angles, thickness).
+        """
 
         thickness = self.gen_line_args()['thickness']
         min_length = self.min_length*thickness#+= 0 if thickness==1 else thickness + thickness//2
@@ -298,7 +457,9 @@ class PolylineGenerator(LinesGenerator):
 ### LINEAR SHAPES ###
 
 class ShapesGenerator:
+    """Abstract shape utilities for filled/borderline shapes and transforms."""
     def __init__(self, size, size_range, types_probs, filled_prob, samples_per_unit, add_borderline_prob, borderline_thickness_range, min_borderline_thickness_diff, dtype=np.int32, **kwargs):
+        """Configure generic shape drawing and sampling parameters."""
         self.size = size
 
         self.size_range = size_range
@@ -332,17 +493,27 @@ class ShapesGenerator:
 
     @staticmethod
     def cross_polyline(size=1.):
+        """Return a cross polyline of given normalized size centered at origin."""
         return np.array([[[1., 0.],[-1., 0.]],[[0.,-1.],[0., 1.]]])*size/2
 
     @staticmethod
     def rectangle_polyline(size=1.):
+        """Return rectangle polyline (axis-aligned) centered at origin."""
         return np.array([[[1., 1.],[-1., 1.]], [[-1., 1.], [-1., -1.]], [[-1., -1.],[1., -1.]], [[1., -1.],[1., 1.]]])*size/2
 
     @staticmethod
     def triangle_polyline(size=1.):
+        """Return an isosceles right triangle polyline centered at origin."""
         return np.array([[[0., -1.], [0., 1.]], [[0., 1.], [1., 0.]], [[1., 0.],[0., -1.]]])*size/2
 
     def circle_polyline(self, size=1.):
+        """Approximate a circle with piecewise linear segments.
+
+        Args:
+            size: diameter in normalized units.
+        Returns:
+            [M, 2, 2] segments approximating the circle.
+        """
         samples = int(np.mean(size)*self.samples_per_unit)
         angles = np.linspace(-math.pi, math.pi, samples+1)
         points = np.stack([np.sin(angles), np.cos(angles)], axis=-1)*size/2
@@ -350,16 +521,28 @@ class ShapesGenerator:
         return np.stack([points[:-1], points[1:]], axis=-2)
     
     def gen_empty_mask(self):
+        """Create an empty mask array of current size and dtype."""
         return np.zeros((self.size, self.size, 1), dtype=self.dtype)
     
     def draw_filled(self, vecs):
+        """Fill a polygon defined by ordered vertices of vecs (y, x)."""
         return cv.fillPoly(self.gen_empty_mask(), pts=vecs[np.newaxis,:,0,::-1], color=1)
     
     def draw_borderline(self, vecs, thickness):
+        """Draw polygon outline with specified thickness."""
         return cv.polylines(self.gen_empty_mask(), vecs[...,::-1], False, 1, thickness=thickness)
     
     @staticmethod
     def get_shape_bbox(vecs, borderline_buffer, batch_dim=False):
+        """Compute axis-aligned bounding boxes around shape vertices.
+
+        Args:
+            vecs: [..., 2, 2] vertices (y, x).
+            borderline_buffer: extra pixels to include around bbox.
+            batch_dim: if True, preserve batch leading dimension.
+        Returns:
+            BBoxes formatted as [[y1,x1],[y0,x1],[y0,x0],[y1,x0]].
+        """
         if batch_dim:
             b = len(vecs)
             vecs = np.reshape(vecs, (b, -1, 2))
@@ -376,6 +559,11 @@ class ShapesGenerator:
         return bbox
     
     def gen_shape_args(self):
+        """Sample a random shape type, size, and its drawing flags.
+
+        Returns:
+            Dict containing vecs, shape_size, filled, borderlined, thickness, shape_type.
+        """
         shape_type = np.random.choice(self.types_names, p=self.types_probs)
 
         fillability = self.types_fillability[shape_type]
@@ -403,14 +591,25 @@ class ShapesGenerator:
     
     @staticmethod
     def random_rot_matrix():
+        """Sample a random rotation matrix and return it with the angle."""
         angle = np.random.uniform(-math.pi, math.pi)
         return gen_point_rot_matrix(angle), angle
     
     @staticmethod
     def rotate_vecs(vecs, rot_matrix):
+        """Apply rotation matrix to shape vecs (supports batch of matrices)."""
         return np.squeeze(np.matmul(rot_matrix[:,np.newaxis, np.newaxis], vecs[...,np.newaxis]), axis=-1)
     
     def shift_and_rotate_vecs(self, vecs, filled, borderlined, borderline_thickness, center, rot_matrix=None, **kwargs):
+        """Rotate and shift shape vecs to centers; also compute clipped bboxes.
+
+        Args:
+            vecs: base shape segments around origin.
+            center: [N,2] centers to shift to.
+            rot_matrix: [N,2,2] or [1,2,2] rotation matrices or None.
+        Returns:
+            (vecs, bboxes) with integer-rounded coordinates and clipped bboxes.
+        """
         if rot_matrix is not None:
             vecs = self.rotate_vecs(vecs, rot_matrix)
         vecs = vecs + center[:,np.newaxis, np.newaxis]
@@ -421,6 +620,7 @@ class ShapesGenerator:
         return vecs, bbox
     
     def gen_shape_mask(self, vecs, filled, borderlined, borderline_thickness, **kwargs):
+        """Rasterize filled shape and optional borderline mask."""
         
         shape_mask = self.draw_filled(vecs) if filled else self.draw_borderline(vecs, borderline_thickness)
 
@@ -430,12 +630,15 @@ class ShapesGenerator:
     
     @staticmethod
     def calc_bordered_shape_size(shape_size, borderlined, borderline_thickness):
+        """Approximate diagonal size for spacing when borderline is present."""
         return (shape_size + borderlined*(borderline_thickness//2))*2**0.5
     
     
 
 class LinearShapesGenerator(ShapesGenerator):
+    """Generate repeated shapes placed along a line with rotation."""
     def __init__(self, shapes_num_range, dist_range, angle_proposals_num, **kwargs):
+        """Configure alignment, count, and spacing for linear shapes."""
         super().__init__(**kwargs)
 
         self.shapes_num_range = shapes_num_range
@@ -443,6 +646,11 @@ class LinearShapesGenerator(ShapesGenerator):
         self.proposals_num = angle_proposals_num
 
     def draw_linear_shapes(self, vecs, shape_size, filled, borderlined, borderline_thickness, max_components, **kwargs):
+        """Place multiple rotated copies of a shape along a long segment.
+
+        Returns:
+            Tuple compliant with MultishapeMapGenerator expectations.
+        """
 
         shapes_num = min(np.random.randint(*self.shapes_num_range), max_components)
         dist = np.random.randint(*self.dist_range)
@@ -500,13 +708,16 @@ class LinearShapesGenerator(ShapesGenerator):
         return (shape_masks, borderline_masks, line_vec, bboxes, tan_angle(np.array([angle])), np.int32((shape_size-1)*2))
     
     def __call__(self, max_components, **kwargs):
+        """Generate one arrangement of linear shapes."""
         return [self.draw_linear_shapes(**self.gen_shape_args(), max_components=max_components)]
     
 
 ### SPREADED SHAPES ###
 
 class SpreadedShapesGenerator(ShapesGenerator):
+    """Scatter multiple rotated shapes across the canvas with min spacing."""
     def __init__(self, shapes_num_range, min_dist, placement_proposals_num, **kwargs):
+        """Configure random placement count, min distance, and proposals."""
         super().__init__(**kwargs)
 
         self.shapes_num_range = shapes_num_range
@@ -514,6 +725,7 @@ class SpreadedShapesGenerator(ShapesGenerator):
         self.placement_proposals_num = placement_proposals_num
 
     def __call__(self, max_components, **kwargs):
+        """Generate a random set of scattered shapes and masks."""
 
         shapes_num = min(np.random.randint(*self.shapes_num_range), max_components)
 
@@ -558,8 +770,14 @@ class SpreadedShapesGenerator(ShapesGenerator):
 ### MAP GENERATOR ###
     
 class MultishapeMapGenerator:
+    """Compose multiple randomized patterns into a labeled synthetic map image.
+
+    Produces images, pattern/shape masks, vector endpoints, bboxes, and labels
+    required by downstream training pipelines.
+    """
     def __init__(self, outputs, size, patterns_num_range, max_components_num, color_rand_range, use_previous_color_prob, min_orig_shape_coverage, grayscale, mask_dtype, bbox_vecs,
                  patterns_prob, line_args, shape_args, line_filled_args, polyline_args, linear_shapes_args, spreaded_shapes_args):
+        """Set global generation config and create pattern generators."""
 
         self.size = size
 
@@ -623,9 +841,18 @@ class MultishapeMapGenerator:
         self.output_padded_shapes = dict(((k, v['padded_shape']) for k, v in self.outputs_info.items()))
 
     def _get_output_info(self, name):
+        """Helper to collect a list of a given property for selected outputs."""
         return [v[name] for (k,v) in self.outputs_info.items()]
 
     def calc_visible_vec(self, vecs, vec_masks):
+        """Estimate representative visible endpoints for each visible vector mask.
+
+        Args:
+            vecs: [N, 2, 2] original (y, x) segments.
+            vec_masks: [N, H, W, 1] visibility masks after occlusion.
+        Returns:
+            [N, 2] points closest to each pixel cluster per vector mask.
+        """
         dists_to_line = numpy_dist_to_line(self.yx_flat[np.newaxis], vecs)
         vis_vecs = numpy_decode1Dcoords(np.argmax((tf.reduce_sum((vecs[:,:,tf.newaxis]-self.yx_flat[tf.newaxis, tf.newaxis])**2+1e-4, axis=-1)**0.5 \
                                                     -np.transpose(dists_to_line, axes=[0,2,1])**2)*np.reshape(vec_masks, (-1,1,self.size**2)), axis=-1), width=self.size, xy=False)
@@ -634,6 +861,7 @@ class MultishapeMapGenerator:
     
     @staticmethod
     def bbox_from_mask(yx, mask):
+        """Compute tight bbox quad from a binary mask and coordinate grid."""
         points = yx[mask>0]
 
         y1, x1 = np.max(points, axis=0)+0.5
@@ -644,6 +872,7 @@ class MultishapeMapGenerator:
         return bbox
     
     def calc_visible_bbox(self, bboxes_masks):
+        """Compute visible bboxes for possibly occluded components."""
         bboxes_masks = np.reshape(bboxes_masks, (-1, self.size**2))
 
         bboxes = np.stack([self.bbox_from_mask(self.yx_flat, bbox_mask) for bbox_mask in bboxes_masks], axis=0)
@@ -652,6 +881,11 @@ class MultishapeMapGenerator:
         
 
     def calc_visible_part(self, vecs, bboxes, vecs_masks, borderline_masks, mask, angle, single_vec):
+        """Resolve occlusions and derive visible masks, vectors, and bboxes.
+
+        Returns:
+            pattern_mask, full_masks, vis_masks, vis_borderline_masks, vis_vecs, vis_bboxes, angle
+        """
         full_vecs_masks = np.max(np.stack([vecs_masks, borderline_masks], axis=0), axis=0) if borderline_masks is not None else vecs_masks
         full_vis_vecs_masks = full_vecs_masks*(1-mask[np.newaxis])
         vis_vecs_masks_filter = np.sum(full_vis_vecs_masks, axis=(1,2,3))>self.min_line_length
@@ -690,9 +924,14 @@ class MultishapeMapGenerator:
     
     @staticmethod
     def random_sort(x):
+        """Randomly reverse array order to diversify color pairing."""
         return x[::(np.random.randint(0,2)*2-1)]
     
     def gen_colors(self, patterns_num):
+        """Generate pairs of foreground/border colors for patterns.
+
+        Ensures alternating palette and optional reuse of previous color.
+        """
         if patterns_num%2>0:
             patterns_num += 1
 
@@ -710,10 +949,12 @@ class MultishapeMapGenerator:
         return colors
     
     def gen_single_color_pair(self):
+        """Generate a single pair of colors (shape and borderline)."""
         return np.array([[clr/255 for clr in gen_colors(grayscale=self.grayscale)] for i in range(2)])
     
     @staticmethod
     def get_pattern_drawing(pattern_mask, shape_masks, borderline_masks, shape_color, borderline_color):
+        """Blend shape and borderline into an RGB image slice using colors."""
         if borderline_masks is None:
             return pattern_mask*shape_color
         
@@ -726,25 +967,35 @@ class MultishapeMapGenerator:
     
     @staticmethod
     def concat_col(col, empty_shape, dtype):
+        """Concatenate list of arrays or return empty typed array if no items."""
         return np.concatenate(col, axis=0) if len(col)>0 else np.zeros(empty_shape, dtype=dtype)
     
     def get_angle_label(self, shape_masks, angle):
+        """Average per-pixel angle label over visible masks (masked average)."""
         return np.ma.average(shape_masks*angle[:,np.newaxis, np.newaxis, np.newaxis], weights=shape_masks, axis=0).data
     
     def vec_center_vec(self, vecs, vecs_mask):
+        """Compute vector from pixel to nearest point on its assigned line."""
         center_vec = numpy_closest_point_on_line(vecs, self.yx_flat[np.newaxis])-self.yx_flat[np.newaxis]
         return np.ma.average(np.reshape(center_vec, (-1,self.size, self.size,2))*vecs_mask, weights=np.repeat(vecs_mask, 2, -1), axis=0).data
     
     def bbox_center_vec(self, bbox, bbox_mask):
+        """Compute vector from pixel to bbox center using masked average."""
         centers = np.mean(bbox, axis=-2, keepdims=True)
         center_vec = centers-self.yx_flat[np.newaxis]
         return np.ma.average(np.reshape(center_vec, (-1,self.size, self.size,2))*bbox_mask, weights=np.repeat(bbox_mask, 2, -1), axis=0).data
     
     @staticmethod
     def get_pattern_idxs_array(vecs, idx):
+        """Return an array filled with pattern index for each component."""
         return np.array([idx]*len(vecs), dtype=np.int32)
 
     def __call__(self, *args):
+        """Generate one synthetic sample and all requested outputs.
+
+        Returns:
+            List of tensors in the order declared by `outputs` passed to ctor.
+        """
 
         patterns_num = np.random.randint(*self.patterns_num_range)
         #print(patterns_num)
@@ -872,16 +1123,35 @@ class MultishapeMapGenerator:
 
 @tf.function
 def colors_random_shift(img, **kwargs):
+    """Randomly circular-shift image colors in [0, 1] range per sample."""
     img = (img + tf.random.uniform((3,), 0., 1.)) % 1
     return {'img': img, **kwargs}
 
 def get_mask_weights(x, batch_reg=False):
+    """Normalize mask to have mean 1 and optionally normalize over batch.
+
+    Args:
+        x: [B,H,W,1] mask.
+        batch_reg: if True, normalize total sum to number of pixels.
+    Returns:
+        Weights tensor with same shape as x.
+    """
     w = tf.math.divide_no_nan(x, tf.reduce_mean(flatten(x), axis=-1)[:, tf.newaxis, tf.newaxis, tf.newaxis])
     if batch_reg:
         w *= tf.math.divide_no_nan(tf.cast(tf.reduce_prod(tf.shape(w)), w.dtype), tf.reduce_sum(w))
     return w
 
 def get_shape_class_label(line_label, shape_label, return_all_shapes_mask=False, reversed_label=False):
+    """Build 3-channel class label: background, line, shape.
+
+    Args:
+        line_label: binary mask of lines.
+        shape_label: binary mask of shapes.
+        return_all_shapes_mask: optionally return union mask.
+        reversed_label: swap order of line/shape channels if True.
+    Returns:
+        class_label or (class_label, all_shapes_mask).
+    """
     i = -1 if reversed_label else 1
     shape_class = tf.concat([line_label, shape_label][::i], axis=-1)
     all_shapes_mask = tf.reduce_max(shape_class, axis=-1, keepdims=True)
@@ -895,6 +1165,7 @@ def get_shape_class_label(line_label, shape_label, return_all_shapes_mask=False,
 
 @tf.function
 def op_line_features(img, line_label, shape_label, angle_label, center_vec_label, thickness_label, **kwargs):
+    """Package inputs/labels/weights for line feature learning tasks."""
     #shape_class = tf.concat([line_label, shape_label], axis=-1)
     #all_shapes_mask = tf.reduce_max(shape_class, axis=-1, keepdims=True)
     #shape_class = tf.cast(tf.concat([1-all_shapes_mask, shape_class], axis=-1), tf.float32)
@@ -918,6 +1189,7 @@ def op_line_features(img, line_label, shape_label, angle_label, center_vec_label
 
 @tf.function
 def blur_img(blur_ratio_range, kernel_size, color_rand_range, img, **kwargs):
+    """Randomly blur and jitter colors for augmentation."""
     blur_ratio = tf.random.uniform((), *blur_ratio_range)
 
     img = tf.clip_by_value(img + tf.random.uniform(tf.shape(img), -color_rand_range, color_rand_range), 0., 1.)
@@ -927,24 +1199,34 @@ def blur_img(blur_ratio_range, kernel_size, color_rand_range, img, **kwargs):
 
 @tf.function
 def random_flip(**kwargs):
+    """Randomly flip tensors horizontally/vertically with 50% chance each."""
     dirs = tf.random.categorical(tf.math.log([[0.5, 0.5]]), 2)[0]*2-1
     a, b  = dirs[0], dirs[1]
     return dict([(k, v[:,::a, ::b]) for k,v in kwargs.items()])
 
 @tf.function
 def op_pixel_similarity(img, pattern_masks, **kwargs):
+    """Build per-pixel one-hot similarity label over patterns including background."""
     background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
     pattern_masks = tf.concat([background_mask, pattern_masks], axis=-4)
     return (img, {'Dot_Similarity': tf.cast(pattern_masks, tf.float32)})
 
 @tf.function
 def op_pixel_similarity_shapes(img, pattern_masks, shape_masks, **kwargs):
+    """Compute normalized per-pixel similarity over shapes (plus background)."""
     background_mask = 1 - tf.reduce_sum(pattern_masks, axis=-4, keepdims=True)
     label_masks = tf.concat([background_mask, shape_masks], axis=-4)
     label_masks /= tf.reduce_sum(label_masks, axis=-4, keepdims=True)
     return (img, {'Dot_Similarity': tf.cast(label_masks, tf.float32)})
 
 def components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n, k=1):
+    """Sample pixel locations from chosen component masks.
+
+    Returns:
+        sample_points: [B, n*k, 2] (y, x) integer points.
+        components_masks: gathered masks.
+        points_mask: [B, n*k] indicator of valid samples.
+    """
     components_masks = tf.concat([vecs_masks, bbox_masks], axis=1)
     components_masks = tf.gather(components_masks, choosen_components, axis=1, batch_dims=1)
     B = tf.shape(choosen_components)[0]
@@ -957,6 +1239,7 @@ def components_masks_sample_points(vecs_masks, bbox_masks, choosen_components, n
     return sample_points, components_masks, points_mask
 
 def vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, k=1):
+    """Select components, sample points, and assemble vector/bbox labels (split)."""
     components_mask = tf.cast(tf.concat([vecs_mask, bbox_mask], axis=-1), tf.float32)
     choosen_components = tf.math.top_k(components_mask-tf.random.uniform(tf.shape(components_mask), 0.0, 0.1), k=n).indices
 
@@ -992,6 +1275,7 @@ def vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, ve
     return choosen_components, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights
 
 def vec_sample_point_extraction_no_split(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, k=1):
+    """Like vec_sample_point_extraction but concatenates vec/bbox label dims."""
 
     vecs = tf.concat([vecs, vecs], axis=-2)
     bboxes = tf.concat([bboxes[...,0::2,:], bboxes[...,1::2,:]], axis=-2)
@@ -1025,6 +1309,7 @@ def vec_sample_point_extraction_no_split(vecs_mask, bbox_mask, vecs_masks, bbox_
 
 @tf.function
 def op_k_shape_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, k=1, shape_thickness=None, vec_label=True, add_thickness=False, add_probe_label=False, **kwargs):
+    """Dataset op: sample k points on n components and build labels/weights."""
     choosen_components, sample_points, vecs_label, class_label, vecs_weights, class_weights = \
         vec_sample_point_extraction_no_split(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, k=k)
     
@@ -1051,6 +1336,7 @@ def op_k_shape_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, ve
 
 @tf.function
 def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n, **kwargs):
+    """Dataset op: sample one point per component and split vec/bbox labels."""
     
     _, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights = \
         vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n)
@@ -1061,10 +1347,12 @@ def op_sample_points_vecs(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vec
             {'vecs': vecs_weights, 'class': class_weights})
 
 def get_indexed_vec_thickness_label(thickness, idxs):
+    """Gather thickness labels by sampled component indices (handles vec/bbox)."""
     return tf.expand_dims(tf.gather(tf.concat([thickness, thickness], axis=1), idxs, axis=1, batch_dims=1), axis=-1)
 
 @tf.function
 def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, shape_thickness, n, **kwargs):
+    """Dataset op: sample components and return vecs/class/thickness triplet."""
     
     choosen_components, sample_points, components_class_mask, mixed_label, class_label, vecs_weights, class_weights = \
         vec_sample_point_extraction(vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, n)
@@ -1078,6 +1366,7 @@ def op_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, 
 
 @tf.function
 def op_dict_free_pass(inputs, labels, weights):
+    """Identity op for pipelines expecting a mapping transformation."""
     return (inputs, labels, weights)
 
 '''def random_vec_angles(vecs, vecs_mask, angle_samples_num):
@@ -1104,6 +1393,7 @@ def op_dict_free_pass(inputs, labels, weights):
     return angle_input'''
 
 def random_vec_angles(vecs, vecs_mask, angle_samples_num, random_angle_weight=0.1):
+    """Sample diverse reference angles from existing vectors with fallback noise."""
     vecs_mask = tf.cast(vecs_mask, tf.float32)
     vec_angles = calc_2x2_vec_angle(vecs)
     #vec_angles = tf.where(vec_angles<0, vec_angles+math.pi, vec_angles)
@@ -1124,6 +1414,7 @@ def random_vec_angles(vecs, vecs_mask, angle_samples_num, random_angle_weight=0.
     return angle_input
 
 def vec_label_prep(vecs, bboxes):
+    """Prepare concatenated vec and bbox endpoints for downstream labels."""
     vecs = tf.concat([vecs, vecs], axis=-2)
     bboxes = tf.concat([bboxes[...,0::2,:], bboxes[...,1::2,:]], axis=-2)
 
@@ -1131,6 +1422,7 @@ def vec_label_prep(vecs, bboxes):
 
 
 def prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, n):
+    """Select up to n components and assemble labels/weights for training."""
 
     vecs, bboxes = vec_label_prep(vecs, bboxes)
 
@@ -1154,6 +1446,7 @@ def prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, n):
 
 @tf.function
 def op_rotated_enc(img, vecs, bboxes, vecs_mask, bbox_mask, angle_samples_num, max_components_num):
+    """Dataset op: angle sampling plus vector labels for encoder training."""
 
     angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num)
 
@@ -1193,6 +1486,10 @@ def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, angle_input):
     return vec_label'''
 
 def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, shape_label, angle_input, vec_rotation=True):
+    """Assemble per-pixel vector labels combining lines and a single bbox.
+
+    Optionally rotate the bbox around its center according to angle_input.
+    """
 
     vecs_masks_sums = tf.reduce_sum(vecs_masks, axis=1)
     vecs_masks_t = tf.transpose(vecs_masks[...,0], [0,2,3,1])
@@ -1228,6 +1525,7 @@ def vec_rotated_full_label(vecs, bboxes, vecs_masks, bbox_masks, line_label, sha
     return full_vec_label
 
 def vec_angle_filter(vecs, angle_input, vecs_mask, vecs_masks, line_label, radian_range):
+    """Filter vectors not matching sampled angles; return filtered masks/labels."""
     vec_angles = calc_2x2_vec_angle(vecs)
     angle_diff = tf.abs(vec_angles[...,tf.newaxis] - angle_input[...,tf.newaxis, :])
     filtered_vecs_mask = tf.cast(tf.reduce_min(angle_diff, axis=-1)<=radian_range, vecs_masks.dtype)*vecs_mask
@@ -1238,6 +1536,7 @@ def vec_angle_filter(vecs, angle_input, vecs_mask, vecs_masks, line_label, radia
 
 @tf.function
 def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_masks, bbox_masks, line_label, shape_label, thickness_label, angle_samples_num, random_angle_weight, rotated_bbox_label, angle_input_rand_range, splitted_conf=False):
+    """Dataset op: build rotated full vector labels with class/thickness targets."""
 
     angle_input = random_vec_angles(vecs, vecs_mask, angle_samples_num, random_angle_weight=random_angle_weight)
 
@@ -1279,6 +1578,7 @@ def op_rotated_enc_full_label(img, vecs, bboxes, vecs_mask, bbox_mask, vecs_mask
 
 @tf.function
 def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_masks, bbox_masks, vecs, bboxes, shape_thickness, max_components_num, **kwargs):
+    """Dataset op: sample all components and return vecs/class/thickness with points."""
     
     vecs_label, class_label, vecs_weights, class_weights, vecs_mask, choosen_components = prepare_shapes_label(vecs, bboxes, vecs_mask, bbox_mask, max_components_num)
 
@@ -1292,6 +1592,7 @@ def op_all_sample_points_vecs_with_thickness(img, vecs_mask, bbox_mask, vecs_mas
 
 @tf.function
 def op_freq_space_angle_mask(img, vecs, vecs_mask, size, threshold, binarise, **kwargs):
+    """Compute angle-consistency mask in frequency space for supervision."""
     vecs_angles = calc_2x2_vec_angle(vecs)
     angles_map = fft_angles(size)
 
@@ -1302,6 +1603,7 @@ def op_freq_space_angle_mask(img, vecs, vecs_mask, size, threshold, binarise, **
 
 @tf.function
 def op_image_autoencoder(img, size, center_shift_range):
+    """Return single-channel image and center points for autoencoder tasks."""
     B = tf.shape(img)[0]
     random_channel = tf.random.uniform((B,1), 0, 3, dtype=tf.int32)
     single_channel_img = tf.transpose(tf.gather(tf.transpose(img, [0,3,1,2]), random_channel, axis=1, batch_dims=1), [0,2,3,1])
@@ -1315,7 +1617,9 @@ def op_image_autoencoder(img, size, center_shift_range):
 
 
 class DatasetGenerator:
+    """Utility to generate, serialize, and load TF datasets for vector maps."""
     def __init__(self, map_generator, ds_path, fold_size, parallel_calls, padded_batch, output_filter, preprocess_funcs, set_shapes=False, **kwargs):
+        """Initialize dataset generator with pipeline and storage settings."""
 
         self.fmg = map_generator
 
@@ -1335,10 +1639,12 @@ class DatasetGenerator:
 
     @tf.function
     def _filter_outputs(self, inputs):
+        """Filter a mapping to include only requested outputs."""
         return dict([(elem, inputs[elem]) for elem in self.output_filter])
 
     @tf.function
     def _gen_images(self, *args):
+        """Generate a single sample by invoking the map generator via py_function."""
 
         inputs = tf.py_function(self.fmg, [], self.fmg.output_padded_shapes)
 
@@ -1346,6 +1652,7 @@ class DatasetGenerator:
     
     @tf.function
     def _set_shapes(self, *args):
+        """Attach static shapes to tensors to help graph building and tracing."""
         # shapes definition
         inputs = args
 
@@ -1355,10 +1662,12 @@ class DatasetGenerator:
         return inputs
     
     def _gen_feature_description(self):
+        """Schema mapping for TFRecord parsing (all fields are serialized tensors)."""
         return {name: tf.io.FixedLenFeature([], tf.string) for name in self.fmg.output_savenames}
     
     @staticmethod
     def create_path_if_needed(path):
+        """Create directory hierarchy if it does not exist."""
         folders = os.path.split(path)
         curr_path = ''
         for folder in folders:
@@ -1368,12 +1677,14 @@ class DatasetGenerator:
 
     @staticmethod
     def _bytes_feature(value):
+        """Wrap a tensor buffer as a TF Example Feature (bytes_list)."""
         """Returns a bytes_list from a string / byte."""
         if isinstance(value, type(tf.constant(0))):
             value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
         return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
     def serialize_example(self, names, inputs):
+        """Serialize named tensors into a single tf.train.Example."""
         feature = {name: self._bytes_feature(tf.io.serialize_tensor(x)) for name, x in zip(names, inputs)}
 
         example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
@@ -1381,6 +1692,7 @@ class DatasetGenerator:
     
     @staticmethod
     def _parse_function(example_proto, dtypes, feature_description):
+        """Parse and deserialize a single Example into typed tensors."""
         inputs = tf.io.parse_single_example(example_proto, feature_description).values()
 
         inputs = [tf.io.parse_tensor(x, x_type) for x, x_type in zip(inputs, dtypes)]
@@ -1388,6 +1700,7 @@ class DatasetGenerator:
         return inputs
     
     def save_tfrec_dataset(self, folds_num=1, starting_num=0):
+        """Generate and save multiple TFRecord files to ds_path."""
         self.create_path_if_needed(self.ds_path)
         names = self.fmg.output_savenames
         for fold in range(folds_num):
@@ -1396,12 +1709,13 @@ class DatasetGenerator:
             #self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
             print(f'\n\033[1msaving fold {fold+1}/{folds_num}\033[0m')
             pb = tf.keras.utils.Progbar(self.fold_size)
-            with tf.io.TFRecordWriter(f'{self.ds_path}/ds-{fold+starting_num}.tfrec') as writer:
+            with tf.io.TFRecordWriter(f'{self.ds_path}/ds-{self.ds_path.split(os.sep)[-1] if False else ''}{fold+starting_num}.tfrec') as writer:
                 for inputs in ds:
                     writer.write(self.serialize_example(names,inputs))
                     pb.add(1)
 
     def upload_dataset_to_storage(self, name):
+        """Upload all files from ds_path to a GCS bucket named project+name."""
         bucket_name = self.storage_client.project + name
         ds_files = [(os.path.join(self.ds_path, filename), filename) for filename in os.listdir(self.ds_path)]
 
@@ -1418,6 +1732,7 @@ class DatasetGenerator:
             pb.add(1)
 
     def download_dataset_from_storage(self, name):
+        """Download all blobs from a GCS bucket named project+name into ds_path."""
         self.create_path_if_needed(self.ds_path)
         bucket_name = self.storage_client.project + name
         bucket = self.storage_client.get_bucket(bucket_name)
@@ -1430,10 +1745,12 @@ class DatasetGenerator:
             pb.add(1)
 
     def delete_bucket(self, name):
+        """Delete the GCS bucket named project+name (force=True)."""
         bucket_name = self.storage_client.project + name
         self.storage_client.get_bucket(bucket_name).delete(force=True)
 
     def dataset_speed_test(self,test_iters, batch_size, ds_iter):
+        """Benchmark iteration speed over a dataset iterator."""
         print('\n\033[1mDataset generator speed test\033[0m')
         start_time = time.time()
         for _ in range(test_iters):
@@ -1444,22 +1761,27 @@ class DatasetGenerator:
 
     @staticmethod
     def delete_dataset(path):
+        """Remove dataset directory recursively using shell rm -r."""
         os.system(f'rm -r {path}')
 
     def get_ds_sizes(self):
+        """List TFRecord file sizes in ds_path in MB as strings."""
         return ['{}: {:.3f} MB'.format(filename, os.path.getsize(os.path.join(self.ds_path, filename))*1e-6) for filename in os.listdir(self.ds_path)]
 
     @tf.function
     def _tf_map_drawing(self, *args):
+        """TF graph wrapper to call numpy-based map generator."""
         return tf.numpy_function(self.fmg, [], self.fmg.output_dtypes)
 
     def _new_dataset(self, parallel_calls):
+        """Create a tf.data.Dataset that generates examples on the fly."""
         ds = tf.data.Dataset.range(self.fold_size)
         ds = ds.map(self._tf_map_drawing, num_parallel_calls=parallel_calls, deterministic=False)
 
         return ds
     
     def _load_dataset(self, val_idxs, validation):
+        """Load TFRecord dataset files either for training or validation split."""
         feature_description = self._gen_feature_description()
         ds_files = [os.path.join(self.ds_path, filename) for i, filename in enumerate(os.listdir(self.ds_path)) if (i in val_idxs if validation else i not in val_idxs)]
         ds = tf.data.TFRecordDataset(ds_files, num_parallel_reads=self.parallel_calls, buffer_size=int(50*1e6))
@@ -1469,9 +1791,22 @@ class DatasetGenerator:
         return ds, len(ds_files)*self.fold_size
     
     def _map_names(self, *args):
+        """Map list of tensors to a dict keyed by output names."""
         return dict(zip(self.fmg.outputs, args))
 
     def dataset(self, batch_size=0, repeat=True, from_saved=False, validation=False, val_idxs=[], shuffle_buffer_size=0):
+        """Build a batched tf.data pipeline with optional preprocessing.
+
+        Args:
+            batch_size: batch size or 0 for unbatched.
+            repeat: if True, repeat indefinitely.
+            from_saved: if True, read TFRecords instead of generating.
+            validation: if True, use validation split indices.
+            val_idxs: list of fold indices to use as validation.
+            shuffle_buffer_size: shuffle buffer for training set.
+        Returns:
+            (dataset, steps) where steps is number of batches per epoch.
+        """
         
         if not from_saved:
             ds = self._new_dataset(self.parallel_calls)
