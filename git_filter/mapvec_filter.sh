@@ -24,6 +24,17 @@ git filter-repo \
 --path maps_vectorization/Fourier/radial_enc_vec_detection.ipynb \
 --path maps_vectorization/Fourier/pixel_similarity_shapes_model.ipynb \
 --path maps_vectorization/Fourier/model_generators/ \
+# Experiment tracking library
+--path maps_vectorization/exp_lib/
+--path maps_vectorization/models_src/Trainer.py \
+--path maps_vectorization/models_src/Trainer_support.py \
+--path maps_vectorization/models_src/Support.py \
+# Frequency-Domain Recognition of Linear Structures in Heavy Noise
+--path maps_vectorization/Fourier/angle_shift.ipynb \
+--path maps_vectorization/Fourier/lin_freq_adj.ipynb \
+--path maps_vectorization/models_src/Hough.py \
+--path maps_vectorization/models_src/fft_lib.py \
+--path maps_vectorization/models_src/Attn_variations.py \
 # Minor experiments
 --path maps_vectorization/Vertex_detection/install_CRF.sh \
 --path maps_vectorization/Vertex_detection/CRF_imports.py \

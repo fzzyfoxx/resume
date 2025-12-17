@@ -3,6 +3,9 @@
 ### Table of Contents
 - [Sythetic Map Generator Framework](#sythetic-map-generator-framework-link)
 - [Simple Patterns Generator](#simple-patterns-generator-link)
+- [Relative Radial Positional Encoding](#relative-radial-positional-encoding-link)
+- [Experiment Tracking Library](#experiment-tracking-library-link)
+- [Frequency-Domain Recognition of Linear Structures in Heavy Noise](#frequency-domain-recognition-of-linear-structures-in-heavy-noise)
 - [Architectures](#architectures-link)
     - [DETR](#detr-link)
     - [Mask R-CNN](#mask-r-cnn-link)
@@ -10,7 +13,6 @@
     - [SegNet](#segnet-link)
     - [K-Means](#k-means-link)
     - [Residual Conv Block](#residual-conv-block-link)
-- [Relative Radial Positional Encoding](#relative-radial-positional-encoding-link)
 - [Minor experiments](#minor-experiments)
     - [RPN Anchor Optimization](#rpn-anchor-optimization-link)
     - [U-Net edge detection with CRF](#u-net-edge-detection-with-crf-link)
@@ -89,6 +91,141 @@ TensorFlow | NumPy | OpenCV | google.cloud | math
 - Angle- and frequency-aware targets: dedicated utilities support rotated encoders, angle-conditioned labels and frequency-space angle masks, enabling experiments on rotation robustness and spectral consistency of learned features.
 - Point-based vector supervision: several dataset ops sample points on components and attach local vector, class and thickness labels, which is useful for probe-based models and sparse supervision schemes.
 - Tight tf.data integration: the whole pipeline (on-the-fly or TFRecord-based) is expressed as standard dataset transformations, making it easy to plug into custom training loops, add new preprocessing stages or branch dataflows for different model families.
+
+<br><br>
+
+## Relative Radial Positional Encoding [link](RRPE.md)
+
+Relative Radial Positional Encoding (RRPE) is a family of geometry-aware positional encodings and attention-based models designed for dense, line‑dominated map vectorization. Instead of describing where a pixel is in the image (absolute x/y), RRPE describes where a pixel is relative to a reference point in polar coordinates (angle and normalized distance). This makes the inductive bias of the model match the geometry of cartographic data: long strokes, rings, junctions and star‑like structures.
+
+The RRPE work in this repository is not a single layer, but a set of related experiments and architectures documented in detail in **RRPE.md** and the linked notebooks. Together, they show that adding a query‑centric radial prior on top of standard CNN/Transformer backbones consistently improves:
+
+- pixel‑wise feature estimation (class, angle, thickness, center‑vector),
+- pixel‑to‑pixel similarity and shape masks,
+- sample‑centric vector detection (segment endpoints, class, optional thickness),
+
+while keeping the runtime overhead moderate.
+
+### Motivation and idea
+
+Cartographic scenes tend to be dominated by thin, elongated and often intersecting structures. For such data, what matters for a decision at a pixel is usually the **relative** geometry to a few reference points ("along this road", "around this junction"), not the absolute (x, y) in the image. Standard sinusoidal encodings over image coordinates ignore this: they are tied to the image frame, not to the object.
+
+RRPE changes the frame of reference. Given a query point (a pixel or a sample), every other pixel is represented by:
+
+- angle: orientation of the ray from the query to that pixel,
+- radius: normalized distance along that ray.
+
+This representation is then encoded either by smooth sector/ring channels or by compact multi‑frequency sin/cos features. Attention uses these encodings as a learned, query‑conditional bias, so it naturally prefers pixels that lie on the same stroke, ring or ray as the query and can suppress distracting parallel structures.
+
+### Families of models using RRPE
+
+The RRPE encodings are exercised in three main model families, all built on synthetic pattern datasets from this repository:
+
+1. **Radial‑encoded pixel features model**  
+   A U‑Net–style backbone is augmented with radial attention and trained to predict, per pixel, shape class (line / shape / background), local angle, thickness and a center‑vector pointing to the shape center or line axis. This model is used as a general geometric feature extractor for other experiments. With RRPE, all feature heads see lower validation losses than the plain U‑Net baseline, showing that query‑centric geometry helps recover local orientation and center information in cluttered scenes.
+
+2. **RRPE‑based pixel similarity models**  
+   These models output dense pixel‑to‑pixel similarity matrices where each row (for a chosen pixel) acts as a soft mask of “pixels belonging to the same object or stroke”. Combined with a relational similarity loss, RRPE makes these masks substantially cleaner: similarity stays high along the true object even through gaps or weak contrast, and falls off on nearby but distinct lines. This is particularly important for downstream attention‑based architectures that rely on good similarity patterns from the first iteration.
+
+3. **RRPE vector detection models**  
+   In a sample‑centric setting, the model receives an image and a set of sample points and predicts, for each sample, one or more vectors (segment endpoints) with class and optional thickness. Here RRPE is centered on each sample: attention looks outwards along rays and rings around the sample and gathers evidence for likely continuations of the underlying stroke. Experiments on synthetic line maps show that RRPE improves endpoint localization and stability in the presence of clutter, crossings and breaks compared to Cartesian encodings or purely convolutional baselines.
+
+Across these families the concrete architectures differ (backbones, number of attention stages, use of backbone features vs colors‑only), but the role of RRPE is the same: provide a strong, query‑relative geometric prior that guides where attention should look.
+
+Overall, RRPE confirms that rephrasing positional information in a query‑centric radial frame is an effective way to inject geometric knowledge into attention mechanisms for map vectorization. The code and experiments in **RRPE.md** can serve both as a reference implementation of relative radial encodings and as a set of end‑to‑end examples for integrating them into feature extractors, similarity models and vector detectors.
+
+<img src="resources/pixel_features_rot.png" alt="pixel features" width="900"/>
+<img src="resources/radial_encoding.png" alt="relative radial encoding" width="900"/>
+
+<br><br>
+
+## Experiment Tracking Library [link](./exp_lib)
+
+A configuration‑driven MLOps layer built around TensorFlow/Keras and MLflow that turns the synthetic map generators and models in this repo into reproducible, scriptable experiments. Instead of hard‑coding data pipelines, architectures and training loops inside notebooks, `exp_lib` externalizes them into JSON configs and small Python modules, so notebooks become thin drivers for well‑defined pipelines.
+
+In a typical workflow you pick a **general config** and an **MSMG config** to describe how synthetic maps should look, then choose a **model definition JSON** that points to a generator function and a compiler module. A dataset generator script turns the configs into `tf.data` pipelines, while a trainer loader script builds a `TrainingProcessor2` instance that knows how to compile, fit and log the model. The notebook only sequences these steps: config → dataset → trainer + model → training + MLflow → metrics and plots.
+
+Where this becomes particularly effective is with complex, multi‑output, geometry‑aware models. Compiler modules in `exp_lib` assemble optimizers and structured losses for tasks like joint prediction of shape class, angle, thickness and center‑vectors, and attach per‑head metrics that understand angles, vector lengths and distances. The same high‑level pattern works across different architectures (U‑Net, RRPE models, similarity heads, vector detectors) because the trainer treats them as black‑box generators described purely by config.
+
+The dataset layer reuses `MultishapeMapGenerator` and `DatasetGenerator` to produce dense synthetic supervision — TFRecord‑backed or on‑the‑fly — with configurable preprocessing and GCS support. A single configuration can feed several models and experiments, and the output‑filtering and preprocessing hooks make it straightforward to expose only the tensors a particular head needs without rewriting the pipeline.
+
+MLflow integration is wired through the trainer and utility scripts: each run records not only metrics and weights, but also the full model definition and compiler arguments. Helper functions download these artifacts, reconstruct models, and cache them locally so trained networks can be treated as backbones and plugged into new pipelines via a simple loader call. Metric‑validation and plotting scripts live next to the library and reuse the same datasets and trainers, which keeps evaluation and visualization reproducible and easy to repeat when configs change.
+
+For day‑to‑day work, `dict_widget` provides an interactive way to adjust JSON‑defined hyperparameters from a notebook before compiling, while the final accepted configuration is pushed back to MLflow. Combined with optional `KerasTuner` integration in `Trainer`/`BuildHyperModel`, this makes `exp_lib` suitable both for fast iteration on research ideas and for running larger, systematically tracked deep learning campaigns on the synthetic map tasks in this repository.
+
+<img src="resources/exp_lib_layout.png" alt="experiment tracking library layout" width="900"/>
+
+<br><br>
+
+## Frequency Domain Recognition of Linear Structures in Heavy Noise
+This section presents methods for detecting and segmenting linear patterns in images with significant noise, using frequency-domain techniques. The focus is on two main approaches: angle-shifted straightening combined with a Transformer-based mask predictor, and frequency proposal generation with scoring.
+
+### angle_shift — Rotation/Straightening and Mask Prediction [link](./Fourier/angle_shift.ipynb)
+
+original img | label | prediction | binarized prediction
+
+<img src="./resources/rotated_lines_masks.png" alt="rotated lines mask prediction" width="900"/>
+
+#### Objective and Setup
+Goal: detect and segment repetitive linear patterns under heavy noise by first canonicalizing orientation and then learning a mask predictor.
+- Synthetic images with controlled line directions, spacing (frequency), and phases enable full supervision and stress testing.
+- Small resolutions (32×32 or 64×64) emphasize efficiency and aliasing robustness.
+- TensorFlow/Keras drive modeling; custom Fourier tools render lines and provide frequency context.
+
+#### Angle-Shifted Straightening (Canonicalization)
+Make lines “look horizontal” before learning to reduce rotational variance:
+- Coarse 90° rotations (rot90_preprocessing) bring dominant angles near horizontal.
+- Fourier-domain straightening uses a complex phase matrix D that compensates residual slope; I' = IFFT(FFT(I)·D) avoids resampling artifacts.
+- Randomized slope jitter and mask smoothing stabilize labels under noise.
+Effect: diverse orientations collapse into a canonical frame, focusing the model on periodicity and contrast.
+
+#### Dataset: VecRotDataset
+Generates straightened training examples:
+- Renders RGB images and binary masks from Fourier line parameters, then applies rotation + straightening.
+- Emits ((I_str, F_str), M): straightened RGB, aligned cosine frequency map, and smoothed mask.
+- Batches are “squeezed” so each transformed instance is an independent sample.
+
+#### Sequence-Style Attention Model for Mask Prediction
+Treat straightened images as 1D sequences along the aligned axis:
+- Permute/reshape, add positional encodings, and fuse a learned embedding of the frequency channel.
+- Stacked Transformer-like EncoderLayers (MHA + FFN) capture long-range periodic dependencies.
+- Trained with Binary Focal Cross-Entropy; metrics include Weighted F1. Robust segmentation is achieved even under heavy noise.
+
+#### Findings (angle_shift)
+- Canonicalization is decisive: rot90 + Fourier straightening simplifies learning and speeds convergence.
+- Frequency context helps: an aligned cosine channel stabilizes masks in the presence of severe noise/color jitter.
+- Top spectral peaks plus small shift search (explored qualitatively here) align well with true spacing/orientation in the straightened space.
+
+
+### lin_freq_adj — Frequency Proposals and Scoring [link](./Fourier/lin_freq_adj.ipynb)
+
+original img | frequency base | loss_label-confidence-F1 | binarized prediction | label
+
+<img src="./resources/lin_freq_adj.png" alt="frequency based lines detection" width="900"/>
+
+#### Frequency Proposals from 2D Spectra
+Connect masks with explanatory frequencies:
+- TopKFreqs computes the 2D FFT, normalizes amplitudes, suppresses DC/low bins and the lower half-plane, then selects energetic coordinates. Dominant phase is recovered and used to synthesize cosine maps (I_uvx).
+- GaussianMixtureComponents optionally clusters intensities; extracting TopKFreqs per cluster reduces interference from crossings or mixed textures.
+
+#### Local Shift Optimization in Frequency Space
+Refine peak coordinates:
+- FreqShiftOptimization searches a small grid around (u, v) and scores synthesized maps against cluster masks using F1/IoU.
+- Returns refined (u, v, phase) and corresponding vector proposals rendered back in the image. This corrects quantization, finite-size, and noise-induced offsets.
+
+#### Dataset for Proposal Quality and Scoring Model
+Build supervision for proposal usefulness:
+- Labels derive from a decomposed FreqLoss blending frequency magnitude error, orientation (angle) error, and phase alignment into a single [0,1] score.
+- VecDataset samples proposals (often from TopKFreqs), renders cosine maps, and stores TFRecords for scalable training.
+- A probability model freezes a line-detection backbone, extracts multi-level encoder features, and applies cross-attention with frequency patches and positional encodings to predict proposal quality (MAE-trained; F1-style decision metrics reported).
+
+#### Findings (lin_freq_adj)
+- Top-k peaks are a strong baseline; local shift search significantly tightens alignment to observed patterns.
+- Learned scoring outperforms raw spectral energy by conditioning on real image evidence via detection features.
+- Cluster-wise extraction decomposes complex scenes, improving precision under crossings/heterogeneity.
+
+original img | label and base frequency | prediction | binarized prediction | confidence-accuracy
+<img src="./resources/freq_based_line_mask.png" alt="frequency based lines detection" width="900"/>
 
 <br><br>
 
@@ -222,51 +359,6 @@ Key components and responsibilities:
 
 <br><br>
 
-## Relative Radial Positional Encoding [link](RRPE.md)
-
-Relative Radial Positional Encoding (RRPE) is a family of geometry-aware positional encodings and attention-based models designed for dense, line‑dominated map vectorization. Instead of describing where a pixel is in the image (absolute x/y), RRPE describes where a pixel is relative to a reference point in polar coordinates (angle and normalized distance). This makes the inductive bias of the model match the geometry of cartographic data: long strokes, rings, junctions and star‑like structures.
-
-The RRPE work in this repository is not a single layer, but a set of related experiments and architectures documented in detail in **RRPE.md** and the linked notebooks. Together, they show that adding a query‑centric radial prior on top of standard CNN/Transformer backbones consistently improves:
-
-- pixel‑wise feature estimation (class, angle, thickness, center‑vector),
-- pixel‑to‑pixel similarity and shape masks,
-- sample‑centric vector detection (segment endpoints, class, optional thickness),
-
-while keeping the runtime overhead moderate.
-
-### Motivation and idea
-
-Cartographic scenes tend to be dominated by thin, elongated and often intersecting structures. For such data, what matters for a decision at a pixel is usually the **relative** geometry to a few reference points ("along this road", "around this junction"), not the absolute (x, y) in the image. Standard sinusoidal encodings over image coordinates ignore this: they are tied to the image frame, not to the object.
-
-RRPE changes the frame of reference. Given a query point (a pixel or a sample), every other pixel is represented by:
-
-- angle: orientation of the ray from the query to that pixel,
-- radius: normalized distance along that ray.
-
-This representation is then encoded either by smooth sector/ring channels or by compact multi‑frequency sin/cos features. Attention uses these encodings as a learned, query‑conditional bias, so it naturally prefers pixels that lie on the same stroke, ring or ray as the query and can suppress distracting parallel structures.
-
-### Families of models using RRPE
-
-The RRPE encodings are exercised in three main model families, all built on synthetic pattern datasets from this repository:
-
-1. **Radial‑encoded pixel features model**  
-   A U‑Net–style backbone is augmented with radial attention and trained to predict, per pixel, shape class (line / shape / background), local angle, thickness and a center‑vector pointing to the shape center or line axis. This model is used as a general geometric feature extractor for other experiments. With RRPE, all feature heads see lower validation losses than the plain U‑Net baseline, showing that query‑centric geometry helps recover local orientation and center information in cluttered scenes.
-
-2. **RRPE‑based pixel similarity models**  
-   These models output dense pixel‑to‑pixel similarity matrices where each row (for a chosen pixel) acts as a soft mask of “pixels belonging to the same object or stroke”. Combined with a relational similarity loss, RRPE makes these masks substantially cleaner: similarity stays high along the true object even through gaps or weak contrast, and falls off on nearby but distinct lines. This is particularly important for downstream attention‑based architectures that rely on good similarity patterns from the first iteration.
-
-3. **RRPE vector detection models**  
-   In a sample‑centric setting, the model receives an image and a set of sample points and predicts, for each sample, one or more vectors (segment endpoints) with class and optional thickness. Here RRPE is centered on each sample: attention looks outwards along rays and rings around the sample and gathers evidence for likely continuations of the underlying stroke. Experiments on synthetic line maps show that RRPE improves endpoint localization and stability in the presence of clutter, crossings and breaks compared to Cartesian encodings or purely convolutional baselines.
-
-Across these families the concrete architectures differ (backbones, number of attention stages, use of backbone features vs colors‑only), but the role of RRPE is the same: provide a strong, query‑relative geometric prior that guides where attention should look.
-
-Overall, RRPE confirms that rephrasing positional information in a query‑centric radial frame is an effective way to inject geometric knowledge into attention mechanisms for map vectorization. The code and experiments in **RRPE.md** can serve both as a reference implementation of relative radial encodings and as a set of end‑to‑end examples for integrating them into feature extractors, similarity models and vector detectors.
-
-<img src="resources/pixel_features_rot.png" alt="pixel features" width="900"/>
-<img src="resources/radial_encoding.png" alt="relative radial encoding" width="900"/>
-
-<br><br>
-
 ## Minor experiments
 
 ### RPN Anchor Optimization [link](./RPN_optimization.ipynb)
@@ -304,6 +396,13 @@ Implementation of U-Net for edge detection on synthetic maps, enhanced with Cond
 The experiment proofed that edges masks won't be very useful for vertex detection task on images with high concentration of edges.
 Linked notebook however shows usage of remote `MLFlow` usage through `DataBricks` platform and integration of `CRF` as a post-processing step for edge refinement.
 
+original image | label | prediction | binarized prediction
 <br><img src="resources/edge_detection.png" alt="inference example" height="150"/>
+
+There is also another implementaion of the same approach but with completely different outcome induced by minor changes in dataset and model hyper-parameters.
+In this [example](./Pattern_matching/edges_detection.ipynb) edges estimations are less blurry and striped patterns are recognized. However, some eges are missing.
+
+original image | label | binarized prediction | prediction
+<br><img src="resources/edge_detection2.png" alt="inference example" height="300"/>
 
 <br><br>

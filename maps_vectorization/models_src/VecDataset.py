@@ -1709,7 +1709,7 @@ class DatasetGenerator:
             #self.ds = self.ds.map(tf_serialize_example, self.cfg.num_parallel_calls)
             print(f'\n\033[1msaving fold {fold+1}/{folds_num}\033[0m')
             pb = tf.keras.utils.Progbar(self.fold_size)
-            with tf.io.TFRecordWriter(f'{self.ds_path}/ds-{self.ds_path.split(os.sep)[-1] if False else ''}{fold+starting_num}.tfrec') as writer:
+            with tf.io.TFRecordWriter(f"{self.ds_path}/ds-{self.ds_path.split(os.sep)[-1] if False else ''}{fold+starting_num}.tfrec") as writer:
                 for inputs in ds:
                     writer.write(self.serialize_example(names,inputs))
                     pb.add(1)
