@@ -1,4 +1,5 @@
 git filter-repo \
+--path git_filter/mapvec_filter.sh \
 # Synthetic map generator
 --path maps_vectorization/src/legend.py \
 --path maps_vectorization/src/map_drawing.py \
