@@ -1,23 +1,47 @@
 # Map Vectorization
 
-### Table of Contents
-- [Sythetic Map Generator Framework](#sythetic-map-generator-framework-link)
-- [Simple Patterns Generator](#simple-patterns-generator-link)
-- [Relative Radial Positional Encoding](#relative-radial-positional-encoding-link)
-- [Experiment Tracking Library](#experiment-tracking-library-link)
-- [Frequency-Domain Recognition of Linear Structures in Heavy Noise](#frequency-domain-recognition-of-linear-structures-in-heavy-noise)
-- [Architectures](#architectures-link)
-    - [DETR](#detr-link)
-    - [Mask R-CNN](#mask-r-cnn-link)
-    - [U-Net](#u-net-link)
-    - [SegNet](#segnet-link)
-    - [K-Means](#k-means-link)
-    - [Residual Conv Block](#residual-conv-block-link)
-- [Minor experiments](#minor-experiments)
-    - [RPN Anchor Optimization](#rpn-anchor-optimization-link)
-    - [U-Net edge detection with CRF](#u-net-edge-detection-with-crf-link)
+This repository documents the development of a novel deep learning method for symbolic map vectorization. It is an individual, ongoing project; only a subset of the conducted experiments is currently available here. The primary focus is on customized positional encodings—radial and rotated variants—in place of standard Cartesian encodings.
 
-## Sythetic Map Generator Framework [link](./src)
+**technological stack**:<br>
+TensorFlow | Keras | NumPy | OpenCV | SciPy | google.cloud | MLflow | KerasTuner | SpaCy | SymPy | math
+
+### Table of Contents
+- [Synthetic Map Generator Framework](#synthetic-map-generator-framework-link)
+End-to-end synthetic cartography pipeline producing maps, legends, and rich supervision (masks, vectors, angles, boxes) for training and evaluation.
+- [Simple Patterns Generator](#simple-patterns-generator-link)
+Compact dataset builder for dense, noisy scenes; emits small canvases with lines/shapes and multi-task labels for rapid prototyping.
+- [Relative Radial Positional Encoding](#relative-radial-positional-encoding-link)
+Docs and code for radial/rotated positional encodings; includes models and ablations comparing to Cartesian encodings.
+- [Experiment Tracking Library](#experiment-tracking-library-link)
+Config-driven pipelines (data, model, training) with MLflow logging, enabling reproducible experiments and easy reruns.
+- [Frequency-Domain Recognition of Linear Structures in Heavy Noise](#frequency-domain-recognition-of-linear-structures-in-heavy-noise)
+Fourier-based notebooks demonstrating orientation canonicalization and frequency proposals for line masks under severe noise.
+- [Architectures](#architectures)
+Implementations of core backbones and heads used across experiments; modular Keras layers for composable research.
+    - [DETR](#detr-link)
+    DETR-style transformer with learnable queries, positional encodings, detection/mask heads, and training utilities.
+    - [Mask R-CNN](#mask-r-cnn-link)
+    Backbone+FPN, RPN, ROI heads; configurable losses and NMS for detection and instance masks.
+    - [U-Net](#u-net-link)
+    Configurable encoder–decoder for segmentation baselines and feature extraction.
+    - [SegNet](#segnet-link)
+    Argmax pooling/unpooling SegNet variant preserving spatial detail during decoding.
+    - [K-Means](#k-means-link)
+    Clustering tools for pixel grouping, mask aggregation, and centroid extraction.
+    - [Residual Conv Block](#residual-conv-block-link)
+    Lightweight residual backbones and memory-style variants for compact encoders.
+- [Losses and Metrics](#losses-and-metrics-link)
+Implementations of specialized metrics and loss functions for detection, segmentation, and matching tasks.
+- [Other experiments](#other-experiments)
+Additional studies and utilities that complement the main methods.
+    - [RPN Anchor Optimization](#rpn-anchor-optimization-link)
+    Model-free anchor prior scoring and Bayesian search, with diagnostics and in-loop validation.
+    - [U-Net edge detection with CRF](#u-net-edge-detection-with-crf-link)
+    Edge detection baseline with CRF post-processing and an example of remote MLflow usage.
+    - [Oriented Non-Maximum Suppression](#oriented-nms-link)
+    Batched NMS for rotated boxes/segments using polygonal and Gaussian IoU backends.
+
+## Synthetic Map Generator Framework [link](./src)
 A Synthetic Map Generator Framework designed to create diverse training datasets for deep learning models focused on vectorization tasks. It provides a customizable pipeline to generate maps, legends, and metadata for tasks like shape detection, edge detection, and pattern classification.
 
 **technological stack**:<br>
@@ -45,6 +69,7 @@ NumPy | math | shapely | Pillow | tensorflow | OpenCV | Spacy | pyproj | SciPy |
 <br><br>
 
 ## Simple Patterns Generator [link](./models_src/VecDataset.py)
+Compact dataset builder for dense, noisy scenes; emits small canvases with lines/shapes and multi-task labels for rapid prototyping.
 
 A compact but expressive synthetic patterns generator built around `MultishapeMapGenerator` and `DatasetGenerator`. It is a simplified, self-contained variant of the full Synthetic Map Generator Framework, designed specifically for controlled experiments on pattern recognition in highly dense and noisy environments.
 
@@ -95,6 +120,7 @@ TensorFlow | NumPy | OpenCV | google.cloud | math
 <br><br>
 
 ## Relative Radial Positional Encoding [link](RRPE.md)
+Docs and code for radial/rotated positional encodings; includes models and ablations comparing to Cartesian encodings.
 
 Relative Radial Positional Encoding (RRPE) is a family of geometry-aware positional encodings and attention-based models designed for dense, line‑dominated map vectorization. Instead of describing where a pixel is in the image (absolute x/y), RRPE describes where a pixel is relative to a reference point in polar coordinates (angle and normalized distance). This makes the inductive bias of the model match the geometry of cartographic data: long strokes, rings, junctions and star‑like structures.
 
@@ -140,6 +166,7 @@ Overall, RRPE confirms that rephrasing positional information in a query‑centr
 <br><br>
 
 ## Experiment Tracking Library [link](./exp_lib)
+Config-driven pipelines (data, model, training) with MLflow logging, enabling reproducible experiments and easy reruns.
 
 A configuration‑driven MLOps layer built around TensorFlow/Keras and MLflow that turns the synthetic map generators and models in this repo into reproducible, scriptable experiments. Instead of hard‑coding data pipelines, architectures and training loops inside notebooks, `exp_lib` externalizes them into JSON configs and small Python modules, so notebooks become thin drivers for well‑defined pipelines.
 
@@ -158,6 +185,8 @@ For day‑to‑day work, `dict_widget` provides an interactive way to adjust JSO
 <br><br>
 
 ## Frequency Domain Recognition of Linear Structures in Heavy Noise
+Fourier-based notebooks demonstrating orientation canonicalization and frequency proposals for line masks under severe noise.
+
 This section presents methods for detecting and segmenting linear patterns in images with significant noise, using frequency-domain techniques. The focus is on two main approaches: angle-shifted straightening combined with a Transformer-based mask predictor, and frequency proposal generation with scoring.
 
 ### angle_shift — Rotation/Straightening and Mask Prediction [link](./Fourier/angle_shift.ipynb)
@@ -230,8 +259,11 @@ original img | label and base frequency | prediction | binarized prediction | co
 <br><br>
 
 ## Architectures
+Implementations of core backbones and heads used across experiments; modular Keras layers for composable research.
 
 ### DETR [link](./models_src/DETR.py)
+DETR-style transformer with learnable queries, positional encodings, detection/mask heads, and training utilities.
+
 Implementation of a DETR-style (DEtection TRansformer) architecture focused on shape detection and optional mask outputs. The implementation is modular and written as Keras layers to allow flexible assembly and inspection for research and custom training.
 
 Key components:
@@ -265,6 +297,7 @@ Training and metrics integration:
 ---
 
 ### Mask R-CNN [link](./models_src/Mask_RCNN.py)
+Backbone+FPN, RPN, ROI heads; configurable losses and NMS for detection and instance masks.
 
 A concise reference for the Mask R-CNN implementation located at models_src/Mask_RCNN.py. The module provides a complete detection pipeline built from modular components suitable for research and custom training loops on synthetic map data.
 
@@ -292,6 +325,7 @@ Key classes and responsibilities:
 ---
 
 ### U-Net [link](./models_src/UNet_model.py)
+Configurable encoder–decoder for segmentation baselines and feature extraction.
 
 Implementation of a configurable U-Net model located at models_src/UNet_model.py. The module provides a Keras-friendly, easy-to-customize segmentation backbone used for edge detection and mask prediction tasks on synthetic maps.
 
@@ -311,6 +345,7 @@ Key components and responsibilities:
 ---
 
 ### SegNet [link](./models_src/SegNet_model.py)
+Argmax pooling/unpooling SegNet variant preserving spatial detail during decoding.
 
 Implementation of a SegNet-style encoder-decoder located at models_src/SegNet_model.py. The module provides a Keras-friendly SegNet variant using argmax-based pooling and unpooling to preserve precise spatial locations during decoding for segmentation tasks on synthetic maps.
 
@@ -333,6 +368,7 @@ Behavior and training notes:
 ---
 
 ### K-Means [link](./models_src/Kmeans.py)
+Clustering tools for pixel grouping, mask aggregation, and centroid extraction.
 
 Implementation of a lightweight K-Means based clustering utility with TensorFlow integration. The module provides tools to cluster image pixels using `sklearn's` `KMeans` and to post-process clusters with TensorFlow ops for smoothing and merging, producing binary masks, centroids and aggregated cluster collections useful for vectorization tasks.
 
@@ -347,6 +383,7 @@ Key components and responsibilities:
 ---
 
 ### Residual Conv Block [link](./models_src/backbones.py)
+Lightweight residual backbones and memory-style variants for compact encoders.
 
 Implementation of a lightweight residual convolutional block and small backbone utilities located at models_src/backbones.py. The module provides flexible building blocks for convolutional encoders and a patch-level memorizing backbone used across detection and segmentation pipelines.
 
@@ -359,9 +396,63 @@ Key components and responsibilities:
 
 <br><br>
 
-## Minor experiments
+## Losses and Metrics [link](./models_src/Metrics.py)
+Custom Keras-compatible losses, metrics, and Hungarian-matching utilities used across experiments.
+
+- **AdaptiveWeightsLoss** (tf.keras.Loss)
+  - Purpose: wrap a base loss and adapt sample_weight on-the-fly so harder samples get higher weight while preserving the original weighting structure.
+  - Key args: loss_func, reg (loss normalization sharpness), adapt_ratio (blend between original/adapted weights), norm_clip (clip on normalized losses), reduction.
+  - Behavior: computes per-sample normalized losses (mean/std), applies a softmax-like reweighting, blends with the provided sample_weight (gradients stopped through weights), then delegates to the base Loss. If no sample_weight is given, acts like the base loss.
+
+- **LossBasedMetric** (tf.keras.metrics.Mean)
+  - Purpose: report the mean value of an arbitrary Loss as a scalar metric.
+  - Behavior: forces reduction=NONE on the wrapped loss, computes per-element values (optionally with sample_weight), and averages over the batch/elements.
+
+- **F12D** (tf.keras.metrics.Metric)
+  - Purpose: F1-score for 2D outputs with micro averaging.
+  - Key args: threshold.
+  - Behavior: flattens spatial dims, accumulates tf.keras.metrics.F1Score(threshold, average='micro') per update, returns the running mean.
+
+- **WeightedF12D** (tf.keras.metrics.Metric)
+  - Purpose: F1 computed from Precision and Recall at a fixed threshold (stable when direct F1 is noisy).
+  - Key args: threshold.
+  - Behavior: updates Precision/Recall (supports sample_weight), computes 2PR/(P+R), and averages across updates.
+
+- **MultiLevelFocalCrossentropy** (tf.keras.losses.Loss)
+  - Purpose: binary focal cross-entropy evaluated at multiple pooled resolutions to encourage scale robustness.
+  - Key args: pooling_levels (extra max-pool stages), alpha, gamma, reduction.
+  - Behavior: computes BCE-focal on the original map and after successive 3x3/stride-2 max-pools; returns the average across levels.
+
+- **IoUMetric** (tf.keras.metrics.Metric)
+  - Purpose: mean IoU for axis-aligned bounding boxes.
+  - Inputs: y_true/y_pred with last dim [y1, x1, y2, x2]; broadcasting over leading dims; supports sample_weight.
+
+- **HungarianMatching** (utility)
+  - Purpose: build a pairwise cost matrix between proposals and targets using a loss (default BinaryCrossentropy) and solve the optimal assignment with the Hungarian algorithm.
+  - Key args: matching_loss_func, pool_size (optional AveragePooling2D), perm (tensor layout before cost).
+  - Outputs: per-batch indices (pred_idx, true_idx) describing the assignment. Uses numpy’s linear_sum_assignment via tf.numpy_function.
+
+- **HungarianLoss** (tf.keras.losses.Loss)
+  - Purpose: reorder predictions/targets by Hungarian assignment, then compute a base loss on matched pairs.
+  - Inputs: y_true/y_pred tensors aligned with the matcher; returns base loss after matching.
+
+- **HungarianClassificationMetric** (tf.keras.metrics.Metric)
+  - Purpose: evaluate a user-provided metric on matched pairs after Hungarian assignment (useful for classification heads over proposals/slots).
+  - Inputs: y_true/y_pred typically shaped [B, H, W, T] (or broadcastable equivalents); flattens matched tensors and accumulates metric_func outputs.
+
+- **MultivariantHungarianLoss** (composite matching + loss aggregator)
+  - Purpose: single pass Hungarian matching using a joint cost from multiple components (classification, bbox, mask), then aggregate per-component losses on matched pairs.
+  - Components: classification (BinaryCrossentropy, optional label smoothing and class-agnostic mode), bbox (IoU + coordinate regression Ln with rank), mask (BinaryFocalCrossentropy with alpha/gamma and optional pooling).
+  - Key args: classification/bbox/mask flags; losses_weights (normalized internally); output_proposals; output_mask_size; iou_weight; bbox_regularization_rank; mask_alpha/mask_gamma; mask_pool_size; mask_class_pred (mask bbox/mask terms by object presence); class_smoothing/mask_smoothing; unit_class_matrix; return_matching.
+  - Behavior: builds per-component cost matrices (with optional pooling/permutation), sums them into a joint matrix, runs Hungarian matching, masks non-object slots if configured, and aggregates normalized component losses. If return_matching=True, also returns dictionaries of matched y_true/y_pred tensors for each enabled component.
+
+<br><br>
+
+## Other experiments
+Additional studies and utilities that complement the main methods.
 
 ### RPN Anchor Optimization [link](./RPN_optimization.ipynb)
+Model-free anchor prior scoring and Bayesian search, with diagnostics and in-loop validation.
 
 This notebook implements a complete optimization pipeline for designing and validating anchor priors used by a Region Proposal Network (RPN) for parcel detection on synthetic maps. It emphasizes model-free anchor scoring, Bayesian hyperparameter search, diagnostic evaluation across object sizes, and validation inside an end-to-end RPN training loop.
 
@@ -390,8 +481,11 @@ Practical takeaways:
 - Use per-size diagnostics to spot underserved size ranges and either retune anchors or reshape the synthetic input distribution.
 - Validate final anchors inside an end-to-end RPN training run to ensure theoretical improvements translate to empirical gains.
 
+---
 
 ### U-Net edge detection with CRF [link](./Vertex_detection/stages_flow.ipynb)
+Edge detection baseline with CRF post-processing and an example of remote MLflow usage.
+
 Implementation of U-Net for edge detection on synthetic maps, enhanced with Conditional Random Fields (CRF) for improved accuracy.
 The experiment proofed that edges masks won't be very useful for vertex detection task on images with high concentration of edges.
 Linked notebook however shows usage of remote `MLFlow` usage through `DataBricks` platform and integration of `CRF` as a post-processing step for edge refinement.
@@ -405,4 +499,30 @@ In this [example](./Pattern_matching/edges_detection.ipynb) edges estimations ar
 original image | label | binarized prediction | prediction
 <br><img src="resources/edge_detection2.png" alt="inference example" height="300"/>
 
+---
+
+### Oriented NMS [link](./models_src/oriented_NMS.py)
+Batched NMS for rotated boxes/segments using polygonal and Gaussian IoU backends.
+
+Batched non‑max suppression for rotated rectangles and line segments with two overlap backends: exact polygonal IoU and a fast Gaussian IoU proxy. Utilities cover box construction from vectors, pairwise grid building, best‑example gathering, and attribute masking.
+
+- Overlap backends
+  - OrientedBboxIOU: exact IoU for oriented rectangles via polygonal intersection (edge intersections + contained vertices → deduplication → angle sort → triangle‑fan area).
+  - GaussianOrientedBboxIou / gaussian_iou: soft IoU proxy using Bhattacharyya/Hellinger distance on 2D Gaussians; converts boxes/segments to Gaussian ellipses and computes all‑to‑all similarity.
+
+- NMS core
+  - OverlapsNMS: wraps tf.image.non_max_suppression_overlaps per batch. Inputs: overlaps (B, N, N), scores (B, N), and a list of attributes (B, N, ...). Outputs selected attributes padded to max_output_size and a selection mask; can also return selected indices. Configurable overlap_threshold, score_threshold, and max_output_size.
+
+- Box/segment builders and geometry helpers
+  - oriented_bbox_from_vec, oriented_square_bbox_from_vec: construct rotated or axis‑aligned rectangles from 2‑point vectors; return (bbox, angle).
+  - get_bbox_properties, bbox_gaussian_properties: derive box center/size/angle and map to Gaussian (u, Σ).
+  - line_vec_gaussian_inputs, straight_bbox_vec_gaussian_inputs, vec_bbox_gaussian_properties: Gaussian parameterization for line segments (thickness/length) or square proxies.
+  - Exact‑IoU internals: line_intersection, is_point_in_rect, parallel_intersection_points, points_duplicates_mask, convex_polygon_area, oriented_rectangle_area.
+
+- Pairwise grids and selection utilities
+  - All2AllGrid: forms all‑pairs along an axis to compute pairwise overlaps/similarities.
+  - GatherBestExamples: gathers attributes at argmax along an axis.
+  - BinaryClassMasks, MaskApply, UnflattenVec: class mask splitting, mask application, and reshaping helpers.
+
 <br><br>
+

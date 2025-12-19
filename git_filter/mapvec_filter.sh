@@ -40,6 +40,7 @@ git filter-repo \
 --path maps_vectorization/Vertex_detection/CRF_imports.py \
 --path maps_vectorization/Vertex_detection/stages_flow.ipynb \
 --path maps_vectorization/RPN_optimization.ipynb \
+--path maps_vectorization/models_src/oriented_NMS.py \
 # Architectures
 --path maps_vectorization/models_src/DETR.py \
 --path maps_vectorization/models_src/Mask_RCNN.py \
@@ -53,4 +54,5 @@ git filter-repo \
 --path maps_vectorization/RRPE.md \
 # Other
 --path maps_vectorization/models_src/Support.py \
+--path maps_vectorization/models_src/Metrics.py \
 --force \
