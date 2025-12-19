@@ -1,0 +1,21 @@
+{
+"randomize_args": {
+ "radius_range": [
+  200,
+  400
+ ],
+ "target_map_size_range": [
+  550,
+  1000
+ ],
+ "padding_range": [
+  50,
+  100
+ ]
+},
+"adjustment_args": {
+    "target_mean_size": 0.45,
+    "min_shapes_num": 10,
+    "adjust_extending": true
+}
+}

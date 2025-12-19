@@ -1,0 +1,65 @@
+{
+    "dg": {
+        "fold_size": 2048
+    },
+    "msmg": {
+        "outputs": ["img", "angle_label", "center_vec_label", "line_label", "shape_label", "thickness_label", "pattern_masks", "shape_masks", "vecs_masks", "bbox_masks", "vecs", "bboxes", "vecs_mask", "bbox_mask", "shape_thickness"],
+        "size": 32,
+        "patterns_num_range": [2,5],
+        "max_components_num": 20,
+        "color_rand_range": 0.1,
+        "use_previous_color_prob": 0.5,
+        "min_orig_shape_coverage": 0.5,
+        "grayscale": false,
+        "mask_dtype": "int8",
+        "bbox_vecs": false,
+        "patterns_prob": {
+            "line_filled": 1.0,
+            "double_line_filled": 0.5,
+            "polyline": 1.0,
+            "linear_shapes": 1.0,
+            "spreaded_shapes": 1.0
+        },
+        "line_args": {
+            "thickness_range": [1,4],
+            "progressive_thickness": false,
+            "progressive_gamma": 1.0,
+            "min_length": 3
+        },
+        "shape_args": {
+            "size_range": [2,6],
+            "types_probs": {
+                "cross": 1.0,
+                "rectangle": 1.0,
+                "triangle": 1.0,
+                "circle": 1.0
+            },
+            "filled_prob": 0.5,
+            "samples_per_unit": 4,
+            "add_borderline_prob": 0.7,
+            "borderline_thickness_range": [1,3],
+            "min_borderline_thickness_diff": 2
+        },
+        "line_filled_args": {
+            "lines_num_range": [3,8],
+            "spacing_range": [1,3],
+            "center_padding": 4,
+            "angles_prop_num": 20
+        },
+        "polyline_args": {
+            "vertices_range": [2,5],
+            "min_angle_diff": 0.2618,
+            "proposals_num": 16
+        },
+        "linear_shapes_args": {
+            "shapes_num_range": [3, 8],
+            "dist_range": [2, 10],
+            "angle_proposals_num": 16
+        },
+        "spreaded_shapes_args": {
+            "shapes_num_range": [3, 6],
+            "placement_proposals_num": 16,
+            "min_dist": 3
+        }
+    }
+}

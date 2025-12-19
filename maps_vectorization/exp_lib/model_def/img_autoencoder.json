@@ -1,0 +1,16 @@
+{
+    "model_args": {
+        "size": 32,
+        "embs_dim": 128,
+        "middle_upscales": 2,
+        "ffn_mid_layers": 2,
+        "dropout": 0.1,
+        "activation": "relu",
+        "encoding_type": "separate",
+        "name": "ImgAutoencoder"
+    },
+    "generator_module": "Adventurers.model_generators.img_autoencoder",
+    "generator_func_name": "img_autoencoder_model_generator",
+    "compiler_func": "exp_lib.compilers.img_autoencoder",
+    "compiler_func_args": {}
+}

@@ -1,0 +1,183 @@
+{
+    "model_args": {
+        "general_setting": {
+            "size": 32,
+            "activation": "relu",
+            "output_format": "concatenated",
+            "norm_ord": 2,
+            "proper_node_threshold": 2.5,
+            "masked_dist": 1000,
+            "vertices_dim": 35
+        },
+        "node_incr_args": {
+            "mode": "static",
+            "params": {
+                "initial_nodes_num": 1,
+                "nodes_per_turn": 4,
+                "max_nodes_per_node": 3,
+                "turns": 8,
+                "no_new_nodes_turn": 6,
+                "new_only": false
+            }
+        },
+        "encoding_args": {
+            "clock_emb_dim": 16,
+            "ring_emb_dim": 8,
+            "clock_reg": 1.5,
+            "ring_reg": 2.0,
+            "ring_lin_reg": 1.0,
+            "sep_ring_reg": 3.0
+        },
+        "similarity_features_args": {
+            "csf_norm": true,
+            "csf_norm_concat": true,
+            "csf_norm_dim": -2
+        },
+        "pixel_features_extraction_args": {
+            "init_ffn": true,
+            "init_ffn_args": {
+                "mid_layers": 0,
+                "mid_units": 64,
+                "output_units": 32,
+                "dropout": 0.0
+            },
+            "attn_num": 2,
+            "num_heads": 2,
+            "post_attn_ffn_args": {
+                "mid_layers": 1,
+                "mid_units": 64,
+                "dropout": 0.0
+            },
+            "add_init_features": true
+        },
+        "neck_unet_args": {
+            "out_dims": 32,
+            "out_activation": null,
+            "init_filters": 64,
+            "init_dense_layer": false,
+            "levels": 3,
+            "level_convs": 2,
+            "kernel_size": 3,
+            "pooling_size": 2,
+            "init_dropout": 0.0,
+            "dropout": 0.0,
+            "batch_normalization": false,
+            "batch_normalization_axis": -1,
+            "layers_prefix": "NeckUNet1D-",
+            "name": "NeckUNet1D"
+        },
+        "pattern_info_args": {
+            "separate_downscale": true,
+            "update_mode": "unet_add_old",
+            "down_conv_args": {
+                "output_units": 128,
+                "filters": 32,
+                "kernel_size": 3,
+                "pooling_size": 2,
+                "dropout": 0.0,
+                "phase_conv_num": 2,
+                "phases_num": 3,
+                "pooling_type": "max"
+            },
+            "mha_args": {
+                "output_dim": 32,
+                "value_dim": 32,
+                "key_dim": 128,
+                "num_heads": 4
+            },
+            "update_args": {
+                "out_activation": null,
+                "init_dense_layer": false,
+                "levels": 3,
+                "level_convs": 2,
+                "kernel_size": 3,
+                "pooling_size": 2,
+                "init_dropout": 0.0,
+                "dropout": 0.0,
+                "batch_normalization": false,
+                "batch_normalization_axis": -1,
+                "layers_prefix": "PttnUNet1D-",
+                "name": "PatternUpdateUNet1D"
+            }
+        },
+        "history_info_args": {
+            "output_norm": true,
+            "output_norm_axis": -2,
+            "down_conv_args": {
+                "output_units": 32,
+                "filters": 32,
+                "kernel_size": 3,
+                "pooling_size": 2,
+                "dropout": 0.0,
+                "phase_conv_num": 2,
+                "phases_num": 3,
+                "pooling_type": "max"
+            },
+            "out_ffn_args": {
+                "mid_layers": 2,
+                "mid_units": 64,
+                "output_units": 32,
+                "dropout": 0.0
+            }
+        },
+        "head_unet_args": {
+            "out_dims": 22,
+            "out_activation": null,
+            "init_filters": 64,
+            "init_dense_layer": false,
+            "levels": 3,
+            "level_convs": 2,
+            "kernel_size": 3,
+            "pooling_size": 2,
+            "init_dropout": 0.0,
+            "dropout": 0.0,
+            "batch_normalization": false,
+            "batch_normalization_axis": -1,
+            "layers_prefix": "HeadUNet1D-",
+            "name": "HeadUNet1D"
+        },
+        "prediction_args": {
+            "new_nodes_norm_dist": false,
+            "shift_norm_dist": false,
+            "down_conv_args": {
+                "output_units": 1,
+                "filters": 16,
+                "kernel_size": 3,
+                "pooling_size": 2,
+                "dropout": 0.0,
+                "phase_conv_num": 2,
+                "phases_num": 3,
+                "pooling_type": "max"
+            }
+        },
+        "backbone_args": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
+        "backbone_layers": {"batch_norm": "Batch-Normalization", "features": "Up-Conv_2"},
+        "lf_model_name": "NodesLF",
+        "name": "NoGame"
+    },
+    "generator_module": "Adventurers.model_generators.nogame_models",
+    "generator_func_name": "NoGame_model_generator",
+    "compiler_func": "exp_lib.compilers.nogame_simplified",
+    "compiler_func_args": {
+        "learning_rate": 0.001,
+        "node_incr_args": {
+                    "mode": "static",
+                    "params": {
+                        "initial_nodes_num": 1,
+                        "nodes_per_turn": 8,
+                        "max_nodes_per_node": 3,
+                        "turns": 3,
+                        "no_new_nodes_turn": 6,
+                        "new_only": false
+                    }
+                },
+        "assignment_threshold": 2.5,
+        "angles_num": 16,
+        "label_smoothing": 0.2,
+        "size": 32,
+        "norm_ord": 1,
+        "gamma": 10.0,
+        "inf_value": 1000,
+        "hungarian": false
+    }
+}

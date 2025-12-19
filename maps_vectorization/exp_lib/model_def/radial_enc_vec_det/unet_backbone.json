@@ -1,0 +1,34 @@
+{
+    "model_args": {
+        "enc_type": "frequency",
+        "num_heads": 2,
+        "embs_dim": 128,
+        "color_embs_dim": 16,
+        "size": 32,
+        "embs_mid_layers": 2,
+        "dropout": 0.0,
+        "activation": "relu",
+        "out_mid_layers": 2,
+        "attns_num": 3,
+        "pos_enc_matmul": false,
+        "queries_self_attn": true,
+        "queries_pos_enc_values": true,
+        "source_query_cross_attn": false,
+        "sample_queries_num": null,
+        "angle_based_preds": false,
+        "backbone_def": {"run_name": "carefree-gnat-93", "load_mlflow_weights": true, "load_mode": "mlflow"},
+        "backbone_trainable": false,
+        "backbone_last_layer": "Up-Conv_2",
+        "backbone_init_layer": "Batch-Normalization",
+        "features_update": false,
+        "thickness_pred": true,
+        "sample_points": 20
+    },
+    "generator_module": "Fourier.model_generators.radial_enc_vec_det",
+    "generator_func_name": "radial_enc_vec_detection_model_generator",
+    "compiler_func": "exp_lib.compilers.vec_detection_with_thickness",
+    "compiler_func_args": {
+        "gamma": 1,
+        "loss_weights": {"vecs": 0.6, "class": 0.25, "thickness": 0.15}
+    }
+}
